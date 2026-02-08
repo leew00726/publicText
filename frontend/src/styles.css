@@ -1,0 +1,527 @@
+﻿:root {
+  --bg: #f4f1eb;
+  --paper: #fffdf8;
+  --ink: #2e2a22;
+  --accent: #aa2e25;
+  --line: #dfd7ca;
+  --ok: #226644;
+  --warn: #8f5c00;
+  --err: #b51f1f;
+  --font-main: "Noto Serif SC", "Source Han Serif SC", serif;
+  --font-ui: "Source Han Sans SC", "PingFang SC", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  color: var(--ink);
+  background: radial-gradient(circle at 20% 10%, #fff9ef, #efe8dc 70%);
+}
+
+.page {
+  padding: 16px;
+}
+
+h2,
+h3 {
+  margin: 0;
+}
+
+.header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.row-gap {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.row-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.checkbox-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--paper);
+}
+
+.data-table th,
+.data-table td {
+  border: 1px solid var(--line);
+  padding: 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.unit-editor-card {
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.doc-title-input {
+  min-width: 240px;
+  flex: 1;
+}
+
+.editor-layout {
+  display: grid;
+  grid-template-columns: 300px 1fr 320px;
+  gap: 12px;
+}
+
+.panel {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 200px;
+}
+
+.structured-panel label,
+.selected-editor label,
+.panel label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.attachments-box {
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.attachment-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 6px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.editor-shell {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  min-height: 70vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-content {
+  padding: 12px;
+  overflow: auto;
+  font-family: "仿宋_GB2312", var(--font-main);
+  line-height: 28pt;
+  background: #f0eee9;
+}
+
+.editor-paper-shell {
+  position: relative;
+  width: 21cm;
+  margin: 0 auto;
+  background: #fff;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+}
+
+.editor-content.has-frontmatter .editor-prose-wrapper .ProseMirror {
+  padding-top: 0;
+}
+
+.frontmatter-layer {
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.frontmatter-paper {
+  padding: 3.7cm 2.5cm 0 2.7cm;
+}
+
+.frontmatter-title {
+  margin: 0;
+  text-align: center;
+  font-family: "方正小标宋简", "方正小标宋", var(--font-main);
+  font-size: 22pt;
+  line-height: 28pt;
+  font-weight: 400;
+  color: #111;
+}
+
+.frontmatter-main-to {
+  margin: 28pt 0 0 0;
+  text-indent: 0;
+  font-family: "仿宋_GB2312", "FangSong_GB2312", "仿宋", "FangSong", var(--font-main);
+  font-size: 16pt;
+  line-height: 28pt;
+  font-weight: 400;
+  color: #111;
+}
+
+.frontmatter-paper.no-title .frontmatter-main-to {
+  margin-top: 0;
+}
+
+.tailmatter-section {
+  padding: 0 2.5cm 3.5cm 2.7cm;
+}
+
+.tailmatter-sign-date {
+  margin-top: 56pt;
+}
+
+.tailmatter-signoff,
+.tailmatter-date {
+  margin: 0;
+  text-align: right;
+  text-indent: 0;
+  line-height: 28pt;
+  font-size: 16pt;
+  font-family: "仿宋_GB2312", "FangSong_GB2312", "仿宋", "FangSong", var(--font-main);
+}
+
+.tailmatter-attachments {
+  margin-top: 28pt;
+}
+
+.tailmatter-attach-label,
+.tailmatter-attach-item {
+  margin: 0;
+  text-indent: 2em;
+  line-height: 28pt;
+  font-size: 16pt;
+  font-family: "仿宋_GB2312", "FangSong_GB2312", "仿宋", "FangSong", var(--font-main);
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror {
+  width: 100%;
+  min-height: 29.7cm;
+  margin: 0 auto;
+  padding: 3.7cm 2.5cm 0 2.7cm;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+  position: relative;
+  z-index: 1;
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror p {
+  margin: 0;
+  text-indent: 2em;
+  line-height: 28pt;
+  font-size: 16pt;
+  font-family: "仿宋_GB2312", "FangSong_GB2312", "仿宋", "FangSong", var(--font-main) !important;
+  font-weight: 400;
+  font-synthesis: none;
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror li > p,
+.editor-content .editor-prose-wrapper .ProseMirror td > p,
+.editor-content .editor-prose-wrapper .ProseMirror th > p {
+  font-family: "仿宋_GB2312", "FangSong_GB2312", "仿宋", "FangSong", var(--font-main) !important;
+  font-size: 16pt;
+  line-height: 28pt;
+  font-synthesis: none;
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror h1,
+.editor-content .editor-prose-wrapper .ProseMirror h2,
+.editor-content .editor-prose-wrapper .ProseMirror h3,
+.editor-content .editor-prose-wrapper .ProseMirror h4 {
+  margin: 0;
+  text-indent: 0;
+  line-height: 28pt;
+  font-size: 16pt;
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror h1 {
+  font-family: "黑体", "SimHei", "Heiti SC", var(--font-ui) !important;
+  font-weight: 700;
+  font-synthesis: none;
+  text-indent: 2em;
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror h2 {
+  font-family: "黑体", "SimHei", "Heiti SC", var(--font-ui) !important;
+  font-weight: 400;
+  font-synthesis: none;
+  text-indent: 2em;
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror h3 {
+  font-family: "仿宋_GB2312", "FangSong_GB2312", "仿宋", "FangSong", var(--font-main) !important;
+  font-weight: 400;
+  font-synthesis: none;
+  text-indent: 2em;
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror h4 {
+  font-family: "仿宋_GB2312", "FangSong_GB2312", "仿宋", "FangSong", var(--font-main) !important;
+  font-weight: 400;
+  font-synthesis: none;
+  text-indent: 2em;
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror h1 *,
+.editor-content .editor-prose-wrapper .ProseMirror h2 *,
+.editor-content .editor-prose-wrapper .ProseMirror h3 *,
+.editor-content .editor-prose-wrapper .ProseMirror h4 * {
+  font-family: inherit !important;
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+  margin-top: 6px;
+  margin-bottom: 6px;
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror td,
+.editor-content .editor-prose-wrapper .ProseMirror th {
+  border: 1px solid #bbb;
+  padding: 4px;
+}
+
+.validation-panel .full-btn {
+  width: 100%;
+}
+
+.issues {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.issue {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.issue.error {
+  border-color: #ffcfcf;
+  background: #fff6f6;
+}
+
+.issue.warning {
+  border-color: #ffe4a8;
+  background: #fffaf0;
+}
+
+.font-status {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+}
+
+.font-status.ok {
+  background: #effaf4;
+  border: 1px solid #bce1cd;
+}
+
+.font-status.error {
+  background: #fff0f0;
+  border: 1px solid #f0c0c0;
+}
+
+.font-preview-warning {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border: 1px solid #f0c0c0;
+  background: #fff8f8;
+  color: #a52a2a;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.font-list {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.font-list .installed {
+  color: var(--ok);
+}
+
+.font-list .missing {
+  color: var(--err);
+  font-weight: 600;
+}
+
+.font-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: grid;
+  place-items: center;
+  z-index: 2000;
+}
+
+.modal {
+  width: min(90vw, 560px);
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.redhead-layout {
+  grid-template-columns: 420px 1fr;
+}
+
+.readonly-box {
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  background: #faf8f2;
+}
+
+.elements-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.element-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto auto;
+  gap: 4px;
+  align-items: center;
+}
+
+.element-row.active {
+  background: #fef4de;
+}
+
+.checkbox-row {
+  display: flex !important;
+  align-items: center;
+  gap: 6px;
+}
+
+.publish-messages .error {
+  color: var(--err);
+}
+
+.publish-messages .warning {
+  color: var(--warn);
+}
+
+.a4-preview-wrap {
+  overflow: auto;
+  padding: 8px;
+}
+
+.a4-preview {
+  position: relative;
+  background: #fff;
+  margin: 0 auto;
+  border: 1px solid #ccc;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+}
+
+.margin-box {
+  position: absolute;
+  border: 1px dashed #6f6f6f;
+}
+
+.safe-top {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: rgba(255, 0, 0, 0.05);
+  border-bottom: 1px dashed #de8a8a;
+}
+
+.preview-element.text {
+  position: absolute;
+  white-space: nowrap;
+}
+
+.preview-element.line {
+  position: absolute;
+  border-top-style: solid;
+}
+
+.preview-element.selected {
+  outline: 1px solid #0070f3;
+}
+
+@media (max-width: 1100px) {
+  .editor-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .redhead-layout {
+    grid-template-columns: 1fr;
+  }
+}

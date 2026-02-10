@@ -47,6 +47,8 @@ export function DocEditorPage() {
   const [syncToken, setSyncToken] = useState(0)
   const [saving, setSaving] = useState(false)
   const [installerOpen, setInstallerOpen] = useState(false)
+  const [aiMode, setAiMode] = useState<'formal' | 'concise' | 'polish'>('formal')
+  const [aiRewriting, setAiRewriting] = useState(false)
 
   const editorRef = useRef<Editor | null>(null)
   const importInputRef = useRef<HTMLInputElement | null>(null)
@@ -174,6 +176,43 @@ export function DocEditorPage() {
     URL.revokeObjectURL(url)
   }
 
+  const aiRewriteSelection = async () => {
+    const editor = editorRef.current
+    if (!editor) return
+
+    const { from, to } = editor.state.selection
+    if (from === to) {
+      alert('请先选中需要润色的正文文本')
+      return
+    }
+    const selectedText = editor.state.doc.textBetween(from, to, '\n', '\n').trim()
+    if (!selectedText) {
+      alert('选中的文本为空')
+      return
+    }
+
+    setAiRewriting(true)
+    try {
+      const res = await api.post<{
+        message: string
+        provider: string
+        model: string
+        rewritten: string
+      }>('/api/ai/rewrite', { text: selectedText, mode: aiMode })
+      const rewritten = (res.data.rewritten || '').trim()
+      if (!rewritten) {
+        alert('智能体未返回有效文本，请重试')
+        return
+      }
+      editor.chain().focus().insertContentAt({ from, to }, rewritten).run()
+    } catch (error: any) {
+      const detail = error?.response?.data?.detail
+      alert(typeof detail === 'string' ? detail : '智能润色失败，请检查后端 DeepSeek 配置')
+    } finally {
+      setAiRewriting(false)
+    }
+  }
+
   const handleImportClick = () => {
     importInputRef.current?.click()
   }
@@ -201,7 +240,7 @@ export function DocEditorPage() {
   return (
     <div className="page doc-editor-page">
       <div className="header-row">
-        <Link to="/">返回列表</Link>
+        <Link to="/docs">返回列表</Link>
         <input
           className="doc-title-input"
           value={doc.title}
@@ -263,6 +302,14 @@ export function DocEditorPage() {
         </button>
         <button type="button" onClick={exportDocx} disabled={!ready}>
           导出 DOCX
+        </button>
+        <select value={aiMode} onChange={(e) => setAiMode(e.target.value as 'formal' | 'concise' | 'polish')} disabled={aiRewriting}>
+          <option value="formal">智能体模式：正式</option>
+          <option value="concise">智能体模式：精简</option>
+          <option value="polish">智能体模式：润色</option>
+        </select>
+        <button type="button" onClick={aiRewriteSelection} disabled={aiRewriting}>
+          {aiRewriting ? '智能体处理中...' : '智能润色选中'}
         </button>
       </div>
 

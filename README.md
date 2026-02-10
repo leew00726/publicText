@@ -6,6 +6,7 @@
 - 红头模板（单位级、多版本、可发布）
 - 规范校验 AB（样式基础 + 标题层级/句末标点）
 - 导出 DOCX（可继续编辑）
+- DeepSeek Agent 润色（选中文本一键改写）
 - 字体强制检测（缺字体阻断导出）
 
 ## 1. 技术栈
@@ -82,6 +83,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy.ps1 -Target fronten
 cd backend
 pip install -r requirements.txt
 uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+接入 DeepSeek（OpenAI 兼容接口）需配置 `backend/.env`：
+```env
+DEEPSEEK_API_KEY=你的密钥
+DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
+DEEPSEEK_MODEL=deepseek-chat
+DEEPSEEK_TIMEOUT_SEC=45
+DEEPSEEK_TEMPERATURE=0.2
 ```
 
 前端：
@@ -181,7 +191,7 @@ npm run dev
   - `POST /api/docs/:id/check`
   - `POST /api/docs/importDocx`
   - `POST /api/docs/:id/exportDocx`
-- AI 预留
+- AI
   - `POST /api/ai/rewrite`
 
 ## 9. 内置示例数据

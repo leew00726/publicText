@@ -113,6 +113,11 @@ class StructuredFields(BaseModel):
     date: str = ""
     exportWithRedhead: bool = True
     attachments: list[AttachmentItem] = Field(default_factory=list)
+    topicId: str | None = None
+    topicName: str | None = None
+    topicTemplateId: str | None = None
+    topicTemplateVersion: int | None = None
+    topicTemplateRules: dict[str, Any] | None = None
 
 
 class DocumentBase(BaseModel):
@@ -176,3 +181,75 @@ class IdResponse(BaseModel):
 
 class ApiMessage(BaseModel):
     message: str
+
+
+class TopicCreate(BaseModel):
+    companyId: str
+    name: str = Field(min_length=1, max_length=200)
+    description: str | None = None
+
+
+class TopicOut(BaseModel):
+    id: str
+    companyId: str
+    name: str
+    code: str
+    description: str | None = None
+    status: str
+    createdAt: datetime
+    updatedAt: datetime
+
+
+class TopicDraftOut(BaseModel):
+    id: str
+    topicId: str
+    version: int
+    status: str
+    inferredRules: dict[str, Any]
+    confidenceReport: dict[str, Any]
+    agentSummary: str | None = None
+    createdAt: datetime
+    updatedAt: datetime
+
+
+class TopicTemplateOut(BaseModel):
+    id: str
+    topicId: str
+    version: int
+    rules: dict[str, Any]
+    sourceDraftId: str | None = None
+    effective: bool
+    createdAt: datetime
+
+
+class TopicAnalyzeResponse(BaseModel):
+    topicId: str
+    draft: TopicDraftOut
+
+
+class TopicReviseRequest(BaseModel):
+    instruction: str = Field(min_length=1, max_length=500)
+    patch: dict[str, Any] | None = None
+
+
+class TopicConfirmResponse(BaseModel):
+    topicId: str
+    template: TopicTemplateOut
+
+
+class TopicCreateDocRequest(BaseModel):
+    title: str | None = None
+    docType: Literal["qingshi", "jiyao", "han", "tongzhi"] | None = None
+    redheadTemplateId: str | None = None
+
+
+class DeletionAuditEventOut(BaseModel):
+    id: str
+    companyId: str
+    topicId: str | None = None
+    fileCount: int
+    totalBytes: int
+    status: str
+    errorCode: str | None = None
+    startedAt: datetime
+    endedAt: datetime

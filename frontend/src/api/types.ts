@@ -58,6 +58,11 @@ export type StructuredFields = {
   date: string
   exportWithRedhead: boolean
   attachments: AttachmentItem[]
+  topicId?: string | null
+  topicName?: string | null
+  topicTemplateId?: string | null
+  topicTemplateVersion?: number | null
+  topicTemplateRules?: Record<string, any> | null
 }
 
 export type GovDoc = {
@@ -80,4 +85,59 @@ export type CheckIssue = {
   message: string
   path: string
   level: 'error' | 'warning'
+}
+
+export type Topic = {
+  id: string
+  companyId: string
+  name: string
+  code: string
+  description?: string | null
+  status: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type TopicDraft = {
+  id: string
+  topicId: string
+  version: number
+  status: string
+  inferredRules: Record<string, any>
+  confidenceReport: Record<string, any>
+  agentSummary?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type TopicAnalyzeResponse = {
+  topicId: string
+  draft: TopicDraft
+}
+
+export type TopicTemplate = {
+  id: string
+  topicId: string
+  version: number
+  rules: Record<string, any>
+  sourceDraftId?: string | null
+  effective: boolean
+  createdAt: string
+}
+
+export type TopicConfirmResponse = {
+  topicId: string
+  template: TopicTemplate
+}
+
+export type DeletionAuditEvent = {
+  id: string
+  companyId: string
+  topicId?: string | null
+  fileCount: number
+  totalBytes: number
+  status: string
+  errorCode?: string | null
+  startedAt: string
+  endedAt: string
 }

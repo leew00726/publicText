@@ -5,6 +5,19 @@ import { api } from '../api/client'
 import type { RedheadElement, RedheadTemplate, Unit } from '../api/types'
 import { A4RedheadPreview } from '../components/A4RedheadPreview'
 
+const ELEMENT_TYPE_LABEL: Record<RedheadElement['type'], string> = {
+  text: '文本',
+  line: '红线',
+}
+
+const BIND_LABEL: Record<RedheadElement['bind'], string> = {
+  unitName: '单位名称',
+  docNo: '文号',
+  signatory: '签发人',
+  copyNo: '份号',
+  fixedText: '固定文本',
+}
+
 function newElement(type: 'text' | 'line'): RedheadElement {
   if (type === 'text') {
     return {
@@ -175,7 +188,7 @@ export function RedheadTemplateEditorPage() {
             {tpl.elements.map((e) => (
               <div key={e.id} className={`element-row ${selectedId === e.id ? 'active' : ''}`}>
                 <button type="button" onClick={() => setSelectedId(e.id)}>
-                  {e.type} / {e.bind} / y={e.yCm}
+                  {ELEMENT_TYPE_LABEL[e.type]} / {BIND_LABEL[e.bind]} / y={e.yCm}
                 </button>
                 <label className="checkbox-row">
                   <input
@@ -202,16 +215,16 @@ export function RedheadTemplateEditorPage() {
             <div className="selected-editor">
               <h3>当前元素属性</h3>
               <label>
-                bind
+                绑定字段
                 <select
                   value={selected.bind}
                   onChange={(e) => patchElement(selected.id, (old) => ({ ...old, bind: e.target.value as RedheadElement['bind'] }))}
                 >
-                  <option value="unitName">unitName</option>
-                  <option value="docNo">docNo</option>
-                  <option value="signatory">signatory</option>
-                  <option value="copyNo">copyNo</option>
-                  <option value="fixedText">fixedText</option>
+                  <option value="unitName">单位名称</option>
+                  <option value="docNo">文号</option>
+                  <option value="signatory">签发人</option>
+                  <option value="copyNo">份号</option>
+                  <option value="fixedText">固定文本</option>
                 </select>
               </label>
               <label>
@@ -224,7 +237,7 @@ export function RedheadTemplateEditorPage() {
                 />
               </label>
               <label>
-                anchor
+                锚点
                 <select
                   value={selected.x.anchor}
                   onChange={(e) =>
@@ -234,9 +247,9 @@ export function RedheadTemplateEditorPage() {
                     }))
                   }
                 >
-                  <option value="marginLeft">marginLeft</option>
-                  <option value="center">center</option>
-                  <option value="marginRight">marginRight</option>
+                  <option value="marginLeft">左边距</option>
+                  <option value="center">居中</option>
+                  <option value="marginRight">右边距</option>
                 </select>
               </label>
               <label>
@@ -260,7 +273,7 @@ export function RedheadTemplateEditorPage() {
               </label>
               {selected.bind === 'fixedText' && (
                 <label>
-                  fixedText
+                  固定文本
                   <input
                     value={selected.fixedText || ''}
                     onChange={(e) => patchElement(selected.id, (old) => ({ ...old, fixedText: e.target.value }))}
@@ -271,7 +284,7 @@ export function RedheadTemplateEditorPage() {
               {selected.type === 'text' && selected.text && (
                 <>
                   <label>
-                    align
+                    对齐方式
                     <select
                       value={selected.text.align}
                       onChange={(e) =>
@@ -281,9 +294,9 @@ export function RedheadTemplateEditorPage() {
                         }))
                       }
                     >
-                      <option value="left">left</option>
-                      <option value="center">center</option>
-                      <option value="right">right</option>
+                      <option value="left">左对齐</option>
+                      <option value="center">居中</option>
+                      <option value="right">右对齐</option>
                     </select>
                   </label>
                   <label>
@@ -330,7 +343,7 @@ export function RedheadTemplateEditorPage() {
               {selected.type === 'line' && selected.line && (
                 <>
                   <label>
-                    lengthMode
+                    长度模式
                     <select
                       value={selected.line.lengthMode}
                       onChange={(e) =>
@@ -340,8 +353,8 @@ export function RedheadTemplateEditorPage() {
                         }))
                       }
                     >
-                      <option value="contentWidth">contentWidth</option>
-                      <option value="custom">custom</option>
+                      <option value="contentWidth">版心宽</option>
+                      <option value="custom">自定义</option>
                     </select>
                   </label>
                   <label>

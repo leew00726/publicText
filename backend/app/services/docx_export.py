@@ -194,26 +194,51 @@ def _apply_header_template(doc: Document, template: dict[str, Any], structured_f
         prev_y = y_cm
 
 
-def _apply_body_paragraph_style(paragraph):
-    paragraph.paragraph_format.line_spacing = Pt(28)
-    paragraph.paragraph_format.first_line_indent = Pt(32)
-    paragraph.paragraph_format.space_before = Pt(0)
-    paragraph.paragraph_format.space_after = Pt(0)
+def _safe_float(value: Any, default: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
 
 
-def _apply_heading_style(paragraph, level: int):
-    paragraph.paragraph_format.line_spacing = Pt(28)
-    paragraph.paragraph_format.first_line_indent = Pt(32) if level in {1, 2, 3, 4} else Pt(0)
-    paragraph.paragraph_format.space_before = Pt(0)
-    paragraph.paragraph_format.space_after = Pt(0)
+def _resolve_topic_style_rules(structured_fields: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    rules = structured_fields.get("topicTemplateRules")
+    if not isinstance(rules, dict):
+        return {}, {}
 
-    style_map = {
+    body = rules.get("body") if isinstance(rules.get("body"), dict) else {}
+    headings = rules.get("headings") if isinstance(rules.get("headings"), dict) else {}
+    return body, headings
+
+
+def _apply_body_paragraph_style(paragraph, body_style: dict[str, Any]):
+    paragraph.paragraph_format.line_spacing = Pt(_safe_float(body_style.get("lineSpacingPt"), 28))
+    paragraph.paragraph_format.first_line_indent = Pt(_safe_float(body_style.get("firstLineIndentPt"), 32))
+    paragraph.paragraph_format.space_before = Pt(_safe_float(body_style.get("spaceBeforePt"), 0))
+    paragraph.paragraph_format.space_after = Pt(_safe_float(body_style.get("spaceAfterPt"), 0))
+
+
+def _apply_heading_style(paragraph, level: int, heading_styles: dict[str, Any]):
+    level_key = f"level{level}"
+    level_style = heading_styles.get(level_key) if isinstance(heading_styles.get(level_key), dict) else {}
+
+    paragraph.paragraph_format.line_spacing = Pt(_safe_float(level_style.get("lineSpacingPt"), 28))
+    paragraph.paragraph_format.first_line_indent = Pt(_safe_float(level_style.get("firstLineIndentPt"), 32))
+    paragraph.paragraph_format.space_before = Pt(_safe_float(level_style.get("spaceBeforePt"), 0))
+    paragraph.paragraph_format.space_after = Pt(_safe_float(level_style.get("spaceAfterPt"), 0))
+
+    default_style_map = {
         1: ("黑体", 16, False),
         2: ("黑体", 16, False),
         3: ("仿宋_GB2312", 16, False),
         4: ("仿宋_GB2312", 16, False),
     }
-    return style_map.get(level, ("仿宋_GB2312", 16, False))
+    default_family, default_size, default_bold = default_style_map.get(level, ("仿宋_GB2312", 16, False))
+
+    family = level_style.get("fontFamily") or default_family
+    size = _safe_float(level_style.get("fontSizePt"), default_size)
+    bold = bool(level_style.get("bold", default_bold))
+    return family, size, bold
 
 
 def _iter_nodes(doc_json: dict[str, Any]) -> list[dict[str, Any]]:
@@ -242,6 +267,7 @@ def export_docx(
     _insert_page_number(footer_para)
 
     structured_fields = document_data.get("structuredFields", {})
+    body_style, heading_styles = _resolve_topic_style_rules(structured_fields)
     if include_redhead:
         _apply_header_template(doc, redhead_template, structured_fields, unit_name)
 
@@ -267,7 +293,7 @@ def export_docx(
         if ntype == "heading":
             level = int((node.get("attrs") or {}).get("level", 1))
             p = doc.add_paragraph()
-            family, size, bold = _apply_heading_style(p, level)
+            family, size, bold = _apply_heading_style(p, level, heading_styles)
             text = _node_text(node)
             r = p.add_run(text)
             _set_run_font(r, family, size, bold)
@@ -275,10 +301,15 @@ def export_docx(
 
         if ntype == "paragraph":
             p = doc.add_paragraph()
-            _apply_body_paragraph_style(p)
+            _apply_body_paragraph_style(p, body_style)
             text = _node_text(node)
             r = p.add_run(text)
-            _set_run_font(r, "仿宋_GB2312", 16)
+            _set_run_font(
+                r,
+                body_style.get("fontFamily", "仿宋_GB2312"),
+                _safe_float(body_style.get("fontSizePt"), 16),
+                bool(body_style.get("bold", False)),
+            )
             continue
 
         if ntype == "table":

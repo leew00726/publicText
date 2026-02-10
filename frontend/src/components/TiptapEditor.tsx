@@ -86,7 +86,7 @@ function normalizeAttachmentName(name: string): string {
   return (name || '')
     .trim()
     .replace(/\.[a-zA-Z0-9]{1,8}$/g, '')
-    .replace(/[。；，、,.!?？！：:;]+$/g, '')
+    .replace(/[。；，、.!?！？;:]+$/g, '')
 }
 
 function formatDateZh(dateStr?: string): string {

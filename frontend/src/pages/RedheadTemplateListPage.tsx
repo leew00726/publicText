@@ -5,6 +5,12 @@ import { api } from '../api/client'
 import type { RedheadTemplate, Unit } from '../api/types'
 import { buildDefaultTemplateA } from '../utils/redheadDefaults'
 
+const STATUS_LABEL: Record<string, string> = {
+  draft: '草稿',
+  published: '已发布',
+  disabled: '已停用',
+}
+
 export function RedheadTemplateListPage() {
   const navigate = useNavigate()
   const [units, setUnits] = useState<Unit[]>([])
@@ -100,7 +106,7 @@ export function RedheadTemplateListPage() {
             <tr key={tpl.id}>
               <td>{tpl.name}</td>
               <td>{tpl.version}</td>
-              <td>{tpl.status}</td>
+              <td>{STATUS_LABEL[tpl.status] || tpl.status}</td>
               <td>{tpl.isDefault ? '是' : '否'}</td>
               <td>{new Date(tpl.updatedAt).toLocaleString()}</td>
               <td className="row-gap">

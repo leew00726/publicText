@@ -64,7 +64,10 @@ def _sample_body(doc_type: str) -> dict:
     }
 
 
-def seed_data(db: Session):
+def seed_data(db: Session, enabled: bool = False):
+    if not enabled:
+        return
+
     if db.query(Unit).count() > 0:
         return
 

@@ -1,7 +1,9 @@
 import io
 import os
 import unittest
+import uuid
 from pathlib import Path
+from unittest.mock import patch
 
 from docx import Document
 from fastapi.testclient import TestClient
@@ -28,6 +30,10 @@ def _docx_bytes(text: str = "示例正文") -> bytes:
     return bio.getvalue()
 
 
+def _fake_pdf_bytes() -> bytes:
+    return b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF"
+
+
 class TopicApiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -44,7 +50,7 @@ class TopicApiTests(unittest.TestCase):
             DB_PATH.unlink()
 
     def test_topic_flow_endpoints(self) -> None:
-        company_resp = self.client.post("/api/units", json={"name": "topic_api_company"})
+        company_resp = self.client.post("/api/units", json={"name": f"topic_api_company_{uuid.uuid4().hex[:8]}"})
         self.assertEqual(company_resp.status_code, 200)
         company_id = company_resp.json()["id"]
 
@@ -56,6 +62,10 @@ class TopicApiTests(unittest.TestCase):
         topic = created.json()
         self.assertEqual(topic["status"], "active")
         topic_id = topic["id"]
+
+        topic_detail = self.client.get(f"/api/topics/{topic_id}")
+        self.assertEqual(topic_detail.status_code, 200)
+        self.assertEqual(topic_detail.json()["id"], topic_id)
 
         listed = self.client.get("/api/topics", params={"companyId": company_id})
         self.assertEqual(listed.status_code, 200)
@@ -107,6 +117,17 @@ class TopicApiTests(unittest.TestCase):
         self.assertEqual(confirmed.status_code, 200)
         template = confirmed.json()["template"]
         self.assertTrue(template["effective"])
+        first_template_id = template["id"]
+        first_template_version = template["version"]
+
+        revised_again = self.client.post(
+            f"/api/topics/{topic_id}/agent/revise",
+            json={"instruction": "正文改成仿宋_GB2312", "patch": {"body": {"fontFamily": "仿宋_GB2312"}}},
+        )
+        self.assertEqual(revised_again.status_code, 200)
+
+        confirmed_again = self.client.post(f"/api/topics/{topic_id}/confirm-template")
+        self.assertEqual(confirmed_again.status_code, 200)
 
         templates = self.client.get(f"/api/topics/{topic_id}/templates")
         self.assertEqual(templates.status_code, 200)
@@ -125,7 +146,7 @@ class TopicApiTests(unittest.TestCase):
         effective = next(item for item in templates.json() if item["effective"])
         create_doc = self.client.post(
             f"/api/topics/{topic_id}/docs",
-            json={"title": "周例会纪要（新建）"},
+            json={"title": "周例会纪要（新建）", "topicTemplateId": first_template_id},
         )
         self.assertEqual(create_doc.status_code, 200)
         created_doc_id = create_doc.json()["id"]
@@ -135,8 +156,45 @@ class TopicApiTests(unittest.TestCase):
         self.assertEqual(created_doc.json()["unitId"], company_id)
         self.assertEqual(created_doc.json()["docType"], "jiyao")
         self.assertEqual(sf["topicId"], topic_id)
-        self.assertEqual(sf["topicTemplateId"], effective["id"])
-        self.assertEqual(sf["topicTemplateVersion"], effective["version"])
+        self.assertEqual(sf["topicTemplateId"], first_template_id)
+        self.assertEqual(sf["topicTemplateVersion"], first_template_version)
+
+    @patch("app.routers.topics.extract_pdf_features", create=True)
+    def test_topic_analyze_accepts_pdf_file(self, mock_extract_pdf) -> None:
+        mock_extract_pdf.return_value = {
+            "body": {"fontFamily": "仿宋_GB2312", "fontSizePt": 16},
+            "headings": {},
+            "page": {"marginsCm": {}},
+        }
+
+        company_resp = self.client.post("/api/units", json={"name": f"topic_pdf_company_{uuid.uuid4().hex[:8]}"})
+        self.assertEqual(company_resp.status_code, 200)
+        company_id = company_resp.json()["id"]
+
+        created = self.client.post(
+            "/api/topics",
+            json={"companyId": company_id, "name": "PDF训练题材", "description": "测试PDF"},
+        )
+        self.assertEqual(created.status_code, 200)
+        topic_id = created.json()["id"]
+
+        analyze = self.client.post(
+            f"/api/topics/{topic_id}/analyze",
+            files=[
+                (
+                    "files",
+                    (
+                        "sample.pdf",
+                        _fake_pdf_bytes(),
+                        "application/pdf",
+                    ),
+                ),
+            ],
+        )
+        self.assertEqual(analyze.status_code, 200)
+        body = analyze.json()
+        self.assertIn("draft", body)
+        self.assertEqual(body["draft"]["status"], "draft")
 
 
 if __name__ == "__main__":

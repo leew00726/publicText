@@ -22,7 +22,7 @@ from app.schemas import (
     TopicTemplateOut,
     UnitOut,
 )
-from app.services.topic_inference import extract_docx_features, infer_topic_rules
+from app.services.topic_inference import extract_docx_features, extract_pdf_features, infer_topic_rules
 
 router = APIRouter(tags=["topics"])
 
@@ -143,6 +143,14 @@ def list_topics(companyId: str, db: Session = Depends(get_db)):
     return [_topic_out(row) for row in rows]
 
 
+@router.get("/api/topics/{topic_id}", response_model=TopicOut)
+def get_topic(topic_id: str, db: Session = Depends(get_db)):
+    topic = db.query(Topic).filter(Topic.id == topic_id).first()
+    if not topic:
+        raise HTTPException(status_code=404, detail="题材不存在")
+    return _topic_out(topic)
+
+
 @router.post("/api/topics", response_model=TopicOut)
 def create_topic(payload: TopicCreate, db: Session = Depends(get_db)):
     company = db.query(Unit).filter(Unit.id == payload.companyId).first()
@@ -172,7 +180,7 @@ async def analyze_topic(topic_id: str, files: list[UploadFile] = File(...), db: 
     if not topic:
         raise HTTPException(status_code=404, detail="题材不存在")
     if not files:
-        raise HTTPException(status_code=400, detail="请至少上传一个 DOCX 文件")
+        raise HTTPException(status_code=400, detail="请至少上传一个 DOCX 或 PDF 文件")
 
     started_at = datetime.utcnow()
     total_bytes = 0
@@ -182,13 +190,19 @@ async def analyze_topic(topic_id: str, files: list[UploadFile] = File(...), db: 
         features_list: list[dict] = []
         for file in files:
             filename = (file.filename or "").lower()
-            if not filename.endswith(".docx"):
-                raise HTTPException(status_code=400, detail="仅支持 DOCX 文件")
             data = await file.read()
             total_bytes += len(data)
             if not data:
                 continue
-            features_list.append(extract_docx_features(data))
+            try:
+                if filename.endswith(".docx"):
+                    features_list.append(extract_docx_features(data))
+                elif filename.endswith(".pdf"):
+                    features_list.append(extract_pdf_features(data))
+                else:
+                    raise HTTPException(status_code=400, detail="仅支持 DOCX 或 PDF 文件")
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
 
         rules, confidence = infer_topic_rules(features_list)
         latest = (
@@ -357,19 +371,28 @@ def create_doc_from_topic(topic_id: str, payload: TopicCreateDocRequest, db: Ses
     if not topic:
         raise HTTPException(status_code=404, detail="题材不存在")
 
-    template = (
-        db.query(TopicTemplate)
-        .filter(TopicTemplate.topic_id == topic_id, TopicTemplate.effective.is_(True))
-        .order_by(TopicTemplate.version.desc())
-        .first()
-    )
-    if not template:
+    if payload.topicTemplateId:
         template = (
             db.query(TopicTemplate)
-            .filter(TopicTemplate.topic_id == topic_id)
+            .filter(TopicTemplate.id == payload.topicTemplateId, TopicTemplate.topic_id == topic_id)
+            .first()
+        )
+        if not template:
+            raise HTTPException(status_code=400, detail="指定题材模板无效")
+    else:
+        template = (
+            db.query(TopicTemplate)
+            .filter(TopicTemplate.topic_id == topic_id, TopicTemplate.effective.is_(True))
             .order_by(TopicTemplate.version.desc())
             .first()
         )
+        if not template:
+            template = (
+                db.query(TopicTemplate)
+                .filter(TopicTemplate.topic_id == topic_id)
+                .order_by(TopicTemplate.version.desc())
+                .first()
+            )
 
     redhead_template_id = payload.redheadTemplateId
     if redhead_template_id:

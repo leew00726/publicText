@@ -1,10 +1,11 @@
 import io
 import unittest
+from unittest.mock import MagicMock, patch
 
 from docx import Document
 from docx.shared import Pt
 
-from app.services.topic_inference import extract_docx_features, infer_topic_rules
+from app.services.topic_inference import extract_docx_features, extract_pdf_features, infer_topic_rules
 
 
 def _build_docx_bytes(body_font: str, heading_font: str, heading_size_pt: float, body_size_pt: float) -> bytes:
@@ -52,6 +53,33 @@ class TopicInferenceTests(unittest.TestCase):
     def test_infer_topic_rules_rejects_empty_features(self) -> None:
         with self.assertRaises(ValueError):
             infer_topic_rules([])
+
+    @patch("app.services.topic_inference.PdfReader")
+    def test_extract_pdf_features_reads_font_and_size(self, mock_reader) -> None:
+        page = MagicMock()
+
+        def fake_extract_text(visitor_text=None):
+            if visitor_text:
+                visitor_text("标题", None, None, {"/BaseFont": "/ABCDEE+SimHei"}, 16)
+                visitor_text("正文", None, None, {"/BaseFont": "/ABCDEE+FangSong_GB2312"}, 14)
+                visitor_text("正文2", None, None, {"/BaseFont": "/ABCDEE+FangSong_GB2312"}, 14)
+            return "标题 正文 正文2"
+
+        page.extract_text.side_effect = fake_extract_text
+        mock_reader.return_value.pages = [page]
+
+        features = extract_pdf_features(b"%PDF-1.4")
+        self.assertEqual(features["body"]["fontFamily"], "FangSong_GB2312")
+        self.assertEqual(features["body"]["fontSizePt"], 14)
+
+    @patch("app.services.topic_inference.PdfReader")
+    def test_extract_pdf_features_rejects_scanned_pdf(self, mock_reader) -> None:
+        page = MagicMock()
+        page.extract_text.return_value = ""
+        mock_reader.return_value.pages = [page]
+
+        with self.assertRaises(ValueError):
+            extract_pdf_features(b"%PDF-1.4")
 
 
 if __name__ == "__main__":

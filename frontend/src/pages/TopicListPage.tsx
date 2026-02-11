@@ -110,7 +110,7 @@ export function TopicListPage() {
                 <td>{new Date(topic.updatedAt).toLocaleString()}</td>
                 <td>
                   <button type="button" onClick={() => navigate(`/topics/${topic.id}`)}>
-                    进入
+                    进入正文编辑
                   </button>
                 </td>
               </tr>

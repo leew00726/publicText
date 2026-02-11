@@ -241,6 +241,7 @@ class TopicCreateDocRequest(BaseModel):
     title: str | None = None
     docType: Literal["qingshi", "jiyao", "han", "tongzhi"] | None = None
     redheadTemplateId: str | None = None
+    topicTemplateId: str | None = None
 
 
 class DeletionAuditEventOut(BaseModel):

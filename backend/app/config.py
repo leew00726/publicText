@@ -5,8 +5,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "Public Text MVP"
     database_url: str = "postgresql+psycopg2://postgres:postgres@postgres:5432/public_text"
-    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174"
-    cors_origin_regex: str = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+    cors_origins: str = "http://localhost:5174,http://127.0.0.1:5174"
+    cors_origin_regex: str = r"^https?://(localhost|127\.0\.0\.1):5174$"
     seed_demo_data: bool = False
     minio_endpoint: str = "minio:9000"
     minio_access_key: str = "minioadmin"

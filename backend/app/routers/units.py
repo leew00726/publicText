@@ -6,9 +6,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import RedheadTemplate, Unit
+from app.models import DeletionAuditEvent, Document, DocumentFile, RedheadTemplate, Topic, TopicTemplate, TopicTemplateDraft, Unit
 from app.schemas import ApiMessage, UnitCreate, UnitOut, UnitUpdate
 from app.services.constants import default_redhead_template_a, default_redhead_template_b
+from app.services.storage import storage_service
 
 router = APIRouter(prefix="/api/units", tags=["units"])
 
@@ -94,4 +95,38 @@ def update_unit(unit_id: str, payload: UnitUpdate, db: Session = Depends(get_db)
         db.rollback()
         raise HTTPException(status_code=409, detail="单位名称已存在")
 
+    return ApiMessage(message="ok")
+
+
+@router.delete("/{unit_id}", response_model=ApiMessage)
+def delete_unit(unit_id: str, db: Session = Depends(get_db)):
+    row = db.query(Unit).filter(Unit.id == unit_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="单位不存在")
+
+    topic_ids = [
+        topic_id
+        for (topic_id,) in db.query(Topic.id).filter(Topic.company_id == unit_id).all()
+    ]
+    if topic_ids:
+        db.query(TopicTemplate).filter(TopicTemplate.topic_id.in_(topic_ids)).delete(synchronize_session=False)
+        db.query(TopicTemplateDraft).filter(TopicTemplateDraft.topic_id.in_(topic_ids)).delete(synchronize_session=False)
+        db.query(DeletionAuditEvent).filter(DeletionAuditEvent.topic_id.in_(topic_ids)).delete(synchronize_session=False)
+        db.query(Topic).filter(Topic.id.in_(topic_ids)).delete(synchronize_session=False)
+
+    doc_ids = [
+        doc_id
+        for (doc_id,) in db.query(Document.id).filter(Document.unit_id == unit_id).all()
+    ]
+    if doc_ids:
+        file_rows = db.query(DocumentFile).filter(DocumentFile.document_id.in_(doc_ids)).all()
+        for item in file_rows:
+            storage_service.delete_object(item.object_name)
+        db.query(DocumentFile).filter(DocumentFile.document_id.in_(doc_ids)).delete(synchronize_session=False)
+        db.query(Document).filter(Document.id.in_(doc_ids)).delete(synchronize_session=False)
+
+    db.query(DeletionAuditEvent).filter(DeletionAuditEvent.company_id == unit_id).delete(synchronize_session=False)
+    db.query(RedheadTemplate).filter(RedheadTemplate.unit_id == unit_id).delete(synchronize_session=False)
+    db.delete(row)
+    db.commit()
     return ApiMessage(message="ok")

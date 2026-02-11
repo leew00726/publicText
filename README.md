@@ -72,7 +72,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy.ps1 -Target fronten
 ```
 
 访问：
-- 前端：`http://localhost:5173`
+- 前端：`http://localhost:5174`
 - 后端：`http://localhost:8000`
 - MinIO Console：`http://localhost:9001`（账号 `minioadmin/minioadmin`）
 

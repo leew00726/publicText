@@ -6,6 +6,11 @@ from typing import Any
 
 from docx import Document
 
+try:
+    from pypdf import PdfReader
+except Exception:  # pragma: no cover - runtime dependency fallback
+    PdfReader = None
+
 
 def _normalize_value(value: Any) -> Any:
     if isinstance(value, float):
@@ -102,6 +107,70 @@ def extract_docx_features(data: bytes) -> dict[str, Any]:
     headings = {f"level{level}": _summarize_samples(samples) for level, samples in heading_samples.items()}
 
     return {"body": body, "headings": headings, "page": {"marginsCm": margins}}
+
+
+def _normalize_pdf_font_name(raw_name: Any) -> str | None:
+    if raw_name is None:
+        return None
+    value = str(raw_name).strip()
+    if not value:
+        return None
+    if value.startswith("/"):
+        value = value[1:]
+    if "+" in value:
+        value = value.split("+", 1)[1]
+    return value or None
+
+
+def extract_pdf_features(data: bytes) -> dict[str, Any]:
+    if PdfReader is None:
+        raise ValueError("当前环境缺少 PDF 解析依赖，请安装 pypdf。")
+
+    try:
+        reader = PdfReader(io.BytesIO(data))
+    except Exception as exc:  # pragma: no cover - parser dependent
+        raise ValueError("PDF 解析失败，请确认文件未损坏。") from exc
+
+    body_samples: list[dict[str, Any]] = []
+    text_parts: list[str] = []
+
+    for page in reader.pages:
+        page_has_visitor = {"called": False}
+
+        def visitor_text(text, _cm, _tm, font_dict, font_size):
+            page_has_visitor["called"] = True
+            text_value = (text or "").strip()
+            if not text_value:
+                return
+            text_parts.append(text_value)
+            sample = {
+                "fontFamily": _normalize_pdf_font_name((font_dict or {}).get("/BaseFont") if isinstance(font_dict, dict) else None),
+                "fontSizePt": _normalize_value(font_size if isinstance(font_size, (int, float)) else None),
+            }
+            if sample["fontFamily"] is not None or sample["fontSizePt"] is not None:
+                body_samples.append(sample)
+
+        try:
+            text = page.extract_text(visitor_text=visitor_text)
+            if isinstance(text, str) and text.strip():
+                text_parts.append(text.strip())
+        except TypeError:
+            text = page.extract_text()
+            if isinstance(text, str) and text.strip():
+                text_parts.append(text.strip())
+        except Exception as exc:  # pragma: no cover - parser dependent
+            raise ValueError("PDF 文本提取失败，请尝试转换为 DOCX 后再训练。") from exc
+
+        if not page_has_visitor["called"] and not text_parts:
+            fallback = page.extract_text()
+            if isinstance(fallback, str) and fallback.strip():
+                text_parts.append(fallback.strip())
+
+    if not "".join(text_parts).strip():
+        raise ValueError("未能从 PDF 提取到正文文本，可能是扫描件。请先 OCR 或上传 DOCX。")
+
+    body = _summarize_samples(body_samples) if body_samples else {}
+    return {"body": body, "headings": {}, "page": {"marginsCm": {}}}
 
 
 def _summarize_samples(samples: list[dict[str, Any]]) -> dict[str, Any]:

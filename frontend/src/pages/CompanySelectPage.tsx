@@ -11,6 +11,7 @@ export function CompanySelectPage() {
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [creating, setCreating] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -44,6 +45,22 @@ export function CompanySelectPage() {
       alert(String(message))
     } finally {
       setCreating(false)
+    }
+  }
+
+  const deleteCompany = async (company: Unit) => {
+    const confirmed = window.confirm(`确认删除公司“${company.name}”？该操作会删除其关联题材、文档和模板。`)
+    if (!confirmed) return
+
+    setDeletingId(company.id)
+    try {
+      await api.delete(`/api/units/${company.id}`)
+      await load()
+    } catch (error: any) {
+      const message = error?.response?.data?.detail || '删除公司失败'
+      alert(String(message))
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -86,9 +103,14 @@ export function CompanySelectPage() {
                 <td>{company.name}</td>
                 <td>{company.code}</td>
                 <td>
-                  <button type="button" onClick={() => navigate(`/companies/${company.id}/topics`)}>
-                    进入题材库
-                  </button>
+                  <div className="row-gap">
+                    <button type="button" onClick={() => navigate(`/companies/${company.id}/topics`)}>
+                      进入题材库
+                    </button>
+                    <button type="button" onClick={() => void deleteCompany(company)} disabled={deletingId === company.id}>
+                      {deletingId === company.id ? '删除中...' : '删除'}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

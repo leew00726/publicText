@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type { RedheadTemplate, Unit } from '../api/types'
@@ -76,7 +76,6 @@ export function RedheadTemplateListPage() {
   return (
     <div className="page">
       <div className="header-row">
-        <Link to="/">返回文档</Link>
         <h2>红头模板列表</h2>
         <select value={unitId} onChange={(e) => setUnitId(e.target.value)}>
           {units.map((u) => (

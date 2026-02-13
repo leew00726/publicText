@@ -81,6 +81,15 @@ export function summarizeRulesAsNarrative(inferredRules: AnyRecord): string[] {
     return formatRuleLine(path, value)
   }).filter((item): item is string => Boolean(item))
 
+  const contentTemplate = inferredRules?.contentTemplate as AnyRecord | undefined
+  if (contentTemplate && typeof contentTemplate === 'object') {
+    const leadingCount = Array.isArray(contentTemplate.leadingNodes) ? contentTemplate.leadingNodes.length : 0
+    const trailingCount = Array.isArray(contentTemplate.trailingNodes) ? contentTemplate.trailingNodes.length : 0
+    if (leadingCount > 0 || trailingCount > 0) {
+      lines.push(`已抽取固定前置区块 ${leadingCount} 段、固定后置区块 ${trailingCount} 段，新建正文将自动带出。`)
+    }
+  }
+
   if (lines.length > 0) return lines
   return ['暂无可读版式规则，请先上传可解析训练材料。']
 }

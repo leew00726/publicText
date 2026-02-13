@@ -227,9 +227,16 @@ class TopicAnalyzeResponse(BaseModel):
     draft: TopicDraftOut
 
 
+class TopicRevisionMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4000)
+
+
 class TopicReviseRequest(BaseModel):
     instruction: str = Field(min_length=1, max_length=500)
     patch: dict[str, Any] | None = None
+    useDeepSeek: bool = False
+    conversation: list[TopicRevisionMessage] = Field(default_factory=list)
 
 
 class TopicConfirmResponse(BaseModel):

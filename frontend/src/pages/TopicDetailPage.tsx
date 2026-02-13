@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type { DeletionAuditEvent, TopicAnalyzeResponse, TopicConfirmResponse, TopicDraft, TopicTemplate } from '../api/types'
@@ -16,9 +16,13 @@ const AUDIT_STATUS_LABEL: Record<string, string> = {
   failed: '失败',
 }
 
+type RevisionMessage = {
+  role: 'user' | 'assistant'
+  content: string
+}
+
 export function TopicDetailPage() {
   const { topicId = '' } = useParams()
-  const navigate = useNavigate()
 
   const [draft, setDraft] = useState<TopicDraft | null>(null)
   const [templates, setTemplates] = useState<TopicTemplate[]>([])
@@ -27,9 +31,12 @@ export function TopicDetailPage() {
   const [analyzing, setAnalyzing] = useState(false)
   const [revising, setRevising] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null)
   const [files, setFiles] = useState<File[]>([])
   const [instruction, setInstruction] = useState('')
   const [bodyFontFamily, setBodyFontFamily] = useState('')
+  const [useDeepSeek, setUseDeepSeek] = useState(true)
+  const [conversation, setConversation] = useState<RevisionMessage[]>([])
   const [message, setMessage] = useState('')
 
   const load = async () => {
@@ -95,15 +102,26 @@ export function TopicDetailPage() {
     }
 
     const patch = bodyFontFamily.trim() ? { body: { fontFamily: bodyFontFamily.trim() } } : undefined
+    const userMessage: RevisionMessage = { role: 'user', content: text }
     setRevising(true)
     setMessage('')
     try {
       const res = await api.post<TopicDraft>(`/api/topics/${topicId}/agent/revise`, {
         instruction: text,
         patch,
+        useDeepSeek,
+        conversation: useDeepSeek ? conversation : [],
       })
       setDraft(res.data)
-      setMessage('已生成新的修订草稿版本。')
+      if (useDeepSeek) {
+        const nextConversation = [...conversation, userMessage]
+        const assistantReply = (res.data.agentSummary || '').trim()
+        if (assistantReply) {
+          nextConversation.push({ role: 'assistant', content: assistantReply })
+        }
+        setConversation(nextConversation)
+      }
+      setMessage(useDeepSeek ? 'DeepSeek 已生成新的修订草稿版本。' : '已生成新的修订草稿版本。')
       setInstruction('')
       setBodyFontFamily('')
     } catch (error: any) {
@@ -130,6 +148,27 @@ export function TopicDetailPage() {
     }
   }
 
+  const deleteTemplate = async (template: TopicTemplate) => {
+    if (!topicId) return
+    const confirmed = window.confirm(
+      `确认删除模板 v${template.version}${template.effective ? '（当前生效）' : ''}？`,
+    )
+    if (!confirmed) return
+
+    setDeletingTemplateId(template.id)
+    setMessage('')
+    try {
+      await api.delete(`/api/topics/${topicId}/templates/${template.id}`)
+      setMessage(`模板 v${template.version} 已删除。`)
+      await load()
+    } catch (error: any) {
+      const detail = error?.response?.data?.detail || '删除模板失败'
+      alert(String(detail))
+    } finally {
+      setDeletingTemplateId(null)
+    }
+  }
+
   const rulesNarrative = draft ? summarizeRulesAsNarrative(draft.inferredRules) : []
   const confidenceNarrative = draft ? summarizeConfidenceAsNarrative(draft.confidenceReport) : []
 
@@ -137,9 +176,6 @@ export function TopicDetailPage() {
     <div className="page">
       <div className="header-row">
         <h2>模板训练</h2>
-        <button type="button" onClick={() => navigate(`/topics/${topicId}`)}>
-          返回正文编辑
-        </button>
       </div>
 
       <div className="unit-editor-card">
@@ -172,6 +208,31 @@ export function TopicDetailPage() {
           正文字体（可选）
           <input value={bodyFontFamily} onChange={(e) => setBodyFontFamily(e.target.value)} placeholder="例如：宋体" />
         </label>
+        <label className="checkbox-inline">
+          <input type="checkbox" checked={useDeepSeek} onChange={(e) => setUseDeepSeek(e.target.checked)} />
+          使用 DeepSeek 对话修订
+        </label>
+        {useDeepSeek ? (
+          <div>
+            <div className="row-gap">
+              <strong>对话上下文</strong>
+              <button type="button" onClick={() => setConversation([])} disabled={revising || conversation.length === 0}>
+                清空对话
+              </button>
+            </div>
+            {conversation.length === 0 ? (
+              <p>当前无历史对话，首次指令会作为对话起点。</p>
+            ) : (
+              <ul className="narrative-list">
+                {conversation.map((item, idx) => (
+                  <li key={`${idx}-${item.role}-${item.content.slice(0, 16)}`}>
+                    {item.role === 'user' ? '你' : 'DeepSeek'}：{item.content}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ) : null}
         <div className="row-gap">
           <button type="button" onClick={() => void revise()} disabled={revising || !draft}>
             {revising ? '修订中...' : '生成修订草稿'}
@@ -229,6 +290,7 @@ export function TopicDetailPage() {
                   <th>版本</th>
                   <th>是否生效</th>
                   <th>创建时间</th>
+                  <th>操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -237,6 +299,15 @@ export function TopicDetailPage() {
                     <td>v{item.version}</td>
                     <td>{item.effective ? '是' : '否'}</td>
                     <td>{new Date(item.createdAt).toLocaleString()}</td>
+                    <td>
+                      <button
+                        type="button"
+                        onClick={() => void deleteTemplate(item)}
+                        disabled={deletingTemplateId === item.id}
+                      >
+                        {deletingTemplateId === item.id ? '删除中...' : '删除'}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

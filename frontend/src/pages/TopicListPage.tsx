@@ -17,8 +17,8 @@ export function TopicListPage() {
   const [topics, setTopics] = useState<Topic[]>([])
   const [loading, setLoading] = useState(false)
   const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
   const [creating, setCreating] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const load = async () => {
     if (!companyId) return
@@ -53,10 +53,8 @@ export function TopicListPage() {
       await api.post<Topic>('/api/topics', {
         companyId,
         name: topicName,
-        description: description.trim() || undefined,
       })
       setName('')
-      setDescription('')
       await load()
     } catch (error: any) {
       const message = error?.response?.data?.detail || '新建题材失败'
@@ -66,20 +64,32 @@ export function TopicListPage() {
     }
   }
 
+  const deleteTopic = async (topic: Topic) => {
+    const confirmed = window.confirm(`确认删除题材“${topic.name}”？该操作会删除其模板草稿与审计记录。`)
+    if (!confirmed) return
+
+    setDeletingId(topic.id)
+    try {
+      await api.delete(`/api/topics/${topic.id}`)
+      await load()
+    } catch (error: any) {
+      const message = error?.response?.data?.detail || '删除题材失败'
+      alert(String(message))
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   return (
     <div className="page">
       <div className="header-row">
         <h2>题材库{currentCompany ? ` - ${currentCompany.name}` : ''}</h2>
-        <button type="button" onClick={() => navigate('/')}>
-          返回公司选择
-        </button>
       </div>
 
       <div className="unit-editor-card">
         <strong>新建题材</strong>
         <div className="row-gap">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="例如：周例会纪要" />
-          <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="题材说明（可选）" />
           <button type="button" onClick={() => void createTopic()} disabled={creating || !companyId}>
             {creating ? '创建中...' : '创建题材'}
           </button>
@@ -95,7 +105,6 @@ export function TopicListPage() {
           <thead>
             <tr>
               <th>题材名称</th>
-              <th>编码</th>
               <th>状态</th>
               <th>更新时间</th>
               <th>操作</th>
@@ -105,13 +114,17 @@ export function TopicListPage() {
             {topics.map((topic) => (
               <tr key={topic.id}>
                 <td>{topic.name}</td>
-                <td>{topic.code}</td>
                 <td>{TOPIC_STATUS_LABEL[topic.status] || topic.status}</td>
                 <td>{new Date(topic.updatedAt).toLocaleString()}</td>
                 <td>
-                  <button type="button" onClick={() => navigate(`/topics/${topic.id}`)}>
-                    进入正文编辑
-                  </button>
+                  <div className="row-gap">
+                    <button type="button" onClick={() => navigate(`/topics/${topic.id}`)}>
+                      进入正文编辑
+                    </button>
+                    <button type="button" onClick={() => void deleteTopic(topic)} disabled={deletingId === topic.id}>
+                      {deletingId === topic.id ? '删除中...' : '删除'}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

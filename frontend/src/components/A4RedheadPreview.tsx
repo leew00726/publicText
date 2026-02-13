@@ -4,9 +4,7 @@ interface Props {
   template: RedheadTemplate
   selectedId?: string
   unitName?: string
-  docNo?: string
   signatory?: string
-  copyNo?: string
 }
 
 const SCALE = 20 // px per cm
@@ -25,13 +23,11 @@ function xToCm(anchor: 'marginLeft' | 'center' | 'marginRight', offsetCm: number
   return margins.left + offsetCm
 }
 
-export function A4RedheadPreview({ template, selectedId, unitName, docNo, signatory, copyNo }: Props) {
+export function A4RedheadPreview({ template, selectedId, unitName, signatory }: Props) {
   const margins = template.page.marginsCm
   const bindMap = {
     unitName: unitName || '某某单位',
-    docNo: docNo || '某文〔2026〕1号',
     signatory: signatory || '签发人',
-    copyNo: copyNo || '份号001',
     fixedText: '',
   }
 

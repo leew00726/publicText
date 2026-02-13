@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Document, DeletionAuditEvent, RedheadTemplate, Topic, TopicTemplate, TopicTemplateDraft, Unit
 from app.schemas import (
+    ApiMessage,
     DeletionAuditEventOut,
     IdResponse,
     TopicAnalyzeResponse,
@@ -22,9 +23,104 @@ from app.schemas import (
     TopicTemplateOut,
     UnitOut,
 )
+from app.services.ai_agent import AgentConfigError, AgentUpstreamError, revise_topic_rules_with_deepseek
 from app.services.topic_inference import extract_docx_features, extract_pdf_features, infer_topic_rules
 
 router = APIRouter(tags=["topics"])
+
+_FONT_ALIASES: dict[str, str] = {
+    "方正小标宋简": "方正小标宋简",
+    "方正小标宋": "方正小标宋简",
+    "小标宋": "方正小标宋简",
+    "仿宋_GB2312": "仿宋_GB2312",
+    "仿宋": "仿宋_GB2312",
+    "楷体_GB2312": "楷体_GB2312",
+    "楷体": "楷体_GB2312",
+    "黑体": "黑体",
+    "宋体": "宋体",
+}
+
+_SORTED_FONT_KEYS = sorted(_FONT_ALIASES.keys(), key=len, reverse=True)
+_TRAILING_SUFFIX_RE = re.compile(
+    r"^(主\s*持(?:\s*人|\s*者)?|参\s*(?:加|会)(?:\s*人|\s*人员|\s*名单)?|列\s*席(?:\s*人|\s*人员)?|出\s*席(?:\s*人|\s*人员)?|记\s*录(?:\s*人|\s*员)?|发\s*(?:送|至|文)|主\s*送|抄\s*送|分\s*送)\s*[：:]"
+)
+
+
+def _extract_font_name(text: str) -> str | None:
+    if not text:
+        return None
+
+    for raw in _SORTED_FONT_KEYS:
+        if raw in text:
+            return _FONT_ALIASES[raw]
+
+    matched = re.search(r"(?:改为|改成|设为|设置为|调整为|变为|使用|用|字体为|为)\s*([A-Za-z0-9_\-\u4e00-\u9fa5]+)", text)
+    if not matched:
+        return None
+
+    candidate = re.split(r"(并|且|保持|不变|不改|不调整|\s)", matched.group(1))[0]
+    candidate = candidate.strip()
+    if not candidate:
+        return None
+    return _FONT_ALIASES.get(candidate, candidate)
+
+
+def _detect_font_targets(text: str) -> set[str]:
+    targets: set[str] = set()
+    if not text:
+        return targets
+
+    if re.search(r"(一级标题|1级标题|1\s*级\s*标题|一\s*级\s*标题)", text):
+        targets.add("level1")
+    if re.search(r"(二级标题|2级标题|2\s*级\s*标题|二\s*级\s*标题)", text):
+        targets.add("level2")
+    if re.search(r"(三级标题|3级标题|3\s*级\s*标题|三\s*级\s*标题)", text):
+        targets.add("level3")
+    if re.search(r"(四级标题|4级标题|4\s*级\s*标题|四\s*级\s*标题)", text):
+        targets.add("level4")
+
+    if "正文" in text:
+        targets.add("body")
+
+    has_any_heading_level = any(level in targets for level in {"level1", "level2", "level3", "level4"})
+    if "标题" in text and not has_any_heading_level:
+        targets.update({"level1", "level2", "level3", "level4"})
+
+    if "全文" in text:
+        targets.update({"body", "level1", "level2", "level3", "level4"})
+
+    return targets
+
+
+def _build_patch_from_instruction(instruction: str) -> dict:
+    patch: dict = {}
+    segments = [seg.strip() for seg in re.split(r"[，,。；;\n]+", instruction or "") if seg.strip()]
+
+    for seg in segments:
+        font_name = _extract_font_name(seg)
+        if not font_name:
+            continue
+
+        targets = _detect_font_targets(seg)
+        if not targets:
+            continue
+
+        if "body" in targets:
+            patch.setdefault("body", {})["fontFamily"] = font_name
+
+        heading_targets = [target for target in targets if target.startswith("level")]
+        if heading_targets:
+            headings = patch.setdefault("headings", {})
+            for level_key in heading_targets:
+                headings.setdefault(level_key, {})["fontFamily"] = font_name
+
+    if patch:
+        return patch
+
+    fallback_font = _extract_font_name(instruction)
+    if fallback_font:
+        return {"body": {"fontFamily": fallback_font}}
+    return {}
 
 
 def _topic_out(row: Topic) -> TopicOut:
@@ -112,6 +208,99 @@ def _merge_patch(target: dict, patch: dict) -> dict:
     return target
 
 
+def _node_text(node: dict) -> str:
+    content = node.get("content")
+    if not isinstance(content, list):
+        return ""
+    return "".join(str(part.get("text") or "") for part in content if isinstance(part, dict)).strip()
+
+
+def _normalize_trailing_suffix_node(node: dict, body_style: dict, force: bool = False) -> dict:
+    if node.get("type") not in {"paragraph", "heading"}:
+        return node
+    if not force and not _TRAILING_SUFFIX_RE.match(_node_text(node)):
+        return node
+
+    attrs = node.get("attrs")
+    next_attrs = copy.deepcopy(attrs) if isinstance(attrs, dict) else {}
+
+    body_font = body_style.get("fontFamily")
+    if isinstance(body_font, str) and body_font.strip():
+        next_attrs["fontFamily"] = body_font.strip()
+
+    body_size = body_style.get("fontSizePt")
+    if isinstance(body_size, (int, float)):
+        next_attrs["fontSizePt"] = body_size
+
+    body_line_spacing = body_style.get("lineSpacingPt")
+    if isinstance(body_line_spacing, (int, float)):
+        next_attrs["lineSpacingPt"] = body_line_spacing
+
+    body_indent_pt = body_style.get("firstLineIndentPt")
+    body_indent_chars = body_style.get("firstLineIndentChars")
+    if isinstance(body_indent_pt, (int, float)):
+        next_attrs["firstLineIndentPt"] = body_indent_pt
+        next_attrs.pop("firstLineIndentChars", None)
+    elif isinstance(body_indent_chars, (int, float)):
+        next_attrs["firstLineIndentChars"] = body_indent_chars
+        next_attrs.pop("firstLineIndentPt", None)
+    elif "firstLineIndentPt" not in next_attrs and "firstLineIndentChars" not in next_attrs:
+        next_attrs["firstLineIndentChars"] = 2
+
+    next_attrs["textAlign"] = "left"
+    next_attrs["bold"] = False
+    node["attrs"] = next_attrs
+    return node
+
+
+def _build_doc_body_from_topic_rules(rules: dict[str, object] | None) -> dict:
+    default_body = {"type": "doc", "content": []}
+    if not isinstance(rules, dict):
+        return default_body
+
+    content_template = rules.get("contentTemplate")
+    if not isinstance(content_template, dict):
+        return default_body
+
+    leading_nodes = content_template.get("leadingNodes")
+    trailing_nodes = content_template.get("trailingNodes")
+
+    if not isinstance(leading_nodes, list):
+        leading_nodes = []
+    if not isinstance(trailing_nodes, list):
+        trailing_nodes = []
+
+    if not leading_nodes and not trailing_nodes:
+        return default_body
+
+    body_style = rules.get("body") if isinstance(rules.get("body"), dict) else {}
+    content: list[dict] = []
+    content.extend(copy.deepcopy(node) for node in leading_nodes if isinstance(node, dict))
+
+    placeholder_text = str(content_template.get("bodyPlaceholder") or "（请在此输入正文）")
+    content.append(
+        {
+            "type": "paragraph",
+            "attrs": {"firstLineIndentChars": 2},
+            "content": [{"type": "text", "text": placeholder_text}],
+        }
+    )
+
+    in_suffix_block = False
+    for node in trailing_nodes:
+        if not isinstance(node, dict):
+            continue
+        cloned_node = copy.deepcopy(node)
+        node_text = _node_text(cloned_node)
+        if _TRAILING_SUFFIX_RE.match(node_text):
+            in_suffix_block = True
+        if in_suffix_block and node_text:
+            content.append(_normalize_trailing_suffix_node(cloned_node, body_style, force=True))
+        else:
+            content.append(cloned_node)
+    return {"type": "doc", "content": content}
+
+
 def _infer_doc_type(topic_name: str, preferred_doc_type: str | None) -> str:
     if preferred_doc_type in {"qingshi", "jiyao", "han", "tongzhi"}:
         return preferred_doc_type
@@ -172,6 +361,20 @@ def create_topic(payload: TopicCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(topic)
     return _topic_out(topic)
+
+
+@router.delete("/api/topics/{topic_id}", response_model=ApiMessage)
+def delete_topic(topic_id: str, db: Session = Depends(get_db)):
+    topic = db.query(Topic).filter(Topic.id == topic_id).first()
+    if not topic:
+        raise HTTPException(status_code=404, detail="题材不存在")
+
+    db.query(TopicTemplate).filter(TopicTemplate.topic_id == topic_id).delete(synchronize_session=False)
+    db.query(TopicTemplateDraft).filter(TopicTemplateDraft.topic_id == topic_id).delete(synchronize_session=False)
+    db.query(DeletionAuditEvent).filter(DeletionAuditEvent.topic_id == topic_id).delete(synchronize_session=False)
+    db.delete(topic)
+    db.commit()
+    return ApiMessage(message="ok")
 
 
 @router.post("/api/topics/{topic_id}/analyze", response_model=TopicAnalyzeResponse)
@@ -300,12 +503,36 @@ def revise_draft(topic_id: str, payload: TopicReviseRequest, db: Session = Depen
         raise HTTPException(status_code=400, detail="请先分析训练材料后再修订")
 
     new_rules = copy.deepcopy(latest.inferred_rules)
-    patch = payload.patch or {}
-    if not patch:
-        if "宋体" in payload.instruction:
-            patch = {"body": {"fontFamily": "宋体"}}
-        elif "黑体" in payload.instruction:
-            patch = {"body": {"fontFamily": "黑体"}}
+    patch = copy.deepcopy(payload.patch or {})
+    agent_summary = payload.instruction
+    instruction_patch = _build_patch_from_instruction(payload.instruction)
+
+    if payload.useDeepSeek:
+        conversation = [{"role": msg.role, "content": msg.content} for msg in payload.conversation]
+        try:
+            ai_result = revise_topic_rules_with_deepseek(
+                current_rules=new_rules,
+                instruction=payload.instruction,
+                conversation=conversation,
+            )
+        except AgentConfigError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except AgentUpstreamError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+        ai_patch = copy.deepcopy(ai_result.get("patch") or {})
+        if instruction_patch:
+            _merge_patch(ai_patch, instruction_patch)
+        if patch:
+            _merge_patch(ai_patch, patch)
+        patch = ai_patch
+        agent_summary = (
+            ai_result.get("assistantReply")
+            or ai_result.get("summary")
+            or payload.instruction
+        )
+    elif not patch:
+        patch = instruction_patch
 
     if patch:
         _merge_patch(new_rules, patch)
@@ -316,7 +543,7 @@ def revise_draft(topic_id: str, payload: TopicReviseRequest, db: Session = Depen
         status="draft",
         inferred_rules=new_rules,
         confidence_report=latest.confidence_report,
-        agent_summary=payload.instruction,
+        agent_summary=agent_summary,
     )
     db.add(new_draft)
     db.commit()
@@ -441,7 +668,7 @@ def create_doc_from_topic(topic_id: str, payload: TopicCreateDocRequest, db: Ses
         redhead_template_id=redhead_template_id,
         status="draft",
         structured_fields=structured_fields,
-        body={"type": "doc", "content": []},
+        body=_build_doc_body_from_topic_rules(template.rules if template else None),
         import_report=None,
     )
     db.add(row)
@@ -474,3 +701,35 @@ def list_templates(topic_id: str, db: Session = Depends(get_db)):
         .all()
     )
     return [_template_out(row) for row in rows]
+
+
+@router.delete("/api/topics/{topic_id}/templates/{template_id}", response_model=ApiMessage)
+def delete_topic_template(topic_id: str, template_id: str, db: Session = Depends(get_db)):
+    topic = db.query(Topic).filter(Topic.id == topic_id).first()
+    if not topic:
+        raise HTTPException(status_code=404, detail="题材不存在")
+
+    template = (
+        db.query(TopicTemplate)
+        .filter(TopicTemplate.id == template_id, TopicTemplate.topic_id == topic_id)
+        .first()
+    )
+    if not template:
+        raise HTTPException(status_code=404, detail="模板不存在")
+
+    was_effective = bool(template.effective)
+    db.delete(template)
+    db.flush()
+
+    if was_effective:
+        replacement = (
+            db.query(TopicTemplate)
+            .filter(TopicTemplate.topic_id == topic_id)
+            .order_by(TopicTemplate.version.desc())
+            .first()
+        )
+        if replacement:
+            replacement.effective = True
+
+    db.commit()
+    return ApiMessage(message="ok")

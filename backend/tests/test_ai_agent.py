@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
 
 from app.routers.ai import RewriteRequest, rewrite_api
-from app.services.ai_agent import AgentConfigError, DeepSeekAgent
+from app.services.ai_agent import AgentConfigError, DeepSeekAgent, revise_topic_rules_with_deepseek
 
 
 class DeepSeekAgentTests(unittest.TestCase):
@@ -75,3 +75,55 @@ class AiRewriteEndpointTests(unittest.TestCase):
             rewrite_api(RewriteRequest(text="待润色正文", mode="formal"))
 
         self.assertEqual(ctx.exception.status_code, 503)
+
+
+class TopicRevisionAgentTests(unittest.TestCase):
+    @patch("app.services.ai_agent.urllib.request.urlopen")
+    def test_revise_topic_rules_returns_patch_and_reply(self, mock_urlopen):
+        fake_payload = {
+            "id": "chatcmpl-topic-revise",
+            "model": "deepseek-chat",
+            "usage": {"total_tokens": 56},
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": json.dumps(
+                            {
+                                "assistantReply": "已将三级标题字体调整为宋体。",
+                                "summary": "三级标题改为宋体",
+                                "patch": {"headings": {"level3": {"fontFamily": "宋体"}}},
+                            },
+                            ensure_ascii=False,
+                        ),
+                    },
+                }
+            ],
+        }
+
+        fake_resp = MagicMock()
+        fake_resp.read.return_value = json.dumps(fake_payload).encode("utf-8")
+        fake_resp.__enter__.return_value = fake_resp
+        mock_urlopen.return_value = fake_resp
+
+        result = revise_topic_rules_with_deepseek(
+            current_rules={"body": {"fontFamily": "仿宋_GB2312"}, "headings": {"level3": {"fontFamily": "黑体"}}},
+            instruction="把三级标题改为宋体",
+            conversation=[{"role": "user", "content": "请把三级标题改成宋体"}],
+            settings=type(
+                "S",
+                (),
+                {
+                    "deepseek_api_key": "test-key",
+                    "deepseek_base_url": "https://api.deepseek.com/v1",
+                    "deepseek_model": "deepseek-chat",
+                    "deepseek_timeout_sec": 30,
+                    "deepseek_temperature": 0.2,
+                    "deepseek_system_prompt": "test",
+                },
+            )(),
+        )
+
+        self.assertEqual(result["patch"]["headings"]["level3"]["fontFamily"], "宋体")
+        self.assertEqual(result["assistantReply"], "已将三级标题字体调整为宋体。")

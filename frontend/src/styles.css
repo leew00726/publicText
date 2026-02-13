@@ -22,6 +22,14 @@ body {
   background: radial-gradient(circle at 20% 10%, #fff9ef, #efe8dc 70%);
 }
 
+.global-back-btn {
+  position: sticky;
+  top: 12px;
+  margin: 12px 0 0 12px;
+  z-index: 1000;
+  background: #fff;
+}
+
 .page {
   padding: 16px;
 }
@@ -116,6 +124,32 @@ button:disabled {
   gap: 12px;
 }
 
+.doc-editor-page {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.doc-editor-page .doc-title-input {
+  flex: 1 1 360px;
+  min-width: 260px;
+}
+
+.doc-editor-page .editor-layout {
+  grid-template-columns: 220px minmax(0, 1fr) 220px;
+  width: 100%;
+  align-items: start;
+}
+
+.doc-editor-page .panel,
+.doc-editor-page .editor-shell {
+  min-width: 0;
+}
+
+.doc-editor-page .editor-shell {
+  min-height: calc(100vh - 260px);
+}
+
 .panel {
   background: var(--paper);
   border: 1px solid var(--line);
@@ -135,10 +169,21 @@ button:disabled {
   font-size: 13px;
 }
 
+.structured-panel,
+.structured-panel label,
+.structured-panel input,
+.structured-panel select,
+.structured-panel textarea {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
 .attachments-box {
   border: 1px dashed var(--line);
   border-radius: 8px;
   padding: 8px;
+  overflow: hidden;
 }
 
 .attachment-item {
@@ -147,6 +192,12 @@ button:disabled {
   gap: 6px;
   align-items: center;
   margin-top: 4px;
+  min-width: 0;
+}
+
+.attachment-item input {
+  min-width: 0;
+  width: 100%;
 }
 
 .editor-shell {
@@ -172,6 +223,24 @@ button:disabled {
   margin: 0 auto;
   background: #fff;
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+}
+
+.editor-redhead-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.editor-redhead-text {
+  position: absolute;
+  white-space: pre-wrap;
+  line-height: 1.2;
+}
+
+.editor-redhead-line {
+  position: absolute;
+  border-top-style: solid;
 }
 
 .editor-content.has-frontmatter .editor-prose-wrapper .ProseMirror {
@@ -257,10 +326,10 @@ button:disabled {
 
 .editor-content .editor-prose-wrapper .ProseMirror p {
   margin: 0;
-  text-indent: 2em;
-  line-height: 28pt;
-  font-size: 16pt;
-  font-family: "仿宋_GB2312", "FangSong_GB2312", "仿宋", "FangSong", var(--font-main) !important;
+  text-indent: var(--pt-body-text-indent, 2em);
+  line-height: var(--pt-body-line-height, 28pt);
+  font-size: var(--pt-body-font-size, 16pt);
+  font-family: var(--pt-body-font-family, "仿宋_GB2312", "FangSong_GB2312", "仿宋", "FangSong", var(--font-main));
   font-weight: 400;
   font-synthesis: none;
 }
@@ -268,9 +337,9 @@ button:disabled {
 .editor-content .editor-prose-wrapper .ProseMirror li > p,
 .editor-content .editor-prose-wrapper .ProseMirror td > p,
 .editor-content .editor-prose-wrapper .ProseMirror th > p {
-  font-family: "仿宋_GB2312", "FangSong_GB2312", "仿宋", "FangSong", var(--font-main) !important;
-  font-size: 16pt;
-  line-height: 28pt;
+  font-family: var(--pt-body-font-family, "仿宋_GB2312", "FangSong_GB2312", "仿宋", "FangSong", var(--font-main));
+  font-size: var(--pt-body-font-size, 16pt);
+  line-height: var(--pt-body-line-height, 28pt);
   font-synthesis: none;
 }
 
@@ -280,36 +349,44 @@ button:disabled {
 .editor-content .editor-prose-wrapper .ProseMirror h4 {
   margin: 0;
   text-indent: 0;
-  line-height: 28pt;
-  font-size: 16pt;
+  line-height: var(--pt-body-line-height, 28pt);
+  font-size: var(--pt-body-font-size, 16pt);
 }
 
 .editor-content .editor-prose-wrapper .ProseMirror h1 {
-  font-family: "黑体", "SimHei", "Heiti SC", var(--font-ui) !important;
-  font-weight: 700;
+  font-family: var(--pt-h1-font-family, "黑体", "SimHei", "Heiti SC", var(--font-ui));
+  font-size: var(--pt-h1-font-size, 16pt);
+  font-weight: var(--pt-h1-font-weight, 700);
+  line-height: var(--pt-h1-line-height, 28pt);
   font-synthesis: none;
-  text-indent: 2em;
+  text-indent: var(--pt-h1-text-indent, 2em);
 }
 
 .editor-content .editor-prose-wrapper .ProseMirror h2 {
-  font-family: "黑体", "SimHei", "Heiti SC", var(--font-ui) !important;
-  font-weight: 400;
+  font-family: var(--pt-h2-font-family, "黑体", "SimHei", "Heiti SC", var(--font-ui));
+  font-size: var(--pt-h2-font-size, 16pt);
+  font-weight: var(--pt-h2-font-weight, 400);
+  line-height: var(--pt-h2-line-height, 28pt);
   font-synthesis: none;
-  text-indent: 2em;
+  text-indent: var(--pt-h2-text-indent, 2em);
 }
 
 .editor-content .editor-prose-wrapper .ProseMirror h3 {
-  font-family: "仿宋_GB2312", "FangSong_GB2312", "仿宋", "FangSong", var(--font-main) !important;
-  font-weight: 400;
+  font-family: var(--pt-h3-font-family, "仿宋_GB2312", "FangSong_GB2312", "仿宋", "FangSong", var(--font-main));
+  font-size: var(--pt-h3-font-size, 16pt);
+  font-weight: var(--pt-h3-font-weight, 400);
+  line-height: var(--pt-h3-line-height, 28pt);
   font-synthesis: none;
-  text-indent: 2em;
+  text-indent: var(--pt-h3-text-indent, 2em);
 }
 
 .editor-content .editor-prose-wrapper .ProseMirror h4 {
-  font-family: "仿宋_GB2312", "FangSong_GB2312", "仿宋", "FangSong", var(--font-main) !important;
-  font-weight: 400;
+  font-family: var(--pt-h4-font-family, "仿宋_GB2312", "FangSong_GB2312", "仿宋", "FangSong", var(--font-main));
+  font-size: var(--pt-h4-font-size, 16pt);
+  font-weight: var(--pt-h4-font-weight, 400);
+  line-height: var(--pt-h4-line-height, 28pt);
   font-synthesis: none;
-  text-indent: 2em;
+  text-indent: var(--pt-h4-text-indent, 2em);
 }
 
 .editor-content .editor-prose-wrapper .ProseMirror h1 *,
@@ -317,6 +394,18 @@ button:disabled {
 .editor-content .editor-prose-wrapper .ProseMirror h3 *,
 .editor-content .editor-prose-wrapper .ProseMirror h4 * {
   font-family: inherit !important;
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror .suffix-line-label {
+  font-family: var(--pt-suffix-label-font-family, "黑体", "SimHei", "Heiti SC", var(--font-ui)) !important;
+  font-weight: var(--pt-suffix-label-font-weight, 400) !important;
+  color: #111 !important;
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror .suffix-line-body {
+  font-family: var(--pt-body-font-family, "仿宋_GB2312", "FangSong_GB2312", "仿宋", "FangSong", var(--font-main)) !important;
+  font-weight: 400 !important;
+  color: #111 !important;
 }
 
 .editor-content .editor-prose-wrapper .ProseMirror table {
@@ -390,6 +479,27 @@ button:disabled {
   font-size: 13px;
 }
 
+.ai-preview-panel {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.ai-preview-meta {
+  font-size: 13px;
+  color: #666;
+}
+
+.ai-preview-panel textarea {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+}
+
 .font-list {
   display: flex;
   gap: 10px;
@@ -450,6 +560,15 @@ button:disabled {
   padding-left: 20px;
   display: grid;
   gap: 6px;
+}
+
+.topic-template-summary {
+  margin-top: 6px;
+}
+
+.topic-template-summary h4 {
+  margin: 8px 0 6px;
+  font-size: 16px;
 }
 
 .elements-list {
@@ -523,8 +642,28 @@ button:disabled {
   outline: 1px solid #0070f3;
 }
 
+@media (max-width: 1500px) {
+  .doc-editor-page .editor-layout {
+    grid-template-columns: 200px minmax(0, 1fr) 200px;
+  }
+}
+
+@media (max-width: 1350px) {
+  .doc-editor-page .editor-layout {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+
+  .doc-editor-page .validation-panel {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 1100px) {
   .editor-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .doc-editor-page .editor-layout {
     grid-template-columns: 1fr;
   }
 

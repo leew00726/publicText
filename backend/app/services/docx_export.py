@@ -15,6 +15,13 @@ from docx.shared import Cm, Pt, RGBColor
 
 from app.services.checker import normalize_doc_no_brackets
 
+RE_SUFFIX_LINE = re.compile(
+    r"^(主\s*持(?:\s*人|\s*者)?|参\s*(?:加|会)(?:\s*人|\s*人员|\s*名单)?|列\s*席(?:\s*人|\s*人员)?|出\s*席(?:\s*人|\s*人员)?|记\s*录(?:\s*人|\s*员)?|发\s*(?:送|至|文)|主\s*送|抄\s*送|分\s*送)\s*[：:]"
+)
+RE_SUFFIX_LINE_CAPTURE = re.compile(
+    r"^((?:主\s*持(?:\s*人|\s*者)?|参\s*(?:加|会)(?:\s*人|\s*人员|\s*名单)?|列\s*席(?:\s*人|\s*人员)?|出\s*席(?:\s*人|\s*人员)?|记\s*录(?:\s*人|\s*员)?|发\s*(?:送|至|文)|主\s*送|抄\s*送|分\s*送)\s*[：:])(\s*.*)$"
+)
+
 
 def _set_run_font(run, family: str, size_pt: float, bold: bool = False, color_hex: str | None = None):
     run.font.name = family
@@ -201,6 +208,28 @@ def _safe_float(value: Any, default: float) -> float:
         return default
 
 
+def _safe_float_or_none(value: Any) -> float | None:
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _normalize_color_hex(value: Any) -> str | None:
+    if value is None:
+        return None
+    raw = str(value).strip()
+    if not raw:
+        return None
+    if raw.startswith("#"):
+        raw = raw[1:]
+    if len(raw) != 6:
+        return None
+    return f"#{raw.upper()}"
+
+
 def _resolve_topic_style_rules(structured_fields: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
     rules = structured_fields.get("topicTemplateRules")
     if not isinstance(rules, dict):
@@ -209,6 +238,17 @@ def _resolve_topic_style_rules(structured_fields: dict[str, Any]) -> tuple[dict[
     body = rules.get("body") if isinstance(rules.get("body"), dict) else {}
     headings = rules.get("headings") if isinstance(rules.get("headings"), dict) else {}
     return body, headings
+
+
+def _has_fixed_leading_content(structured_fields: dict[str, Any]) -> bool:
+    rules = structured_fields.get("topicTemplateRules")
+    if not isinstance(rules, dict):
+        return False
+    content_template = rules.get("contentTemplate")
+    if not isinstance(content_template, dict):
+        return False
+    leading_nodes = content_template.get("leadingNodes")
+    return isinstance(leading_nodes, list) and len(leading_nodes) > 0
 
 
 def _apply_body_paragraph_style(paragraph, body_style: dict[str, Any]):
@@ -241,6 +281,102 @@ def _apply_heading_style(paragraph, level: int, heading_styles: dict[str, Any]):
     return family, size, bold
 
 
+def _resolve_node_attrs(node: dict[str, Any]) -> dict[str, Any]:
+    attrs = node.get("attrs")
+    if isinstance(attrs, dict):
+        return attrs
+    return {}
+
+
+def _apply_node_paragraph_overrides(paragraph, node_attrs: dict[str, Any], default_font_size_pt: float):
+    align = str(node_attrs.get("textAlign") or "").strip().lower()
+    if align == "center":
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    elif align == "right":
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    elif align == "justify":
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    elif align == "left":
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+    line_spacing_pt = _safe_float_or_none(node_attrs.get("lineSpacingPt"))
+    if line_spacing_pt is not None:
+        paragraph.paragraph_format.line_spacing = Pt(line_spacing_pt)
+
+    first_indent_pt = _safe_float_or_none(node_attrs.get("firstLineIndentPt"))
+    if first_indent_pt is not None:
+        paragraph.paragraph_format.first_line_indent = Pt(first_indent_pt)
+    else:
+        first_indent_chars = _safe_float_or_none(node_attrs.get("firstLineIndentChars"))
+        if first_indent_chars is not None:
+            paragraph.paragraph_format.first_line_indent = Pt(first_indent_chars * default_font_size_pt)
+        elif align in {"center", "right"}:
+            paragraph.paragraph_format.first_line_indent = Pt(0)
+
+
+def _resolve_node_run_style(node_attrs: dict[str, Any], fallback_family: str, fallback_size_pt: float, fallback_bold: bool):
+    family = str(node_attrs.get("fontFamily") or fallback_family)
+    size = _safe_float(node_attrs.get("fontSizePt"), fallback_size_pt)
+    node_bold = node_attrs.get("bold")
+    bold = bool(node_bold) if isinstance(node_bold, bool) else fallback_bold
+    color_hex = _normalize_color_hex(node_attrs.get("colorHex"))
+    return family, size, bold, color_hex
+
+
+def _append_red_divider_paragraph(doc: Document):
+    paragraph = doc.add_paragraph()
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    paragraph.paragraph_format.space_before = Pt(0)
+    paragraph.paragraph_format.space_after = Pt(0)
+    paragraph.paragraph_format.line_spacing = Pt(1)
+    paragraph.paragraph_format.first_line_indent = Pt(0)
+    _add_paragraph_border(paragraph, color="D40000", size_eighth_point=12)
+
+
+def _is_suffix_line(text: str) -> bool:
+    return bool(RE_SUFFIX_LINE.match((text or "").strip()))
+
+
+def _normalize_suffix_line_attrs(node_attrs: dict[str, Any], body_style: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(node_attrs or {})
+    body_family = body_style.get("fontFamily")
+    if isinstance(body_family, str) and body_family.strip():
+        normalized["fontFamily"] = body_family.strip()
+
+    body_size = _safe_float_or_none(body_style.get("fontSizePt"))
+    if body_size is not None:
+        normalized["fontSizePt"] = body_size
+
+    body_line = _safe_float_or_none(body_style.get("lineSpacingPt"))
+    if body_line is not None:
+        normalized["lineSpacingPt"] = body_line
+
+    body_indent_pt = _safe_float_or_none(body_style.get("firstLineIndentPt"))
+    body_indent_chars = _safe_float_or_none(body_style.get("firstLineIndentChars"))
+    if body_indent_pt is not None:
+        normalized["firstLineIndentPt"] = body_indent_pt
+        normalized.pop("firstLineIndentChars", None)
+    elif body_indent_chars is not None:
+        normalized["firstLineIndentChars"] = body_indent_chars
+        normalized.pop("firstLineIndentPt", None)
+
+    normalized["textAlign"] = "left"
+    normalized["bold"] = False
+    return normalized
+
+
+def _split_suffix_line(text: str) -> tuple[str | None, str]:
+    value = (text or "").strip()
+    if not value:
+        return None, ""
+    match = RE_SUFFIX_LINE_CAPTURE.match(value)
+    if not match:
+        return None, value
+    label = match.group(1)
+    rest = match.group(2) or ""
+    return label, rest
+
+
 def _iter_nodes(doc_json: dict[str, Any]) -> list[dict[str, Any]]:
     return list((doc_json or {}).get("content") or [])
 
@@ -268,10 +404,13 @@ def export_docx(
 
     structured_fields = document_data.get("structuredFields", {})
     body_style, heading_styles = _resolve_topic_style_rules(structured_fields)
+    suppress_auto_frontmatter = _has_fixed_leading_content(structured_fields)
     if include_redhead:
         _apply_header_template(doc, redhead_template, structured_fields, unit_name)
 
-    title = structured_fields.get("title") or document_data.get("title") or ""
+    title = ""
+    if not suppress_auto_frontmatter:
+        title = structured_fields.get("title") or document_data.get("title") or ""
     if title:
         p_title = doc.add_paragraph()
         p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -279,7 +418,9 @@ def export_docx(
         run = p_title.add_run(title)
         _set_run_font(run, "方正小标宋简", 22)
 
-    main_to = structured_fields.get("mainTo", "").strip()
+    main_to = ""
+    if not suppress_auto_frontmatter:
+        main_to = structured_fields.get("mainTo", "").strip()
     if main_to:
         p_main = doc.add_paragraph()
         p_main.paragraph_format.line_spacing = Pt(28)
@@ -287,29 +428,49 @@ def export_docx(
         run = p_main.add_run(main_to)
         _set_run_font(run, "仿宋_GB2312", 16)
 
+    in_suffix_block = False
     for node in _iter_nodes(document_data.get("body", {})):
         ntype = node.get("type")
+        node_attrs = _resolve_node_attrs(node)
 
         if ntype == "heading":
             level = int((node.get("attrs") or {}).get("level", 1))
             p = doc.add_paragraph()
             family, size, bold = _apply_heading_style(p, level, heading_styles)
+            family, size, bold, color_hex = _resolve_node_run_style(node_attrs, family, size, bold)
+            _apply_node_paragraph_overrides(p, node_attrs, size)
             text = _node_text(node)
             r = p.add_run(text)
-            _set_run_font(r, family, size, bold)
+            _set_run_font(r, family, size, bold, color_hex=color_hex)
             continue
 
         if ntype == "paragraph":
+            if bool(node_attrs.get("dividerRed")):
+                _append_red_divider_paragraph(doc)
+                continue
+
             p = doc.add_paragraph()
             _apply_body_paragraph_style(p, body_style)
+            default_family = body_style.get("fontFamily", "仿宋_GB2312")
+            default_size = _safe_float(body_style.get("fontSizePt"), 16)
+            default_bold = bool(body_style.get("bold", False))
             text = _node_text(node)
-            r = p.add_run(text)
-            _set_run_font(
-                r,
-                body_style.get("fontFamily", "仿宋_GB2312"),
-                _safe_float(body_style.get("fontSizePt"), 16),
-                bool(body_style.get("bold", False)),
-            )
+            if _is_suffix_line(text):
+                in_suffix_block = True
+            if in_suffix_block and text.strip():
+                node_attrs = _normalize_suffix_line_attrs(node_attrs, body_style)
+            _apply_node_paragraph_overrides(p, node_attrs, default_size)
+            family, size, bold, color_hex = _resolve_node_run_style(node_attrs, default_family, default_size, default_bold)
+            label_text, body_text = _split_suffix_line(text)
+            if label_text:
+                label_run = p.add_run(label_text)
+                _set_run_font(label_run, "黑体", size, False)
+                if body_text:
+                    body_run = p.add_run(body_text)
+                    _set_run_font(body_run, family, size, bold, color_hex=color_hex)
+            else:
+                r = p.add_run(text)
+                _set_run_font(r, family, size, bold, color_hex=color_hex)
             continue
 
         if ntype == "table":

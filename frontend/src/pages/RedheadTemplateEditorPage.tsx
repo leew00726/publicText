@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type { RedheadElement, RedheadTemplate, Unit } from '../api/types'
@@ -12,9 +12,9 @@ const ELEMENT_TYPE_LABEL: Record<RedheadElement['type'], string> = {
 
 const BIND_LABEL: Record<RedheadElement['bind'], string> = {
   unitName: '单位名称',
-  docNo: '文号',
+  docNo: '固定文本',
   signatory: '签发人',
-  copyNo: '份号',
+  copyNo: '固定文本',
   fixedText: '固定文本',
 }
 
@@ -133,7 +133,6 @@ export function RedheadTemplateEditorPage() {
   return (
     <div className="page redhead-editor-page">
       <div className="header-row">
-        <Link to="/redheads">返回模板列表</Link>
         <h2>红头模板编辑</h2>
         <button type="button" onClick={save}>
           保存
@@ -221,9 +220,7 @@ export function RedheadTemplateEditorPage() {
                   onChange={(e) => patchElement(selected.id, (old) => ({ ...old, bind: e.target.value as RedheadElement['bind'] }))}
                 >
                   <option value="unitName">单位名称</option>
-                  <option value="docNo">文号</option>
                   <option value="signatory">签发人</option>
-                  <option value="copyNo">份号</option>
                   <option value="fixedText">固定文本</option>
                 </select>
               </label>

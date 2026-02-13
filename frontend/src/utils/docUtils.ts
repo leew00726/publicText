@@ -6,6 +6,8 @@ const RE_H1 = /^[一二三四五六七八九十百千万零〇两]+、/
 const RE_H2 = /^[（(][一二三四五六七八九十百千万零〇两]+[）)]/
 const RE_H3 = /^\d+[\.．、]/
 const RE_H4 = /^[（(]\d+[）)]/
+const RE_SUFFIX_MARKER =
+  /^(主\s*持(?:\s*人|\s*者)?|参\s*(?:加|会)(?:\s*人|\s*人员|\s*名单)?|列\s*席(?:\s*人|\s*人员)?|出\s*席(?:\s*人|\s*人员)?|记\s*录(?:\s*人|\s*员)?|发\s*(?:送|至|文)|主\s*送|抄\s*送|分\s*送)\s*[：:]/
 const RE_ATTACHMENT_LABEL = /^附件\s*[:：]\s*(.*)$/
 const RE_ATTACHMENT_ITEM = /^(\d+)[\.．、]\s*(.+)$/
 
@@ -102,13 +104,39 @@ function replaceHeadingPrefix(level: number, text: string, value: number): strin
   return `${prefix}${withoutPrefix}`
 }
 
+function stripHeadingPrefix(level: 1 | 2 | 3 | 4, text: string): string {
+  const raw = text.trim()
+  if (level === 1) return raw.replace(/^[一二三四五六七八九十百千万零〇两]+、\s*/, '').trim()
+  if (level === 2) return raw.replace(/^[（(][一二三四五六七八九十百千万零〇两]+[）)]\s*/, '').trim()
+  if (level === 3) return raw.replace(/^\d+[\.．、]\s*/, '').trim()
+  return raw.replace(/^[（(]\d+[）)]\s*/, '').trim()
+}
+
+function shouldTreatAsHeading(level: 1 | 2 | 3 | 4, text: string): boolean {
+  const body = stripHeadingPrefix(level, text)
+  if (!body) return true
+
+  const hasSentencePunct = /[。！？；]/.test(body)
+  const commaCount = (body.match(/[，,]/g) || []).length
+
+  if ((level === 2 || level === 4) && (hasSentencePunct || commaCount > 0 || body.length > 20)) {
+    return false
+  }
+
+  if ((level === 1 || level === 3) && hasSentencePunct && body.length > 24) {
+    return false
+  }
+
+  return true
+}
+
 function detectHeadingLevel(text: string): 1 | 2 | 3 | 4 | null {
   const t = normalizeCommonText(text)
   if (!t) return null
-  if (RE_H1.test(t)) return 1
-  if (RE_H2.test(t)) return 2
-  if (RE_H3.test(t)) return 3
-  if (RE_H4.test(t)) return 4
+  if (RE_H1.test(t) && shouldTreatAsHeading(1, t)) return 1
+  if (RE_H2.test(t) && shouldTreatAsHeading(2, t)) return 2
+  if (RE_H3.test(t) && shouldTreatAsHeading(3, t)) return 3
+  if (RE_H4.test(t) && shouldTreatAsHeading(4, t)) return 4
   return null
 }
 
@@ -178,18 +206,86 @@ function trimLeadingBlankParagraphs(docJson: any): any {
   return docJson
 }
 
-function applyBodyLayoutOnly(body: any): any {
+type BodyLayoutOptions = {
+  preserveLeadingNodes?: any[]
+  preserveTrailingNodes?: any[]
+}
+
+function normalizeParagraphAttrs(rawAttrs: any, defaultIndentChars: number = 2): Record<string, any> {
+  const textAlign = typeof rawAttrs?.textAlign === 'string' ? rawAttrs.textAlign.trim().toLowerCase() : ''
+  if (textAlign === 'center' || textAlign === 'right') {
+    return { textAlign, firstLineIndentChars: 0 }
+  }
+  if (textAlign === 'left' || textAlign === 'justify') {
+    return { textAlign, firstLineIndentChars: defaultIndentChars }
+  }
+  return { firstLineIndentChars: defaultIndentChars }
+}
+
+function normalizeFixedSuffixNodeAttrs(node: any, bodyRules: Record<string, any>, force: boolean = false): any {
+  if (!node || (node.type !== 'paragraph' && node.type !== 'heading')) return node
+  const text = normalizeCommonText(getNodeText(node))
+  if (!force && !RE_SUFFIX_MARKER.test(text)) return node
+
+  const nextNode = structuredClone(node)
+  const nextAttrs: Record<string, any> = { ...(nextNode.attrs || {}) }
+
+  if (typeof bodyRules.fontFamily === 'string' && bodyRules.fontFamily.trim()) {
+    nextAttrs.fontFamily = bodyRules.fontFamily.trim()
+  }
+  if (typeof bodyRules.fontSizePt === 'number' && Number.isFinite(bodyRules.fontSizePt)) {
+    nextAttrs.fontSizePt = bodyRules.fontSizePt
+  }
+  if (typeof bodyRules.lineSpacingPt === 'number' && Number.isFinite(bodyRules.lineSpacingPt)) {
+    nextAttrs.lineSpacingPt = bodyRules.lineSpacingPt
+  }
+  if (typeof bodyRules.firstLineIndentPt === 'number' && Number.isFinite(bodyRules.firstLineIndentPt)) {
+    nextAttrs.firstLineIndentPt = bodyRules.firstLineIndentPt
+  } else if (
+    typeof bodyRules.firstLineIndentChars === 'number' &&
+    Number.isFinite(bodyRules.firstLineIndentChars)
+  ) {
+    nextAttrs.firstLineIndentChars = bodyRules.firstLineIndentChars
+  } else if (nextAttrs.firstLineIndentPt == null && nextAttrs.firstLineIndentChars == null) {
+    nextAttrs.firstLineIndentChars = 2
+  }
+
+  nextAttrs.textAlign = 'left'
+  nextAttrs.bold = false
+  nextNode.attrs = nextAttrs
+  return nextNode
+}
+
+function applyBodyLayoutOnly(body: any, options: BodyLayoutOptions = {}): any {
   const cloned = structuredClone(body || { type: 'doc', content: [] })
   const content = Array.isArray(cloned.content) ? cloned.content : []
+  const preserveLeading = Array.isArray(options.preserveLeadingNodes) ? options.preserveLeadingNodes : []
+  const preserveTrailing = Array.isArray(options.preserveTrailingNodes) ? options.preserveTrailingNodes : []
+  const leadingCount = Math.min(preserveLeading.length, content.length)
+  const trailingCount = Math.min(preserveTrailing.length, Math.max(content.length - leadingCount, 0))
+
+  for (let i = 0; i < leadingCount; i += 1) {
+    content[i] = structuredClone(preserveLeading[i])
+  }
+  if (trailingCount > 0) {
+    const srcStart = preserveTrailing.length - trailingCount
+    const dstStart = content.length - trailingCount
+    for (let i = 0; i < trailingCount; i += 1) {
+      content[dstStart + i] = structuredClone(preserveTrailing[srcStart + i])
+    }
+  }
+
   let inAttachmentBlock = false
 
-  for (const node of content) {
+  for (let index = 0; index < content.length; index += 1) {
+    const node = content[index]
     if (!node || (node.type !== 'paragraph' && node.type !== 'heading')) continue
+    if (index < leadingCount || index >= content.length - trailingCount) continue
 
     const text = normalizeCommonText(getNodeText(node))
     if (!text) {
       node.type = 'paragraph'
-      node.attrs = { ...(node.attrs || {}), firstLineIndentChars: 2 }
+      node.attrs = normalizeParagraphAttrs(node.attrs, 2)
       setNodeText(node, '')
       continue
     }
@@ -198,7 +294,7 @@ function applyBodyLayoutOnly(body: any): any {
     if (attachmentLabel) {
       inAttachmentBlock = true
       node.type = 'paragraph'
-      node.attrs = { ...(node.attrs || {}), firstLineIndentChars: 2 }
+      node.attrs = normalizeParagraphAttrs(node.attrs, 2)
       const rest = (attachmentLabel[1] || '').trim()
       setNodeText(node, rest ? `附件：${normalizeAttachmentName(rest)}` : '附件：')
       continue
@@ -208,10 +304,10 @@ function applyBodyLayoutOnly(body: any): any {
       const attachmentItem = text.match(RE_ATTACHMENT_ITEM)
       if (attachmentItem) {
         node.type = 'paragraph'
-        node.attrs = { ...(node.attrs || {}), firstLineIndentChars: 2 }
-        const index = Number(attachmentItem[1])
+        node.attrs = normalizeParagraphAttrs(node.attrs, 2)
+        const attachmentIndex = Number(attachmentItem[1])
         const name = normalizeAttachmentName(attachmentItem[2])
-        setNodeText(node, `${index}. ${name}`)
+        setNodeText(node, `${attachmentIndex}. ${name}`)
         continue
       }
       inAttachmentBlock = false
@@ -224,7 +320,7 @@ function applyBodyLayoutOnly(body: any): any {
       setNodeText(node, normalizeHeadingPunctuation(level, text))
     } else {
       node.type = 'paragraph'
-      node.attrs = { ...(node.attrs || {}), firstLineIndentChars: 2 }
+      node.attrs = normalizeParagraphAttrs(node.attrs, 2)
       setNodeText(node, normalizeTailPunctuation(text))
     }
   }
@@ -321,8 +417,30 @@ export function applyOneClickLayout(body: any): any {
 
 export function applyOneClickLayoutWithFields(body: any, structuredFields: StructuredFields): { body: any; structuredFields: StructuredFields } {
   const extracted = extractStructuredFieldsFromBody(body, structuredFields)
+  const rules = (structuredFields as any)?.topicTemplateRules
+  const contentTemplate = rules && typeof rules === 'object' ? (rules as any).contentTemplate : null
+  const bodyRules = rules && typeof rules === 'object' && (rules as any).body && typeof (rules as any).body === 'object' ? (rules as any).body : {}
+  const preserveLeadingNodes =
+    contentTemplate && Array.isArray(contentTemplate.leadingNodes)
+      ? contentTemplate.leadingNodes.filter((node: any) => node && typeof node === 'object')
+      : []
+  const preserveTrailingNodes =
+    contentTemplate && Array.isArray(contentTemplate.trailingNodes)
+      ? (() => {
+          let inSuffixBlock = false
+          return contentTemplate.trailingNodes
+            .filter((node: any) => node && typeof node === 'object')
+            .map((node: any) => {
+              const text = normalizeCommonText(getNodeText(node))
+              if (RE_SUFFIX_MARKER.test(text)) inSuffixBlock = true
+              if (inSuffixBlock && text) return normalizeFixedSuffixNodeAttrs(node, bodyRules, true)
+              return node
+            })
+        })()
+      : []
+
   return {
-    body: applyBodyLayoutOnly(extracted.body),
+    body: applyBodyLayoutOnly(extracted.body, { preserveLeadingNodes, preserveTrailingNodes }),
     structuredFields: extracted.structuredFields,
   }
 }

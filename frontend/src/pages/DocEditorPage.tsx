@@ -1,16 +1,16 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import type { Editor } from '@tiptap/react'
 
 import { api } from '../api/client'
-import type { CheckIssue, GovDoc, RedheadTemplate, Unit } from '../api/types'
+import type { CheckIssue, GovDoc } from '../api/types'
 import { FontInstallModal } from '../components/FontInstallModal'
 import { FontStatusBar } from '../components/FontStatusBar'
 import { StructuredFormPanel } from '../components/StructuredFormPanel'
 import { TiptapEditor } from '../components/TiptapEditor'
 import { ValidationPanel } from '../components/ValidationPanel'
 import { useFontCheck } from '../hooks/useFontCheck'
-import { applyOneClickLayoutWithFields, normalizeDocNoBracket } from '../utils/docUtils'
+import { applyOneClickLayoutWithFields } from '../utils/docUtils'
 
 const DEFAULT_STRUCTURED_FIELDS = {
   title: '',
@@ -20,8 +20,22 @@ const DEFAULT_STRUCTURED_FIELDS = {
   signatory: '',
   copyNo: '',
   date: '',
-  exportWithRedhead: true,
+  exportWithRedhead: false,
   attachments: [] as Array<{ index: number; name: string }>,
+}
+
+type RewritePreview = {
+  from: number
+  to: number
+  original: string
+  rewritten: string
+  mode: 'formal' | 'concise' | 'polish'
+}
+
+const AI_MODE_LABEL: Record<'formal' | 'concise' | 'polish', string> = {
+  formal: '正式',
+  concise: '精简',
+  polish: '润色',
 }
 
 function normalizeDoc(doc: GovDoc): GovDoc {
@@ -31,7 +45,7 @@ function normalizeDoc(doc: GovDoc): GovDoc {
       ...DEFAULT_STRUCTURED_FIELDS,
       ...(doc.structuredFields || {}),
       attachments: Array.isArray(doc.structuredFields?.attachments) ? doc.structuredFields.attachments : [],
-      exportWithRedhead: doc.structuredFields?.exportWithRedhead !== false,
+      exportWithRedhead: false,
     },
   }
 }
@@ -41,14 +55,13 @@ export function DocEditorPage() {
   const navigate = useNavigate()
 
   const [doc, setDoc] = useState<GovDoc | null>(null)
-  const [units, setUnits] = useState<Unit[]>([])
-  const [templates, setTemplates] = useState<RedheadTemplate[]>([])
   const [issues, setIssues] = useState<CheckIssue[]>([])
   const [syncToken, setSyncToken] = useState(0)
   const [saving, setSaving] = useState(false)
   const [installerOpen, setInstallerOpen] = useState(false)
   const [aiMode, setAiMode] = useState<'formal' | 'concise' | 'polish'>('formal')
   const [aiRewriting, setAiRewriting] = useState(false)
+  const [rewritePreview, setRewritePreview] = useState<RewritePreview | null>(null)
 
   const editorRef = useRef<Editor | null>(null)
   const importInputRef = useRef<HTMLInputElement | null>(null)
@@ -56,28 +69,14 @@ export function DocEditorPage() {
   const { status, missing, ready, checking, recheck } = useFontCheck()
 
   const loadBase = useCallback(async () => {
-    const unitRes = await api.get<Unit[]>('/api/units')
-    setUnits(unitRes.data)
-
     if (!id) return
     const docRes = await api.get<GovDoc>(`/api/docs/${id}`)
     setDoc(normalizeDoc(docRes.data))
   }, [id])
 
-  const loadTemplates = useCallback(async (unitId: string) => {
-    const res = await api.get<RedheadTemplate[]>('/api/redheadTemplates', { params: { unitId } })
-    setTemplates(res.data)
-  }, [])
-
   useEffect(() => {
     void loadBase()
   }, [loadBase])
-
-  useEffect(() => {
-    if (doc?.unitId) {
-      void loadTemplates(doc.unitId)
-    }
-  }, [doc?.unitId, loadTemplates])
 
   const setDocField = (patch: Partial<GovDoc>) => {
     if (!doc) return
@@ -94,10 +93,7 @@ export function DocEditorPage() {
         unitId: doc.unitId,
         redheadTemplateId: doc.redheadTemplateId,
         status: doc.status,
-        structuredFields: {
-          ...doc.structuredFields,
-          docNo: normalizeDocNoBracket(doc.structuredFields.docNo),
-        },
+        structuredFields: doc.structuredFields,
         body: doc.body,
       }
       await api.put(`/api/docs/${doc.id}`, payload)
@@ -116,10 +112,7 @@ export function DocEditorPage() {
     if (!doc) return
     const result = applyOneClickLayoutWithFields(doc.body, doc.structuredFields)
     const nextBody = result.body
-    const nextFields = {
-      ...result.structuredFields,
-      docNo: normalizeDocNoBracket(result.structuredFields.docNo),
-    }
+    const nextFields = { ...result.structuredFields }
 
     const isDefaultTitle = doc.title === '新建公文' || doc.title === '新建通知'
     const nextTitle = isDefaultTitle && nextFields.title.trim() ? nextFields.title : doc.title
@@ -192,25 +185,68 @@ export function DocEditorPage() {
     }
 
     setAiRewriting(true)
+    setRewritePreview(null)
     try {
       const res = await api.post<{
         message: string
         provider: string
         model: string
         rewritten: string
-      }>('/api/ai/rewrite', { text: selectedText, mode: aiMode })
+      }>('/api/ai/rewrite', { text: selectedText, mode: aiMode }, { timeout: 120000 })
       const rewritten = (res.data.rewritten || '').trim()
       if (!rewritten) {
         alert('智能体未返回有效文本，请重试')
         return
       }
-      editor.chain().focus().insertContentAt({ from, to }, rewritten).run()
+      setRewritePreview({
+        from,
+        to,
+        original: selectedText,
+        rewritten,
+        mode: aiMode,
+      })
     } catch (error: any) {
-      const detail = error?.response?.data?.detail
-      alert(typeof detail === 'string' ? detail : '智能润色失败，请检查后端 DeepSeek 配置')
+      if (error?.code === 'ECONNABORTED') {
+        alert('智能润色请求超时，请检查后端网络与 DeepSeek 配置。')
+      } else {
+        const detail = error?.response?.data?.detail
+        if (typeof detail === 'string') {
+          alert(detail)
+        } else if (Array.isArray(detail)) {
+          const msg = detail.map((item: any) => item?.msg).filter(Boolean).join('；')
+          alert(msg || '智能润色失败，请检查后端 DeepSeek 配置。')
+        } else {
+          alert('智能润色失败，请检查后端 DeepSeek 配置。')
+        }
+      }
     } finally {
       setAiRewriting(false)
     }
+  }
+
+  const applyRewritePreview = () => {
+    if (!rewritePreview) return
+    const editor = editorRef.current
+    if (!editor) return
+
+    const currentText = editor.state.doc.textBetween(rewritePreview.from, rewritePreview.to, '\n', '\n').trim()
+    if (currentText !== rewritePreview.original) {
+      alert('原选区已变化，请重新选择文本并再次智能润色。')
+      return
+    }
+
+    const finalText = rewritePreview.rewritten.trim()
+    if (!finalText) {
+      alert('润色文本为空，请重新生成或手动输入。')
+      return
+    }
+
+    editor
+      .chain()
+      .focus()
+      .insertContentAt({ from: rewritePreview.from, to: rewritePreview.to }, finalText)
+      .run()
+    setRewritePreview(null)
   }
 
   const handleImportClick = () => {
@@ -224,14 +260,19 @@ export function DocEditorPage() {
     form.append('unitId', doc.unitId)
     form.append('docType', doc.docType)
     form.append('title', doc.title || '导入文档')
-    if (doc.redheadTemplateId) form.append('redheadTemplateId', doc.redheadTemplateId)
 
     const res = await api.post<{ docId: string; importReport: any }>('/api/docs/importDocx', form)
-    alert(`导入完成：未识别标题 ${res.data.importReport.unrecognizedTitleCount} 段`) // MVP
+    alert(`导入完成：未识别标题 ${res.data.importReport.unrecognizedTitleCount} 段`)
     navigate(`/docs/${res.data.docId}`)
   }
 
-  const currentTemplateList = useMemo(() => templates, [templates])
+  const hasFixedLeadingNodes = useMemo(() => {
+    const rules = doc?.structuredFields?.topicTemplateRules as any
+    const leadingNodes = rules?.contentTemplate?.leadingNodes
+    return Array.isArray(leadingNodes) && leadingNodes.length > 0
+  }, [doc?.structuredFields?.topicTemplateRules])
+  const previewTitleText = hasFixedLeadingNodes ? doc?.structuredFields?.title || '' : doc?.structuredFields?.title || doc?.title || ''
+  const previewMainToText = hasFixedLeadingNodes ? '' : doc?.structuredFields?.mainTo || ''
 
   if (!doc) {
     return <div className="page">加载中...</div>
@@ -240,60 +281,12 @@ export function DocEditorPage() {
   return (
     <div className="page doc-editor-page">
       <div className="header-row">
-        <Link to="/docs">返回列表</Link>
         <input
           className="doc-title-input"
           value={doc.title}
           onChange={(e) => setDocField({ title: e.target.value })}
           placeholder="文档标题"
         />
-        <select value={doc.docType} onChange={(e) => setDocField({ docType: e.target.value as GovDoc['docType'] })}>
-          <option value="qingshi">请示</option>
-          <option value="jiyao">纪要</option>
-          <option value="han">函</option>
-          <option value="tongzhi">通知</option>
-        </select>
-        <select
-          value={doc.unitId}
-          onChange={(e) => {
-            const unitId = e.target.value
-            setDocField({ unitId, redheadTemplateId: null })
-            void loadTemplates(unitId)
-          }}
-        >
-          {units.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={doc.redheadTemplateId || ''}
-          onChange={(e) => setDocField({ redheadTemplateId: e.target.value || null })}
-          disabled={!doc.structuredFields.exportWithRedhead}
-        >
-          <option value="">请选择红头模板</option>
-          {currentTemplateList.map((tpl) => (
-            <option key={tpl.id} value={tpl.id}>
-              {tpl.name} v{tpl.version} {tpl.isDefault ? '(默认)' : ''}
-            </option>
-          ))}
-        </select>
-        <label className="checkbox-inline">
-          <input
-            type="checkbox"
-            checked={doc.structuredFields.exportWithRedhead}
-            onChange={(e) =>
-              setDocField({
-                structuredFields: {
-                  ...doc.structuredFields,
-                  exportWithRedhead: e.target.checked,
-                },
-              })
-            }
-          />
-          导出含红头
-        </label>
         <button type="button" onClick={saveDoc} disabled={saving}>
           {saving ? '保存中...' : '保存'}
         </button>
@@ -309,7 +302,7 @@ export function DocEditorPage() {
           <option value="polish">智能体模式：润色</option>
         </select>
         <button type="button" onClick={aiRewriteSelection} disabled={aiRewriting}>
-          {aiRewriting ? '智能体处理中...' : '智能润色选中'}
+          {aiRewriting ? '生成预览中...' : rewritePreview ? '重新润色预览' : '智能润色选中'}
         </button>
       </div>
 
@@ -328,11 +321,38 @@ export function DocEditorPage() {
       <FontStatusBar status={status} missing={missing} onOpenInstaller={() => setInstallerOpen(true)} />
       {!ready && <div className="font-preview-warning">当前缺少必需字体，正文框预览字体可能不准确（导出会被阻断）。</div>}
 
+      {rewritePreview && (
+        <div className="ai-preview-panel">
+          <div className="row-between">
+            <strong>智能润色预览</strong>
+            <span className="ai-preview-meta">模式：{AI_MODE_LABEL[rewritePreview.mode]}</span>
+          </div>
+
+          <label>
+            原文
+            <textarea value={rewritePreview.original} readOnly rows={3} />
+          </label>
+          <label>
+            润色后（可编辑）
+            <textarea
+              value={rewritePreview.rewritten}
+              rows={5}
+              onChange={(e) => setRewritePreview((prev) => (prev ? { ...prev, rewritten: e.target.value } : prev))}
+            />
+          </label>
+          <div className="row-gap">
+            <button type="button" onClick={applyRewritePreview} disabled={!rewritePreview.rewritten.trim()}>
+              替换正文
+            </button>
+            <button type="button" onClick={() => setRewritePreview(null)}>
+              取消
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="editor-layout">
-        <StructuredFormPanel
-          value={doc.structuredFields}
-          onChange={(next) => setDocField({ structuredFields: { ...next, docNo: normalizeDocNoBracket(next.docNo) } })}
-        />
+        <StructuredFormPanel value={doc.structuredFields} onChange={(next) => setDocField({ structuredFields: { ...next } })} />
 
         <TiptapEditor
           value={doc.body}
@@ -341,11 +361,12 @@ export function DocEditorPage() {
           onReady={(editor) => {
             editorRef.current = editor
           }}
-          titleText={doc.structuredFields.title || doc.title}
-          mainToText={doc.structuredFields.mainTo}
+          titleText={previewTitleText}
+          mainToText={previewMainToText}
           signOffText={doc.structuredFields.signOff}
           dateText={doc.structuredFields.date}
           attachments={doc.structuredFields.attachments}
+          topicTemplateRules={doc.structuredFields.topicTemplateRules || null}
         />
 
         <ValidationPanel issues={issues} onCheck={runCheck} onOneClickLayout={doOneClickLayout} onLocate={locatePath} />

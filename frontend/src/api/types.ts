@@ -1,7 +1,6 @@
 ﻿export type Unit = {
   id: string
   name: string
-  code: string
 }
 
 export type RedheadElement = {
@@ -141,3 +140,4 @@ export type DeletionAuditEvent = {
   startedAt: string
   endedAt: string
 }
+

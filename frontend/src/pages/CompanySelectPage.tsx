@@ -9,7 +9,6 @@ export function CompanySelectPage() {
   const [companies, setCompanies] = useState<Unit[]>([])
   const [loading, setLoading] = useState(false)
   const [name, setName] = useState('')
-  const [code, setCode] = useState('')
   const [creating, setCreating] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
@@ -36,9 +35,8 @@ export function CompanySelectPage() {
 
     setCreating(true)
     try {
-      await api.post<Unit>('/api/units', { name: companyName, code: code.trim() || undefined })
+      await api.post<Unit>('/api/units', { name: companyName })
       setName('')
-      setCode('')
       await load()
     } catch (error: any) {
       const message = error?.response?.data?.detail || '创建公司失败'
@@ -68,16 +66,12 @@ export function CompanySelectPage() {
     <div className="page">
       <div className="header-row">
         <h2>公司选择</h2>
-        <button type="button" onClick={() => navigate('/docs')}>
-          进入文档中心
-        </button>
       </div>
 
       <div className="unit-editor-card">
         <strong>新建公司</strong>
         <div className="row-gap">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="公司名称（必填）" />
-          <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="公司编码（可选）" />
           <button type="button" onClick={() => void createCompany()} disabled={creating}>
             {creating ? '创建中...' : '创建公司'}
           </button>
@@ -93,7 +87,6 @@ export function CompanySelectPage() {
           <thead>
             <tr>
               <th>公司名称</th>
-              <th>编码</th>
               <th>操作</th>
             </tr>
           </thead>
@@ -101,7 +94,6 @@ export function CompanySelectPage() {
             {companies.map((company) => (
               <tr key={company.id}>
                 <td>{company.name}</td>
-                <td>{company.code}</td>
                 <td>
                   <div className="row-gap">
                     <button type="button" onClick={() => navigate(`/companies/${company.id}/topics`)}>

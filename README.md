@@ -1,91 +1,175 @@
-﻿# 内网可部署 Web 公文排版系统（MVP）
+﻿# 公文智能排版系统（青年创意大赛参赛版）
 
-本项目实现了请示/纪要/函三类公文的内网排版 MVP，支持：
-- DOCX 导入净化（剥离原红头）
-- 在线编辑（结构化要素 + 富文本正文）
-- 红头模板（单位级、多版本、可发布）
-- 规范校验 AB（样式基础 + 标题层级/句末标点）
-- 导出 DOCX（可继续编辑）
-- DeepSeek Agent 润色（选中文本一键改写）
-- 字体强制检测（缺字体阻断导出）
+面向政企常见公文场景（纪要、通知、请示、函），本项目提供一套“训练即模板、编辑即排版、导出即成文”的 Web 化系统。
 
-## 1. 技术栈
-- 前端：React + TypeScript + Vite + Tiptap
-- 后端：FastAPI + SQLAlchemy
-- 存储：PostgreSQL（元数据）+ MinIO（导入源文件/导出文件）
-- DOCX：`python-docx` 服务端解析/生成
-- 部署：Docker Compose（frontend + backend + postgres + minio）
+核心目标：
+- 降低公文排版门槛，让非专业用户也能稳定产出规范文稿。
+- 将“格式经验”沉淀为可复用模板，而不是依赖个人反复手工调整。
+- 在智能辅助场景下保证可控性和可追溯性（先预览再替换、训练审计可查）。
 
-## 2. 目录结构
+## 1. 项目亮点（参赛价值）
+
+- 模板可学习：上传历史 DOCX/PDF，系统自动推断正文、标题层级、边距、尾部固定块等规则，形成题材模板。
+- 红头可复用：支持红头模板数据化表达（元素、坐标、字体、红线），导出时生成可编辑 DOCX。
+- 智能辅助可控：接入 DeepSeek 进行改写/修订，但正文润色采用“预览栏 + 用户确认替换”，避免误改原文。
+- 预览与导出一致：前端 A4 画布按模板规则渲染，后端导出按同一规则落地到 `python-docx`。
+- 合规保障机制：强制字体检测、格式校验、一键排版、训练删除审计，兼顾效率与规范。
+- 知识沉淀闭环：公司 -> 题材库 -> 文档库 -> 正文编辑，全流程可追踪、可迭代。
+
+## 2. 典型使用流程
+
+1. 在公司选择页创建/选择公司。
+2. 进入题材库，新建题材（例如“周例会纪要”）。
+3. 进入模板训练页，上传历史材料并分析。
+4. 在训练草稿上通过指令（可选 DeepSeek）修订规则并确认模板。
+5. 进入正文编辑入口，按模板新建文档。
+6. 在正文编辑页进行结构化填充、正文编写、规范校验、一键排版。
+7. 在“文档库”查看该题材下所有已保存文档并继续编辑或删除。
+8. 导出 DOCX 用于流转盖章，保留二次编辑能力。
+
+## 3. 功能全景
+
+### 3.1 公司与题材管理
+- 公司管理：创建、删除公司（删除时级联清理题材/文档/模板/对象存储）。
+- 题材管理：创建、删除题材。
+- 页面流转：`公司选择 -> 题材库 -> 文档库 -> 正文编辑`。
+- 全局返回按钮：按固定业务层级回退，避免跳转混乱。
+
+### 3.2 模板训练与版本化
+- 训练输入：支持 DOCX/PDF。
+- 自动推断：
+  - 正文样式（字体、字号、行距、首行缩进）
+  - 标题层级样式（H1~H4）
+  - 页边距
+  - 固定前置/后置内容（含红线分隔符）
+- 置信度报告：展示每类规则的置信度与样本数。
+- 草稿版本：每次分析/修订生成新草稿版本。
+- 模板确认：草稿确认后形成正式模板版本，并可切换生效版本。
+- 模板删除：支持删除指定版本，自动处理“当前生效模板”的回退。
+
+### 3.3 智能体修订（模板层）
+- 本地规则补丁：对模板规则做确定性 patch。
+- DeepSeek 对话修订：支持连续上下文对话修订模板草稿。
+- 零留存策略：训练文件不落盘，仅保留删除审计元数据。
+
+### 3.4 正文编辑（文档层）
+- 三栏工作区：
+  - 左侧：结构化要素（标题、主送、落款、日期、附件）。
+  - 中间：A4 正文编辑与实时预览（含红头叠加、尾部要素）。
+  - 右侧：规范校验与一键排版。
+- 智能润色：针对选中文本调用 DeepSeek，先显示预览，再由用户点击“替换正文”。
+- 导入 DOCX：抽取正文结构并输出导入报告。
+- 导出 DOCX：保持红头、页码、边距、标题层级、尾部格式一致。
+
+### 3.5 文档库（题材内）
+- 每个题材独立文档库。
+- 展示文档标题与更新时间（按本地时区格式化）。
+- 支持打开编辑与删除文档。
+
+### 3.6 规范与合规能力
+- 规范校验：节点类型、标题层级、编号连续性、标题句末标点、正文缩进等。
+- 一键排版：自动规范标题编号/标点、正文段落属性、附件格式等。
+- 字体强检：缺少关键字体时阻断导出，避免“预览正常、导出错字”。
+
+## 4. 技术架构与实现路径
+
+### 4.1 总体架构
+
+```text
+React + TypeScript + Tiptap (frontend)
+            |
+            v
+      FastAPI (backend)
+      |        |        |
+      |        |        +-- DeepSeek(OpenAI兼容接口)
+      |        |
+      |        +-- MinIO / 本地文件存储（导入源、导出产物）
+      |
+      +-- PostgreSQL（公司/题材/模板/文档/审计元数据）
+```
+
+### 4.2 前端实现
+- 路由：React Router，关键页面包括公司选择、题材库、文档库、训练页、正文编辑页。
+- 编辑器：Tiptap + 自定义扩展（段落/标题样式属性、后置名单标签装饰）。
+- 预览渲染：
+  - 使用 CSS 变量承载模板规则（正文、H1~H4、后置标签）。
+  - A4 画布 + 红头叠加层 + 前置/后置固定内容层。
+- 用户交互：
+  - 智能润色预览面板（可编辑、可取消）。
+  - 全局返回按钮按业务层级回退。
+
+### 4.3 后端实现
+- 框架：FastAPI + SQLAlchemy + Pydantic。
+- 数据模型：`Unit`、`Topic`、`TopicTemplateDraft`、`TopicTemplate`、`Document`、`DeletionAuditEvent` 等。
+- 关键服务：
+  - `topic_inference.py`：训练材料样式抽取、模板规则推断、置信度计算。
+  - `ai_agent.py`：DeepSeek 调用封装（文本改写、模板修订）。
+  - `docx_import.py`：DOCX 解析与净化导入。
+  - `docx_export.py`：模板规则到 Word 排版的确定性映射。
+  - `checker.py`：格式规范校验。
+  - `storage.py`：MinIO / 本地双模式存储。
+
+### 4.4 一致性保障机制（重点）
+- 同一套模板规则同时驱动前端预览与后端导出。
+- 后置名单（主持/参加/记录/发送等）通过规则归一为正文样式，避免局部黑体残留。
+- 红色分割线作为显式节点属性（`dividerRed`）在预览和导出两端同步处理。
+
+## 5. 关键创新点（大赛陈述建议）
+
+- 从“文档编辑器”升级为“格式知识引擎”：把经验型格式固化为数据化规则。
+- 训练零留存 + 删除审计：兼顾敏感文档场景下的隐私和可监管。
+- 智能体不越权：所有 AI 改动均可见、可回退、可人工确认。
+- 技术落地导向：不依赖重模型训练，使用规则推断 + 可解释置信度，部署成本低、迭代快。
+
+## 6. 项目结构
 
 ```text
 .
 ├─ backend
 │  ├─ app
-│  │  ├─ routers
-│  │  ├─ services
-│  │  ├─ models.py
-│  │  └─ main.py
-│  └─ assets/fonts/font-pack.zip
+│  │  ├─ routers          # API 路由（公司/题材/训练/文档/AI）
+│  │  ├─ services         # 推断、导入导出、校验、存储、AI
+│  │  ├─ models.py        # 数据模型
+│  │  ├─ schemas.py       # 请求/响应模型
+│  │  └─ main.py          # 应用入口
+│  └─ assets/fonts        # 字体安装包入口
 ├─ frontend
-│  ├─ src/pages
-│  ├─ src/components
-│  └─ src/utils
-└─ docker-compose.yml
+│  ├─ src/pages           # 业务页面
+│  ├─ src/components      # 编辑器、校验、回退按钮等
+│  ├─ src/utils           # 一键排版、字体检测、时间格式化
+│  └─ src/api             # API 客户端与类型
+├─ docker-compose.yml
+└─ deploy.ps1
 ```
 
-## 3. 快速启动（内网）
+## 7. 快速启动
 
-### 3.1 Docker Compose（推荐）
-要求：安装 Docker Desktop（或等价容器运行时）。
+### 7.1 Docker Compose（推荐）
+
+前置条件：已安装并启动 Docker Desktop。
+
+在项目根目录（有 `docker-compose.yml` 的目录）执行：
 
 ```bash
 docker compose up -d --build
 ```
 
-### 3.1.1 一键发布脚本（Windows PowerShell）
-
-项目根目录已提供 `deploy.ps1`：
-
-```powershell
-cd "D:\桌面\publicText"
-.\deploy.ps1 -Target frontend
-```
-
-常用参数：
-- `-Target frontend`：只重建发布前端（默认）
-- `-Target backend`：只重建发布后端
-- `-Target all`：重建发布前后端
-- `-NoCache`：无缓存重建
-- `-ShowLogs`：发布后输出最近日志
-
-示例：
-
-```powershell
-.\deploy.ps1 -Target all -NoCache -ShowLogs
-```
-
-若从 `cmd` 调用 PowerShell，建议加 `-NoProfile`（避免本机 profile 干扰）：
-
-```cmd
-powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy.ps1 -Target frontend
-```
-
-访问：
+访问地址：
 - 前端：`http://localhost:5174`
 - 后端：`http://localhost:8000`
-- MinIO Console：`http://localhost:9001`（账号 `minioadmin/minioadmin`）
+- 健康检查：`http://localhost:8000/api/health`
+- MinIO 控制台：`http://localhost:9001`
 
-### 3.2 本地开发启动（无 Docker）
+仅重建前后端：
 
-后端：
 ```bash
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+docker compose up -d --build backend frontend
 ```
 
-接入 DeepSeek（OpenAI 兼容接口）需配置 `backend/.env`：
+### 7.2 DeepSeek 配置
+
+在项目根目录创建 `.env`（供 `docker compose` 读取）：
+
 ```env
 DEEPSEEK_API_KEY=你的密钥
 DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
@@ -94,124 +178,103 @@ DEEPSEEK_TIMEOUT_SEC=45
 DEEPSEEK_TEMPERATURE=0.2
 ```
 
-前端：
+说明：
+- 若不配置 `DEEPSEEK_API_KEY`，智能润色/智能修订会失败，其他功能可正常运行。
+- 更新 `.env` 后请重建 `backend` 容器使配置生效。
+
+### 7.3 Windows 一键发布脚本
+
+```powershell
+.\deploy.ps1 -Target all -NoCache -ShowLogs
+```
+
+常用参数：
+- `-Target frontend|backend|all`
+- `-NoCache`
+- `-ShowLogs`
+
+## 8. 本地开发（无 Docker）
+
+### 8.1 后端
+
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+后端读取环境变量时会加载当前工作目录的 `.env`。
+
+### 8.2 前端
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-## 4. 字体强制要求与安装
+如需指定后端地址，可在前端环境变量中设置 `VITE_API_BASE`。
 
-系统硬性要求字体（缺任一即阻断导出）：
+## 9. 核心 API（摘要）
+
+### 公司与题材
+- `GET /api/companies`
+- `POST /api/units`
+- `DELETE /api/units/{unit_id}`
+- `GET /api/topics?companyId=...`
+- `POST /api/topics`
+- `DELETE /api/topics/{topic_id}`
+
+### 模板训练
+- `POST /api/topics/{topic_id}/analyze`
+- `GET /api/topics/{topic_id}/drafts/latest`
+- `POST /api/topics/{topic_id}/agent/revise`
+- `POST /api/topics/{topic_id}/confirm-template`
+- `GET /api/topics/{topic_id}/templates`
+- `DELETE /api/topics/{topic_id}/templates/{template_id}`
+
+### 文档
+- `POST /api/topics/{topic_id}/docs`
+- `GET /api/docs?topicId=...`
+- `GET /api/docs/{doc_id}`
+- `PUT /api/docs/{doc_id}`
+- `DELETE /api/docs/{doc_id}`
+- `POST /api/docs/{doc_id}/check`
+- `POST /api/docs/importDocx`
+- `POST /api/docs/{doc_id}/exportDocx`
+
+### AI
+- `POST /api/ai/rewrite`
+
+## 10. 字体与版权合规
+
+系统要求字体：
 - 方正小标宋简
 - 仿宋_GB2312
 - 楷体_GB2312
 - 黑体
 
-### 4.1 检测机制
-- 进入编辑页自动检测并显示状态条
-- 点击“导出 DOCX”前强制复检
-- 检测优先使用 `document.fonts.check`，并使用 Canvas 宽度对比法兜底
-- 结果可缓存到 `localStorage`，导出前始终复检
+说明：
+- 编辑页自动检测字体，导出前强制复检。
+- 仓库不内置受版权约束的商用字体文件，请使用单位已授权字体。
 
-### 4.2 安装入口
-- 下载：`/assets/fonts/font-pack.zip`
+## 11. 大赛演示建议脚本（5 分钟）
 
-> 注意：仓库内 `font-pack.zip` 仅含安装说明与占位文件，请在内网替换为已授权字体文件后分发。
+1. 展示“公司 -> 题材库 -> 文档库 -> 正文编辑”整体流程。
+2. 上传历史纪要训练材料，生成草稿并展示置信度报告。
+3. 输入修订指令，演示智能体修订并确认模板版本。
+4. 新建正文，演示一键排版和规范校验定位。
+5. 选中段落进行智能润色，展示“预览后替换”。
+6. 导出 DOCX，打开文件验证红头、字体、编号和尾部格式。
 
-### 4.3 安装步骤
-- Windows：右键字体文件 -> 安装 / 为所有用户安装
-- macOS：用 Font Book 安装
+## 12. 当前边界与后续规划
 
-## 5. 红头模板（单位级可配置）
+当前已实现：
+- 面向纪要/通知/请示/函的模板化排版闭环。
+- 训练推断、版本管理、正文编辑、校验、导入导出、智能润色。
 
-- 数据结构：JSON（page + elements）
-- 作用域：仅首页（Different First Page）
-- 元素类型：`text` / `line`
-- 绑定字段：`unitName/docNo/signatory/copyNo/fixedText`
-- 管理能力：列表、编辑、复制、发布、设默认、停用
-- 预览能力：A4 画布 + 边距线 + 顶部安全区 + 元素高亮
-
-### 发布前校验
-阻断：
-1. 溢出顶部安全区
-2. `yCm < 0` 或 `yCm >= 3.7`
-3. 缺少 `unitName` 文本元素
-
-警告：
-- `docNo` 与 `signatory` y 差值 > 0.05cm
-- `unitName` 非 center anchor
-
-## 6. 文档编辑能力
-
-- 文档类型：请示/纪要/函
-- 双模式：
-  - 左侧结构化字段：title/mainTo/docNo/signatory/copyNo/date/attachments
-  - 中间富文本：H1~H4、列表、表格
-- 自动编号：`一、（一）1.（1）` 重排
-- 智能粘贴：保留少量语义标签（标题/加粗/列表/表格），剥离脏样式
-- 校验 AB：右侧面板显示问题并可定位
-- 一键套版：正文缩进、标题标点规则、编号重排、文号括号归一 `〔〕`
-
-## 7. DOCX 导入与导出
-
-### 7.1 导入净化
-- 服务端解析 DOCX 段落/标题/编号/表格
-- 默认忽略原页眉复杂对象（剥离原红头）
-- 标题识别：优先编号形态，其次字体特征辅助
-- 生成导入报告：未识别标题、编号异常、表格异常
-- 导入后轻量套版
-
-### 7.2 导出 DOCX
-- 页面：A4 + 边距 3.7/3.5/2.7/2.5 cm
-- 正文：仿宋_GB2312 3号、固定行距 28pt、首行缩进两字
-- 页码：页脚居中
-- 红头：仅首页页眉（Different First Page）
-- 红头实现：段落 + 制表位 + 段落边框（红线），不使用浮动文本框
-
-## 8. API 一览
-
-- Units
-  - `GET /api/units`
-- Redhead Templates
-  - `GET /api/redheadTemplates?unitId=`
-  - `GET /api/redheadTemplates/:id`
-  - `POST /api/redheadTemplates`
-  - `PUT /api/redheadTemplates/:id`
-  - `POST /api/redheadTemplates/:id/clone`
-  - `POST /api/redheadTemplates/:id/publish`
-  - `POST /api/redheadTemplates/:id/disable`
-  - `POST /api/redheadTemplates/:id/setDefault`
-- Documents
-  - `GET /api/docs`
-  - `POST /api/docs`
-  - `GET /api/docs/:id`
-  - `PUT /api/docs/:id`
-  - `POST /api/docs/:id/check`
-  - `POST /api/docs/importDocx`
-  - `POST /api/docs/:id/exportDocx`
-- AI
-  - `POST /api/ai/rewrite`
-
-## 9. 内置示例数据
-- 2 个单位
-- 每单位 2 个红头模板（模板A/模板B）
-- 3 个示例文档（请示/纪要/函）
-
-## 10. 自测记录
-
-已执行：
-- `python -m compileall backend/app` 通过
-- `npm run build`（frontend）通过
-- 后端核心链路脚本验证：
-  - 种子数据初始化成功（3 文档）
-  - 文档校验执行成功
-  - DOCX 导出成功（生成二进制）
-  - DOCX 导入成功（返回导入报告）
-
-未执行：
-- `docker compose up`（当前环境无 `docker` 命令）
-
-## 11. 许可证与字体合规
-本项目代码不内置受版权约束的商用中文字库文件。请在单位已获授权前提下，将合法字体文件放入 `font-pack.zip` 后在内网发布。
+后续规划：
+- 多角色协作与审批流。
+- 更细粒度模板对比与回滚。
+- 规则异常自动诊断与修复建议。
+- 多机构私有化部署与权限域隔离。

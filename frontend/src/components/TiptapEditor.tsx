@@ -407,7 +407,7 @@ export function TiptapEditor({
   useEffect(() => {
     if (!editor) return
     editor.commands.setContent(value || { type: 'doc', content: [] }, false)
-  }, [editor, syncToken, value])
+  }, [editor, syncToken])
 
   const title = (titleText || '').trim()
   const mainTo = (mainToText || '').trim()

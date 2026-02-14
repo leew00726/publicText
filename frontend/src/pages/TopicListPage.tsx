@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type { Topic, Unit } from '../api/types'
+import { formatServerDateTime } from '../utils/time'
 
 const TOPIC_STATUS_LABEL: Record<string, string> = {
   active: '启用',
@@ -115,9 +116,12 @@ export function TopicListPage() {
               <tr key={topic.id}>
                 <td>{topic.name}</td>
                 <td>{TOPIC_STATUS_LABEL[topic.status] || topic.status}</td>
-                <td>{new Date(topic.updatedAt).toLocaleString()}</td>
+                <td>{formatServerDateTime(topic.updatedAt)}</td>
                 <td>
                   <div className="row-gap">
+                    <button type="button" onClick={() => navigate(`/topics/${topic.id}/library`)}>
+                      库
+                    </button>
                     <button type="button" onClick={() => navigate(`/topics/${topic.id}`)}>
                       进入正文编辑
                     </button>

@@ -4,6 +4,7 @@ import { CompanySelectPage } from './pages/CompanySelectPage'
 import { DocEditorPage } from './pages/DocEditorPage'
 import { TopicComposePage } from './pages/TopicComposePage'
 import { TopicDetailPage } from './pages/TopicDetailPage'
+import { TopicLibraryPage } from './pages/TopicLibraryPage'
 import { TopicListPage } from './pages/TopicListPage'
 
 export default function App() {
@@ -14,6 +15,7 @@ export default function App() {
         <Route path="/" element={<CompanySelectPage />} />
         <Route path="/companies/:companyId/topics" element={<TopicListPage />} />
         <Route path="/topics/:topicId" element={<TopicComposePage />} />
+        <Route path="/topics/:topicId/library" element={<TopicLibraryPage />} />
         <Route path="/topics/:topicId/train" element={<TopicDetailPage />} />
         <Route path="/docs/:id" element={<DocEditorPage />} />
         <Route path="*" element={<Navigate to="/" />} />

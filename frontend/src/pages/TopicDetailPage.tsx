@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type { DeletionAuditEvent, TopicAnalyzeResponse, TopicConfirmResponse, TopicDraft, TopicTemplate } from '../api/types'
+import { formatServerDateTime } from '../utils/time'
 import { summarizeConfidenceAsNarrative, summarizeRulesAsNarrative } from '../utils/topicNarrative'
 
 const DRAFT_STATUS_LABEL: Record<string, string> = {
@@ -298,7 +299,7 @@ export function TopicDetailPage() {
                   <tr key={item.id}>
                     <td>v{item.version}</td>
                     <td>{item.effective ? '是' : '否'}</td>
-                    <td>{new Date(item.createdAt).toLocaleString()}</td>
+                    <td>{formatServerDateTime(item.createdAt)}</td>
                     <td>
                       <button
                         type="button"
@@ -338,7 +339,7 @@ export function TopicDetailPage() {
                   <td>{event.fileCount}</td>
                   <td>{event.totalBytes}</td>
                   <td>{event.errorCode || '-'}</td>
-                  <td>{new Date(event.endedAt).toLocaleString()}</td>
+                  <td>{formatServerDateTime(event.endedAt)}</td>
                 </tr>
               ))}
             </tbody>

@@ -3,7 +3,7 @@
 from datetime import datetime
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -43,8 +43,14 @@ def _to_out(row: Document) -> DocumentOut:
 
 
 @router.get("", response_model=list[DocumentOut])
-def list_docs(db: Session = Depends(get_db)):
-    rows = db.query(Document).order_by(Document.updated_at.desc()).all()
+def list_docs(topicId: str | None = Query(default=None), unitId: str | None = Query(default=None), db: Session = Depends(get_db)):
+    query = db.query(Document)
+    if unitId:
+        query = query.filter(Document.unit_id == unitId)
+
+    rows = query.order_by(Document.updated_at.desc()).all()
+    if topicId:
+        rows = [row for row in rows if isinstance(row.structured_fields, dict) and row.structured_fields.get("topicId") == topicId]
     return [_to_out(r) for r in rows]
 
 

@@ -491,6 +491,51 @@ class TopicApiTests(unittest.TestCase):
         self.assertEqual(list_after_second_delete.status_code, 200)
         self.assertEqual(list_after_second_delete.json(), [])
 
+    def test_list_docs_can_filter_by_topic_id(self) -> None:
+        company_resp = self.client.post("/api/units", json={"name": f"topic_docs_filter_{uuid.uuid4().hex[:8]}"})
+        self.assertEqual(company_resp.status_code, 200)
+        company_id = company_resp.json()["id"]
+
+        topic_a = self.client.post(
+            "/api/topics",
+            json={"companyId": company_id, "name": "题材A", "description": "文档筛选A"},
+        )
+        self.assertEqual(topic_a.status_code, 200)
+        topic_a_id = topic_a.json()["id"]
+
+        topic_b = self.client.post(
+            "/api/topics",
+            json={"companyId": company_id, "name": "题材B", "description": "文档筛选B"},
+        )
+        self.assertEqual(topic_b.status_code, 200)
+        topic_b_id = topic_b.json()["id"]
+
+        create_a = self.client.post(
+            f"/api/topics/{topic_a_id}/docs",
+            json={"title": "题材A文档"},
+        )
+        self.assertEqual(create_a.status_code, 200)
+        doc_a_id = create_a.json()["id"]
+
+        create_b = self.client.post(
+            f"/api/topics/{topic_b_id}/docs",
+            json={"title": "题材B文档"},
+        )
+        self.assertEqual(create_b.status_code, 200)
+        doc_b_id = create_b.json()["id"]
+
+        filtered_a = self.client.get("/api/docs", params={"topicId": topic_a_id})
+        self.assertEqual(filtered_a.status_code, 200)
+        filtered_a_ids = [item["id"] for item in filtered_a.json()]
+        self.assertIn(doc_a_id, filtered_a_ids)
+        self.assertNotIn(doc_b_id, filtered_a_ids)
+
+        filtered_b = self.client.get("/api/docs", params={"topicId": topic_b_id})
+        self.assertEqual(filtered_b.status_code, 200)
+        filtered_b_ids = [item["id"] for item in filtered_b.json()]
+        self.assertIn(doc_b_id, filtered_b_ids)
+        self.assertNotIn(doc_a_id, filtered_b_ids)
+
     @patch("app.routers.topics.extract_pdf_features", create=True)
     def test_topic_analyze_accepts_pdf_file(self, mock_extract_pdf) -> None:
         mock_extract_pdf.return_value = {

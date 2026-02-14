@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type { RedheadTemplate, Unit } from '../api/types'
+import { formatServerDateTime } from '../utils/time'
 import { buildDefaultTemplateA } from '../utils/redheadDefaults'
 
 const STATUS_LABEL: Record<string, string> = {
@@ -107,7 +108,7 @@ export function RedheadTemplateListPage() {
               <td>{tpl.version}</td>
               <td>{STATUS_LABEL[tpl.status] || tpl.status}</td>
               <td>{tpl.isDefault ? '是' : '否'}</td>
-              <td>{new Date(tpl.updatedAt).toLocaleString()}</td>
+              <td>{formatServerDateTime(tpl.updatedAt)}</td>
               <td className="row-gap">
                 <button type="button" onClick={() => navigate(`/redheads/${tpl.id}`)}>
                   编辑

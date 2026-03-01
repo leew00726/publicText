@@ -278,3 +278,64 @@ npm run dev
 - 更细粒度模板对比与回滚。
 - 规则异常自动诊断与修复建议。
 - 多机构私有化部署与权限域隔离。
+
+## 13. 全量迁移（旧电脑到新电脑）
+
+为保证“代码 + 数据 + 对象文件 + 环境变量”完整复现，仓库根目录提供了两个脚本：
+- `backup-all.ps1`：在旧电脑导出备份
+- `restore-all.ps1`：在新电脑导入恢复
+
+### 13.1 旧电脑导出
+
+在项目根目录执行：
+
+```powershell
+.\backup-all.ps1
+```
+
+默认会生成到：
+- `.\backups\public-text-时间戳`
+
+可选参数：
+
+```powershell
+.\backup-all.ps1 -BackupDir C:\backup\publicText
+.\backup-all.ps1 -SkipEnvCopy
+```
+
+导出内容包含：
+- `public_text.dump`（PostgreSQL）
+- `minio_data.zip`（MinIO `/data`）
+- `.env`（可选）
+- `git-info.txt`、`checksums.txt`、`manifest.json`、`font-check.txt`
+
+### 13.2 新电脑导入
+
+1. 将备份目录拷到新电脑（例如 `C:\backup\publicText`）。
+2. 将同版本代码放到项目目录（建议用 `git` checkout 到备份中的 commit）。
+3. 在项目根目录执行：
+
+```powershell
+.\restore-all.ps1 -BackupDir C:\backup\publicText
+```
+
+脚本会要求输入 `RESTORE` 确认覆盖。若要跳过交互：
+
+```powershell
+.\restore-all.ps1 -BackupDir C:\backup\publicText -Force
+```
+
+可选参数：
+
+```powershell
+.\restore-all.ps1 -BackupDir C:\backup\publicText -SkipEnvRestore
+```
+
+恢复完成后访问：
+- 前端：`http://localhost:5174`
+- 后端健康检查：`http://localhost:8000/api/health`
+
+### 13.3 注意事项
+
+- 两台机器都需要 Docker Desktop 正常运行。
+- 若你使用受版权约束字体，请在新电脑单独安装授权字体（脚本不会复制系统字体）。

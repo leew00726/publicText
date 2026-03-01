@@ -13,5 +13,8 @@ __pycache__/
 # env
 .env
 
+# local backups
+backups/
+
 # misc
 .DS_Store

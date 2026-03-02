@@ -11,6 +11,7 @@ export function GlobalBackButton() {
   const [topicCompanyId, setTopicCompanyId] = useState<string | null>(null)
 
   const docMatch = useMemo(() => matchPath('/docs/:id', location.pathname), [location.pathname])
+  const companyHomeMatch = useMemo(() => matchPath('/companies', location.pathname), [location.pathname])
   const topicListMatch = useMemo(() => matchPath('/companies/:companyId/topics', location.pathname), [location.pathname])
   const topicLibraryMatch = useMemo(() => matchPath('/topics/:topicId/library', location.pathname), [location.pathname])
   const topicComposeMatch = useMemo(() => matchPath('/topics/:topicId', location.pathname), [location.pathname])
@@ -82,12 +83,15 @@ export function GlobalBackButton() {
       return `/companies/${topicCompanyId}/topics`
     }
     if (topicListMatch?.params?.companyId) {
-      return '/'
+      return '/companies'
+    }
+    if (companyHomeMatch) {
+      return '/workspace'
     }
     return null
-  }, [isDocPage, docTopicId, topicLibraryMatch, topicComposeMatch, topicTrainMatch, topicCompanyId, topicListMatch])
+  }, [isDocPage, docTopicId, topicLibraryMatch, topicComposeMatch, topicTrainMatch, topicCompanyId, topicListMatch, companyHomeMatch])
 
-  if (location.pathname === '/') {
+  if (location.pathname === '/' || location.pathname === '/workspace') {
     return null
   }
 
@@ -103,7 +107,7 @@ export function GlobalBackButton() {
         if (window.history.length > 1) {
           navigate(-1)
         } else {
-          navigate('/')
+          navigate('/workspace')
         }
       }}
     >

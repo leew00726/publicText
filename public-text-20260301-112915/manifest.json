@@ -1,0 +1,14 @@
+﻿{
+    "generatedAtUtc":  "2026-03-01T03:29:18.5807550Z",
+    "machine":  "LEE",
+    "backupDir":  "C:\\Users\\lzy\\Desktop\\publicText\\backups\\public-text-20260301-112915",
+    "databaseName":  "public_text",
+    "databaseDumpFile":  "public_text.dump",
+    "databaseDumpBytes":  27271,
+    "minioArchiveFile":  "minio_data.zip",
+    "minioArchiveBytes":  46700,
+    "includesEnvFile":  true,
+    "gitInfoFile":  "git-info.txt",
+    "fontReportFile":  "font-check.txt",
+    "checksumsFile":  "checksums.txt"
+}

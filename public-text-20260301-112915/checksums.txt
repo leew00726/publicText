@@ -1,0 +1,8 @@
+﻿
+Path                                                                                 Hash                         
+----                                                                                 ----                         
+C:\Users\lzy\Desktop\publicText\backups\public-text-20260301-112915\public_text.dump 7D9B2F7A0C4DE61DE1D20DD947...
+C:\Users\lzy\Desktop\publicText\backups\public-text-20260301-112915\minio_data.zip   1FB94A26D7789C7BBACD272CA6...
+
+
+

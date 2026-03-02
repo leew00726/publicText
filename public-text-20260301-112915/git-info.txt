@@ -1,0 +1,8 @@
+﻿commit=887cd29854753574a21aed2e0465e1ebab82d3a2
+branch=main
+
+status:
+ M README.md
+?? backup-all.ps1
+?? backups/
+?? restore-all.ps1

@@ -1,0 +1,16 @@
+
+> public-text-frontend@0.1.0 dev
+> vite --host 0.0.0.0 --port 5174
+
+Port 5174 is in use, trying another one...
+Port 5175 is in use, trying another one...
+Port 5176 is in use, trying another one...
+
+  [32m[1mVITE[22m v6.4.1[39m  [2mready in [0m[1m316[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5177[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://198.18.0.1:[1m5177[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.31.247:[1m5177[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://172.18.128.1:[1m5177[22m/[39m
+[2m12:58:56[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32m✨ new dependencies optimized: [33m@tiptap/core, @tiptap/pm/state, @tiptap/pm/view, @tiptap/extension-heading, @tiptap/extension-paragraph[32m[39m
+[2m12:58:56[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32m✨ optimized dependencies changed. reloading[39m

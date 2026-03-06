@@ -5,6 +5,8 @@ export type EmployeeSession = {
   username: string
   role: EmployeeRole
   loginAt: string
+  companyId?: string
+  companyName?: string
 }
 
 export type EmployeeModule = {
@@ -26,6 +28,11 @@ export type EmployeeLoginValidation = {
   passwordError: string | null
 }
 
+export type EmployeeCompanyRef = {
+  id: string
+  name: string
+}
+
 export const EMPLOYEE_SESSION_STORAGE_KEY = 'public_text_employee_session'
 
 const MIN_PASSWORD_LENGTH = 6
@@ -35,21 +42,21 @@ const MODULE_DEFINITIONS: ModuleDefinition[] = [
     key: 'summary',
     title: '公文总结',
     description: '聚焦内容提炼、要点归纳与主题提取，快速形成可复用摘要。',
-    entryPath: '/companies',
+    entryPath: '/summary',
     allowedRoles: ['staff', 'admin'],
   },
   {
     key: 'layout',
     title: '公文排版',
     description: '统一正文结构、格式规范和输出标准，提升发文一致性。',
-    entryPath: '/companies',
+    entryPath: '/layout',
     allowedRoles: ['staff', 'admin'],
   },
   {
     key: 'management',
     title: '公文管理',
     description: '管理公司、题材和历史文档，支持后续权限精细化治理。',
-    entryPath: '/companies',
+    entryPath: '/management',
     allowedRoles: ['admin'],
   },
 ]
@@ -71,11 +78,24 @@ export function validateEmployeeLogin(username: string, password: string): Emplo
   }
 }
 
-export function createEmployeeSession(username: string, role: EmployeeRole, now: Date = new Date()): EmployeeSession {
+export function createEmployeeSession(
+  username: string,
+  role: EmployeeRole,
+  companyOrNow?: EmployeeCompanyRef | Date,
+  nowArg: Date = new Date(),
+): EmployeeSession {
+  const now = companyOrNow instanceof Date ? companyOrNow : nowArg
+  const company = companyOrNow instanceof Date ? null : companyOrNow || null
   return {
     username: username.trim(),
     role,
     loginAt: now.toISOString(),
+    ...(company
+      ? {
+          companyId: company.id.trim(),
+          companyName: company.name.trim(),
+        }
+      : {}),
   }
 }
 
@@ -88,11 +108,23 @@ export function parseEmployeeSession(payload: string | null | undefined): Employ
     if (typeof parsed.username !== 'string' || !parsed.username.trim()) return null
     if (!isEmployeeRole(parsed.role)) return null
     if (typeof parsed.loginAt !== 'string' || Number.isNaN(Date.parse(parsed.loginAt))) return null
+    if (parsed.companyId !== undefined && typeof parsed.companyId !== 'string') return null
+    if (parsed.companyName !== undefined && typeof parsed.companyName !== 'string') return null
+
+    const companyId = typeof parsed.companyId === 'string' ? parsed.companyId.trim() : ''
+    const companyName = typeof parsed.companyName === 'string' ? parsed.companyName.trim() : ''
+    if (Boolean(companyId) !== Boolean(companyName)) return null
 
     return {
       username: parsed.username.trim(),
       role: parsed.role,
       loginAt: parsed.loginAt,
+      ...(companyId && companyName
+        ? {
+            companyId,
+            companyName,
+          }
+        : {}),
     }
   } catch {
     return null

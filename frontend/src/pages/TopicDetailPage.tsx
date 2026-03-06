@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type { DeletionAuditEvent, TopicAnalyzeResponse, TopicConfirmResponse, TopicDraft, TopicTemplate } from '../api/types'
+import { PageHeader } from '../components/PageHeader'
 import { formatServerDateTime } from '../utils/time'
 import { summarizeConfidenceAsNarrative, summarizeRulesAsNarrative } from '../utils/topicNarrative'
 
@@ -46,14 +47,14 @@ export function TopicDetailPage() {
     try {
       const [draftRes, templateRes, auditRes] = await Promise.all([
         api
-          .get<TopicDraft>(`/api/topics/${topicId}/drafts/latest`)
+          .get<TopicDraft>(`/api/management/topics/${topicId}/drafts/latest`)
           .then((res) => res.data)
           .catch((error: any) => {
             if (error?.response?.status === 404) return null
             throw error
           }),
-        api.get<TopicTemplate[]>(`/api/topics/${topicId}/templates`),
-        api.get<DeletionAuditEvent[]>(`/api/topics/${topicId}/audit-events`),
+        api.get<TopicTemplate[]>(`/api/management/topics/${topicId}/templates`),
+        api.get<DeletionAuditEvent[]>(`/api/management/topics/${topicId}/audit-events`),
       ])
       setDraft(draftRes)
       setTemplates(templateRes.data)
@@ -80,7 +81,7 @@ export function TopicDetailPage() {
     setAnalyzing(true)
     setMessage('')
     try {
-      const res = await api.post<TopicAnalyzeResponse>(`/api/topics/${topicId}/analyze`, form, {
+      const res = await api.post<TopicAnalyzeResponse>(`/api/management/topics/${topicId}/analyze`, form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       setDraft(res.data.draft)
@@ -107,7 +108,7 @@ export function TopicDetailPage() {
     setRevising(true)
     setMessage('')
     try {
-      const res = await api.post<TopicDraft>(`/api/topics/${topicId}/agent/revise`, {
+      const res = await api.post<TopicDraft>(`/api/management/topics/${topicId}/agent/revise`, {
         instruction: text,
         patch,
         useDeepSeek,
@@ -138,7 +139,7 @@ export function TopicDetailPage() {
     setConfirming(true)
     setMessage('')
     try {
-      const res = await api.post<TopicConfirmResponse>(`/api/topics/${topicId}/confirm-template`)
+      const res = await api.post<TopicConfirmResponse>(`/api/management/topics/${topicId}/confirm-template`)
       setMessage(`模板 v${res.data.template.version} 已确认并生效。`)
       await load()
     } catch (error: any) {
@@ -159,7 +160,7 @@ export function TopicDetailPage() {
     setDeletingTemplateId(template.id)
     setMessage('')
     try {
-      await api.delete(`/api/topics/${topicId}/templates/${template.id}`)
+      await api.delete(`/api/management/topics/${topicId}/templates/${template.id}`)
       setMessage(`模板 v${template.version} 已删除。`)
       await load()
     } catch (error: any) {
@@ -174,79 +175,85 @@ export function TopicDetailPage() {
   const confidenceNarrative = draft ? summarizeConfidenceAsNarrative(draft.confidenceReport) : []
 
   return (
-    <div className="page">
-      <div className="header-row">
-        <h2>模板训练</h2>
-      </div>
+    <main className="page workspace-page">
+      <PageHeader
+        eyebrow="Training"
+        title="模板训练"
+        description="上传样本、使用 DeepSeek 修订模板草稿，并确认保存模板版本。"
+        meta={
+          <>
+            <span className="soft-pill">题材 ID {topicId}</span>
+            <span className="soft-pill">零留存模式</span>
+            <span className="soft-pill">模板数 {templates.length}</span>
+          </>
+        }
+      />
 
-      <div className="unit-editor-card">
-        <strong>题材 ID：{topicId}</strong>
-        <span>模式：零留存（仅审计元数据）</span>
-      </div>
+      {message ? <div className="inline-status-card">{message}</div> : null}
 
-      <div className="panel">
-        <h3>1）上传并分析训练材料</h3>
-        <div className="row-gap">
-          <input type="file" multiple accept=".docx,.pdf,application/pdf" onChange={(e) => setFiles(Array.from(e.target.files || []))} />
-          <button type="button" onClick={() => void analyze()} disabled={analyzing || loading}>
-            {analyzing ? '分析中...' : '开始分析'}
-          </button>
-        </div>
-      </div>
-
-      <div className="panel">
-        <h3>2）智能体修订模板草稿</h3>
-        <label>
-          修订指令
-          <textarea
-            rows={3}
-            value={instruction}
-            onChange={(e) => setInstruction(e.target.value)}
-            placeholder="例如：正文改为宋体，保持标题层级不变"
-          />
-        </label>
-        <label>
-          正文字体（可选）
-          <input value={bodyFontFamily} onChange={(e) => setBodyFontFamily(e.target.value)} placeholder="例如：宋体" />
-        </label>
-        <label className="checkbox-inline">
-          <input type="checkbox" checked={useDeepSeek} onChange={(e) => setUseDeepSeek(e.target.checked)} />
-          使用 DeepSeek 对话修订
-        </label>
-        {useDeepSeek ? (
-          <div>
-            <div className="row-gap">
-              <strong>对话上下文</strong>
-              <button type="button" onClick={() => setConversation([])} disabled={revising || conversation.length === 0}>
-                清空对话
-              </button>
-            </div>
-            {conversation.length === 0 ? (
-              <p>当前无历史对话，首次指令会作为对话起点。</p>
-            ) : (
-              <ul className="narrative-list">
-                {conversation.map((item, idx) => (
-                  <li key={`${idx}-${item.role}-${item.content.slice(0, 16)}`}>
-                    {item.role === 'user' ? '你' : 'DeepSeek'}：{item.content}
-                  </li>
-                ))}
-              </ul>
-            )}
+      <section className="workspace-grid workspace-grid-two">
+        <div className="panel">
+          <h3>1）上传并分析训练材料</h3>
+          <div className="row-gap">
+            <input type="file" multiple accept=".docx,.pdf,application/pdf" onChange={(e) => setFiles(Array.from(e.target.files || []))} />
+            <button type="button" onClick={() => void analyze()} disabled={analyzing || loading}>
+              {analyzing ? '分析中...' : '开始分析'}
+            </button>
           </div>
-        ) : null}
-        <div className="row-gap">
-          <button type="button" onClick={() => void revise()} disabled={revising || !draft}>
-            {revising ? '修订中...' : '生成修订草稿'}
-          </button>
-          <button type="button" onClick={() => void confirmTemplate()} disabled={confirming || !draft}>
-            {confirming ? '确认中...' : '确认并保存模板'}
-          </button>
         </div>
-      </div>
 
-      {message ? <div className="unit-editor-card">{message}</div> : null}
+        <div className="panel">
+          <h3>2）智能体修订模板草稿</h3>
+          <label>
+            修订指令
+            <textarea
+              rows={3}
+              value={instruction}
+              onChange={(e) => setInstruction(e.target.value)}
+              placeholder="例如：正文改为宋体，保持标题层级不变"
+            />
+          </label>
+          <label>
+            正文字体（可选）
+            <input value={bodyFontFamily} onChange={(e) => setBodyFontFamily(e.target.value)} placeholder="例如：宋体" />
+          </label>
+          <label className="checkbox-inline">
+            <input type="checkbox" checked={useDeepSeek} onChange={(e) => setUseDeepSeek(e.target.checked)} />
+            使用 DeepSeek 对话修订
+          </label>
+          {useDeepSeek ? (
+            <div>
+              <div className="row-gap">
+                <strong>对话上下文</strong>
+                <button type="button" onClick={() => setConversation([])} disabled={revising || conversation.length === 0}>
+                  清空对话
+                </button>
+              </div>
+              {conversation.length === 0 ? (
+                <p>当前无历史对话，首次指令会作为对话起点。</p>
+              ) : (
+                <ul className="narrative-list">
+                  {conversation.map((item, idx) => (
+                    <li key={`${idx}-${item.role}-${item.content.slice(0, 16)}`}>
+                      {item.role === 'user' ? '你' : 'DeepSeek'}：{item.content}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : null}
+          <div className="row-gap">
+            <button type="button" onClick={() => void revise()} disabled={revising || !draft}>
+              {revising ? '修订中...' : '生成修订草稿'}
+            </button>
+            <button type="button" onClick={() => void confirmTemplate()} disabled={confirming || !draft}>
+              {confirming ? '确认中...' : '确认并保存模板'}
+            </button>
+          </div>
+        </div>
+      </section>
 
-      <div className="editor-layout">
+      <section className="workspace-grid workspace-grid-three">
         <div className="panel">
           <h3>最新草稿</h3>
           {loading ? (
@@ -315,9 +322,9 @@ export function TopicDetailPage() {
             </table>
           )}
         </div>
-      </div>
+      </section>
 
-      <div className="panel">
+      <section className="panel">
         <h3>训练材料删除审计</h3>
         {auditEvents.length === 0 ? (
           <p>暂无审计事件。</p>
@@ -345,7 +352,7 @@ export function TopicDetailPage() {
             </tbody>
           </table>
         )}
-      </div>
-    </div>
+      </section>
+    </main>
   )
 }

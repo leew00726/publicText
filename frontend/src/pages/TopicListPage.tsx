@@ -3,6 +3,9 @@ import { useNavigate, useParams } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type { Topic, Unit } from '../api/types'
+import { PageHeader } from '../components/PageHeader'
+import { loadEmployeeSession } from '../utils/employeeAuth'
+import { canPerformAction } from '../utils/pagePermissions'
 import { formatServerDateTime } from '../utils/time'
 
 const TOPIC_STATUS_LABEL: Record<string, string> = {
@@ -10,7 +13,11 @@ const TOPIC_STATUS_LABEL: Record<string, string> = {
   disabled: '停用',
 }
 
-export function TopicListPage() {
+type TopicListPageProps = {
+  mode: 'layout' | 'management'
+}
+
+export function TopicListPage({ mode }: TopicListPageProps) {
   const { companyId = '' } = useParams()
   const navigate = useNavigate()
 
@@ -20,14 +27,18 @@ export function TopicListPage() {
   const [name, setName] = useState('')
   const [creating, setCreating] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const role = loadEmployeeSession()?.role || 'staff'
+  const canCreateTopic = mode === 'management' && canPerformAction(role, 'management.topic.create')
+  const canDeleteTopic = mode === 'management' && canPerformAction(role, 'management.topic.delete')
+  const canManageTopic = mode === 'management'
 
   const load = async () => {
     if (!companyId) return
     setLoading(true)
     try {
       const [companyRes, topicRes] = await Promise.all([
-        api.get<Unit[]>('/api/companies'),
-        api.get<Topic[]>('/api/topics', { params: { companyId } }),
+        api.get<Unit[]>('/api/management/companies'),
+        api.get<Topic[]>('/api/management/topics', { params: { companyId } }),
       ])
       setCompanies(companyRes.data)
       setTopics(topicRes.data)
@@ -43,6 +54,10 @@ export function TopicListPage() {
   const currentCompany = useMemo(() => companies.find((item) => item.id === companyId), [companies, companyId])
 
   const createTopic = async () => {
+    if (!canCreateTopic) {
+      alert('当前账号无创建题材权限，请联系管理员处理。')
+      return
+    }
     const topicName = name.trim()
     if (!topicName) {
       alert('请输入题材名称')
@@ -51,7 +66,7 @@ export function TopicListPage() {
 
     setCreating(true)
     try {
-      await api.post<Topic>('/api/topics', {
+      await api.post<Topic>('/api/management/topics', {
         companyId,
         name: topicName,
       })
@@ -66,12 +81,16 @@ export function TopicListPage() {
   }
 
   const deleteTopic = async (topic: Topic) => {
+    if (!canDeleteTopic) {
+      alert('当前账号无删除题材权限，请联系管理员处理。')
+      return
+    }
     const confirmed = window.confirm(`确认删除题材“${topic.name}”？该操作会删除其模板草稿与审计记录。`)
     if (!confirmed) return
 
     setDeletingId(topic.id)
     try {
-      await api.delete(`/api/topics/${topic.id}`)
+      await api.delete(`/api/management/topics/${topic.id}`)
       await load()
     } catch (error: any) {
       const message = error?.response?.data?.detail || '删除题材失败'
@@ -82,59 +101,89 @@ export function TopicListPage() {
   }
 
   return (
-    <div className="page">
-      <div className="header-row">
-        <h2>题材库{currentCompany ? ` - ${currentCompany.name}` : ''}</h2>
-      </div>
+    <main className="page workspace-page">
+      <PageHeader
+        eyebrow={canManageTopic ? 'Governance' : 'Topics'}
+        title={`${canManageTopic ? '题材管理' : '题材库'}${currentCompany ? ` · ${currentCompany.name}` : ''}`}
+        description={canManageTopic ? '维护题材、模板版本和文档流转入口。' : '从题材库进入文档库或正文编辑入口。'}
+        meta={
+          <>
+            <span className="soft-pill">题材数 {topics.length}</span>
+            <span className="soft-pill">{canManageTopic ? '管理模式' : '排版模式'}</span>
+          </>
+        }
+      />
 
-      <div className="unit-editor-card">
-        <strong>新建题材</strong>
-        <div className="row-gap">
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="例如：周例会纪要" />
-          <button type="button" onClick={() => void createTopic()} disabled={creating || !companyId}>
-            {creating ? '创建中...' : '创建题材'}
-          </button>
-        </div>
-      </div>
+      {canCreateTopic ? (
+        <section className="unit-editor-card">
+          <strong>新建题材</strong>
+          <div className="row-gap">
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="例如：周例会纪要" />
+            <button type="button" onClick={() => void createTopic()} disabled={creating || !companyId}>
+              {creating ? '创建中...' : '创建题材'}
+            </button>
+          </div>
+        </section>
+      ) : null}
 
-      {loading ? (
-        <p>加载中...</p>
-      ) : topics.length === 0 ? (
-        <p>该公司题材库为空，请先新建题材并上传训练材料。</p>
-      ) : (
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>题材名称</th>
-              <th>状态</th>
-              <th>更新时间</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {topics.map((topic) => (
-              <tr key={topic.id}>
-                <td>{topic.name}</td>
-                <td>{TOPIC_STATUS_LABEL[topic.status] || topic.status}</td>
-                <td>{formatServerDateTime(topic.updatedAt)}</td>
-                <td>
-                  <div className="row-gap">
-                    <button type="button" onClick={() => navigate(`/topics/${topic.id}/library`)}>
-                      库
-                    </button>
-                    <button type="button" onClick={() => navigate(`/topics/${topic.id}`)}>
-                      进入正文编辑
-                    </button>
-                    <button type="button" onClick={() => void deleteTopic(topic)} disabled={deletingId === topic.id}>
-                      {deletingId === topic.id ? '删除中...' : '删除'}
-                    </button>
-                  </div>
-                </td>
+      <section className="workspace-table-card">
+        {loading ? (
+          <p>加载中...</p>
+        ) : topics.length === 0 ? (
+          <div className="empty-state">
+            <strong>该公司题材库为空</strong>
+            <p>请先新建题材并上传训练材料，再进入文档编排与治理流程。</p>
+          </div>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>题材名称</th>
+                <th>状态</th>
+                <th>更新时间</th>
+                <th>操作</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </div>
+            </thead>
+            <tbody>
+              {topics.map((topic) => (
+                <tr key={topic.id}>
+                  <td>{topic.name}</td>
+                  <td>{TOPIC_STATUS_LABEL[topic.status] || topic.status}</td>
+                  <td>{formatServerDateTime(topic.updatedAt)}</td>
+                  <td>
+                    <div className="row-gap table-actions">
+                      {canManageTopic ? (
+                        <>
+                          <button type="button" onClick={() => navigate(`/management/topics/${topic.id}/train`)}>
+                            模板训练
+                          </button>
+                          <button type="button" onClick={() => navigate(`/layout/topics/${topic.id}/library`)}>
+                            文档库
+                          </button>
+                          {canDeleteTopic ? (
+                            <button type="button" onClick={() => void deleteTopic(topic)} disabled={deletingId === topic.id}>
+                              {deletingId === topic.id ? '删除中...' : '删除'}
+                            </button>
+                          ) : null}
+                        </>
+                      ) : (
+                        <>
+                          <button type="button" onClick={() => navigate(`/layout/topics/${topic.id}/library`)}>
+                            文档库
+                          </button>
+                          <button type="button" onClick={() => navigate(`/layout/topics/${topic.id}`)}>
+                            进入正文编辑
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+    </main>
   )
 }

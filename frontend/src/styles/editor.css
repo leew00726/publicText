@@ -1,0 +1,454 @@
+.doc-editor-page {
+  gap: 18px;
+}
+
+.editor-command-bar {
+  border-radius: 28px;
+  padding: 16px 18px;
+}
+
+.editor-command-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.doc-title-input {
+  flex: 1 1 280px;
+  min-width: 220px;
+}
+
+.editor-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr) 280px;
+  gap: 18px;
+  align-items: start;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.structured-panel,
+.validation-panel {
+  min-height: 260px;
+}
+
+.structured-panel label,
+.selected-editor label,
+.panel label {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.structured-panel,
+.structured-panel label,
+.structured-panel input,
+.structured-panel select,
+.structured-panel textarea {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.attachments-box,
+.readonly-box {
+  border: 1px dashed rgba(111, 145, 186, 0.22);
+  border-radius: 18px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.attachment-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+  min-width: 0;
+}
+
+.attachment-item input {
+  min-width: 0;
+}
+
+.editor-shell {
+  min-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.66);
+  box-shadow: var(--shadow-lg);
+}
+
+.editor-content {
+  padding: 20px;
+  overflow: auto;
+  font-family: '仿宋_GB2312', var(--font-body);
+  line-height: 28pt;
+  background: linear-gradient(180deg, rgba(232, 240, 251, 0.92), rgba(240, 245, 252, 0.82));
+}
+
+.editor-paper-shell {
+  position: relative;
+  width: 21cm;
+  margin: 0 auto;
+  background: #fff;
+  box-shadow: 0 22px 44px rgba(17, 28, 45, 0.12);
+}
+
+.editor-redhead-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.editor-redhead-text {
+  position: absolute;
+  white-space: pre-wrap;
+  line-height: 1.2;
+}
+
+.editor-redhead-line {
+  position: absolute;
+  border-top-style: solid;
+}
+
+.editor-content.has-frontmatter .editor-prose-wrapper .ProseMirror {
+  padding-top: 0;
+}
+
+.frontmatter-layer {
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.frontmatter-paper {
+  padding: 3.7cm 2.5cm 0 2.7cm;
+}
+
+.frontmatter-title {
+  margin: 0;
+  text-align: center;
+  font-family: '方正小标宋简', '方正小标宋', var(--font-body);
+  font-size: 22pt;
+  line-height: 28pt;
+  font-weight: 400;
+  color: #111;
+}
+
+.frontmatter-main-to {
+  margin: 28pt 0 0 0;
+  text-indent: 0;
+  font-family: '仿宋_GB2312', 'FangSong_GB2312', '仿宋', 'FangSong', var(--font-body);
+  font-size: 16pt;
+  line-height: 28pt;
+  font-weight: 400;
+  color: #111;
+}
+
+.frontmatter-paper.no-title .frontmatter-main-to {
+  margin-top: 0;
+}
+
+.tailmatter-section {
+  padding: 0 2.5cm 3.5cm 2.7cm;
+}
+
+.tailmatter-sign-date {
+  margin-top: 56pt;
+}
+
+.tailmatter-signoff,
+.tailmatter-date,
+.tailmatter-attach-label,
+.tailmatter-attach-item {
+  margin: 0;
+  text-align: right;
+  text-indent: 0;
+  line-height: 28pt;
+  font-size: 16pt;
+  font-family: '仿宋_GB2312', 'FangSong_GB2312', '仿宋', 'FangSong', var(--font-body);
+}
+
+.tailmatter-attachments {
+  margin-top: 28pt;
+}
+
+.tailmatter-attach-label,
+.tailmatter-attach-item {
+  text-align: left;
+  text-indent: 2em;
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror {
+  width: 100%;
+  min-height: 29.7cm;
+  margin: 0 auto;
+  padding: 3.7cm 2.5cm 0 2.7cm;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+  position: relative;
+  z-index: 1;
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror p {
+  margin: 0;
+  text-indent: var(--pt-body-text-indent, 2em);
+  line-height: var(--pt-body-line-height, 28pt);
+  font-size: var(--pt-body-font-size, 16pt);
+  font-family: var(--pt-body-font-family, '仿宋_GB2312', 'FangSong_GB2312', '仿宋', 'FangSong', var(--font-body));
+  font-weight: 400;
+  font-synthesis: none;
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror li > p,
+.editor-content .editor-prose-wrapper .ProseMirror td > p,
+.editor-content .editor-prose-wrapper .ProseMirror th > p {
+  font-family: var(--pt-body-font-family, '仿宋_GB2312', 'FangSong_GB2312', '仿宋', 'FangSong', var(--font-body));
+  font-size: var(--pt-body-font-size, 16pt);
+  line-height: var(--pt-body-line-height, 28pt);
+  font-synthesis: none;
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror h1,
+.editor-content .editor-prose-wrapper .ProseMirror h2,
+.editor-content .editor-prose-wrapper .ProseMirror h3,
+.editor-content .editor-prose-wrapper .ProseMirror h4 {
+  margin: 0;
+  text-indent: 0;
+  line-height: var(--pt-body-line-height, 28pt);
+  font-size: var(--pt-body-font-size, 16pt);
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror h1 {
+  font-family: var(--pt-h1-font-family, '黑体', 'SimHei', 'Heiti SC', var(--font-ui));
+  font-size: var(--pt-h1-font-size, 16pt);
+  font-weight: var(--pt-h1-font-weight, 700);
+  line-height: var(--pt-h1-line-height, 28pt);
+  font-synthesis: none;
+  text-indent: var(--pt-h1-text-indent, 2em);
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror h2 {
+  font-family: var(--pt-h2-font-family, '黑体', 'SimHei', 'Heiti SC', var(--font-ui));
+  font-size: var(--pt-h2-font-size, 16pt);
+  font-weight: var(--pt-h2-font-weight, 400);
+  line-height: var(--pt-h2-line-height, 28pt);
+  font-synthesis: none;
+  text-indent: var(--pt-h2-text-indent, 2em);
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror h3 {
+  font-family: var(--pt-h3-font-family, '仿宋_GB2312', 'FangSong_GB2312', '仿宋', 'FangSong', var(--font-body));
+  font-size: var(--pt-h3-font-size, 16pt);
+  font-weight: var(--pt-h3-font-weight, 400);
+  line-height: var(--pt-h3-line-height, 28pt);
+  font-synthesis: none;
+  text-indent: var(--pt-h3-text-indent, 2em);
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror h4 {
+  font-family: var(--pt-h4-font-family, '仿宋_GB2312', 'FangSong_GB2312', '仿宋', 'FangSong', var(--font-body));
+  font-size: var(--pt-h4-font-size, 16pt);
+  font-weight: var(--pt-h4-font-weight, 400);
+  line-height: var(--pt-h4-line-height, 28pt);
+  font-synthesis: none;
+  text-indent: var(--pt-h4-text-indent, 2em);
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror h1 *,
+.editor-content .editor-prose-wrapper .ProseMirror h2 *,
+.editor-content .editor-prose-wrapper .ProseMirror h3 *,
+.editor-content .editor-prose-wrapper .ProseMirror h4 * {
+  font-family: inherit !important;
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror .suffix-line-label {
+  font-family: var(--pt-suffix-label-font-family, '黑体', 'SimHei', 'Heiti SC', var(--font-ui)) !important;
+  font-weight: var(--pt-suffix-label-font-weight, 400) !important;
+  color: #111 !important;
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror .suffix-line-body {
+  font-family: var(--pt-body-font-family, '仿宋_GB2312', 'FangSong_GB2312', '仿宋', 'FangSong', var(--font-body)) !important;
+  font-weight: 400 !important;
+  color: #111 !important;
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  margin-top: 6px;
+  margin-bottom: 6px;
+}
+
+.editor-content .editor-prose-wrapper .ProseMirror td,
+.editor-content .editor-prose-wrapper .ProseMirror th {
+  border: 1px solid #bbb;
+  padding: 4px;
+}
+
+.font-status,
+.ai-preview-panel,
+.font-preview-warning {
+  border-radius: 24px;
+  padding: 16px 18px;
+}
+
+.font-status {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.66);
+  box-shadow: var(--shadow-sm);
+}
+
+.font-status.ok {
+  border-color: rgba(31, 138, 85, 0.18);
+  background: rgba(237, 249, 242, 0.9);
+}
+
+.font-status.error,
+.font-preview-warning {
+  border-color: rgba(208, 74, 74, 0.18);
+  background: rgba(255, 246, 246, 0.94);
+}
+
+.font-list {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.font-list .installed {
+  color: var(--ok);
+}
+
+.font-list .missing,
+.publish-messages .error {
+  color: var(--err);
+  font-weight: 600;
+}
+
+.font-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.font-actions a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.ai-preview-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.ai-preview-meta {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.validation-panel .full-btn {
+  width: 100%;
+}
+
+.issues {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.issue {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.66);
+}
+
+.issue.error {
+  border-color: rgba(208, 74, 74, 0.18);
+  background: rgba(255, 246, 246, 0.96);
+}
+
+.issue.warning,
+.publish-messages .warning {
+  color: var(--warn);
+  background: rgba(255, 248, 234, 0.94);
+}
+
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(14, 22, 37, 0.26);
+  z-index: 100;
+}
+
+.modal {
+  width: min(90vw, 560px);
+  border-radius: 28px;
+  padding: 22px;
+  display: grid;
+  gap: 10px;
+}
+
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 1440px) {
+  .editor-layout {
+    grid-template-columns: 240px minmax(0, 1fr) 240px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .editor-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .editor-paper-shell {
+    width: min(100%, 21cm);
+  }
+}
+
+@media (max-width: 760px) {
+  .editor-command-row,
+  .font-status,
+  .modal-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .editor-content {
+    padding: 12px;
+  }
+}

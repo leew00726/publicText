@@ -4,25 +4,42 @@ import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import type { GovDoc } from '../api/types'
 
-export function GlobalBackButton() {
+interface GlobalBackButtonProps {
+  variant?: 'floating' | 'shell'
+}
+
+export function GlobalBackButton({ variant = 'floating' }: GlobalBackButtonProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const [docTopicId, setDocTopicId] = useState<string | null>(null)
   const [topicCompanyId, setTopicCompanyId] = useState<string | null>(null)
 
-  const docMatch = useMemo(() => matchPath('/docs/:id', location.pathname), [location.pathname])
-  const companyHomeMatch = useMemo(() => matchPath('/companies', location.pathname), [location.pathname])
-  const topicListMatch = useMemo(() => matchPath('/companies/:companyId/topics', location.pathname), [location.pathname])
-  const topicLibraryMatch = useMemo(() => matchPath('/topics/:topicId/library', location.pathname), [location.pathname])
-  const topicComposeMatch = useMemo(() => matchPath('/topics/:topicId', location.pathname), [location.pathname])
-  const topicTrainMatch = useMemo(() => matchPath('/topics/:topicId/train', location.pathname), [location.pathname])
+  const layoutRootMatch = useMemo(() => matchPath('/layout', location.pathname), [location.pathname])
+  const managementRootMatch = useMemo(() => matchPath('/management', location.pathname), [location.pathname])
+  const layoutSummaryMatch = useMemo(() => matchPath('/layout/summary', location.pathname), [location.pathname])
 
-  const isDocPage = Boolean(docMatch?.params?.id)
-  const docId = docMatch?.params?.id || null
+  const layoutCompanyHomeMatch = useMemo(() => matchPath('/layout/company-home', location.pathname), [location.pathname])
+  const managementCompanyHomeMatch = useMemo(() => matchPath('/management/companies', location.pathname), [location.pathname])
+  const layoutTopicListMatch = useMemo(() => matchPath('/layout/companies/:companyId/topics', location.pathname), [location.pathname])
+  const managementTopicListMatch = useMemo(
+    () => matchPath('/management/companies/:companyId/topics', location.pathname),
+    [location.pathname],
+  )
+
+  const layoutTopicLibraryMatch = useMemo(() => matchPath('/layout/topics/:topicId/library', location.pathname), [location.pathname])
+  const layoutTopicComposeMatch = useMemo(() => matchPath('/layout/topics/:topicId', location.pathname), [location.pathname])
+  const managementTopicTrainMatch = useMemo(
+    () => matchPath('/management/topics/:topicId/train', location.pathname),
+    [location.pathname],
+  )
+  const layoutDocMatch = useMemo(() => matchPath('/layout/docs/:id', location.pathname), [location.pathname])
+
+  const isDocPage = Boolean(layoutDocMatch?.params?.id)
+  const docId = layoutDocMatch?.params?.id || null
   const currentTopicId =
-    topicLibraryMatch?.params?.topicId ||
-    topicComposeMatch?.params?.topicId ||
-    topicTrainMatch?.params?.topicId ||
+    layoutTopicLibraryMatch?.params?.topicId ||
+    layoutTopicComposeMatch?.params?.topicId ||
+    managementTopicTrainMatch?.params?.topicId ||
     docTopicId ||
     null
 
@@ -34,7 +51,7 @@ export function GlobalBackButton() {
     }
 
     void api
-      .get<GovDoc>(`/api/docs/${docId}`)
+      .get<GovDoc>(`/api/layout/docs/${docId}`)
       .then((res) => {
         if (cancelled) return
         setDocTopicId(res.data?.structuredFields?.topicId || null)
@@ -57,7 +74,7 @@ export function GlobalBackButton() {
     }
 
     void api
-      .get<{ companyId: string }>(`/api/topics/${currentTopicId}`)
+      .get<{ companyId: string }>(`/api/management/topics/${currentTopicId}`)
       .then((res) => {
         if (cancelled) return
         setTopicCompanyId(res.data?.companyId || null)
@@ -74,22 +91,51 @@ export function GlobalBackButton() {
 
   const fixedBackPath = useMemo(() => {
     if (isDocPage && docTopicId) {
-      return `/topics/${docTopicId}/library`
+      return `/layout/topics/${docTopicId}/library`
     }
-    if (topicLibraryMatch?.params?.topicId && topicCompanyId) {
-      return `/companies/${topicCompanyId}/topics`
+    if (layoutTopicLibraryMatch?.params?.topicId && topicCompanyId) {
+      return `/layout/companies/${topicCompanyId}/topics`
     }
-    if ((topicComposeMatch?.params?.topicId || topicTrainMatch?.params?.topicId) && topicCompanyId) {
-      return `/companies/${topicCompanyId}/topics`
+    if (layoutTopicComposeMatch?.params?.topicId && topicCompanyId) {
+      return `/layout/companies/${topicCompanyId}/topics`
     }
-    if (topicListMatch?.params?.companyId) {
-      return '/companies'
+    if (managementTopicTrainMatch?.params?.topicId && topicCompanyId) {
+      return `/management/companies/${topicCompanyId}/topics`
     }
-    if (companyHomeMatch) {
+    if (layoutSummaryMatch) {
+      return '/workspace'
+    }
+    if (layoutTopicListMatch?.params?.companyId) {
+      return '/layout'
+    }
+    if (managementTopicListMatch?.params?.companyId) {
+      return '/management/companies'
+    }
+    if (layoutCompanyHomeMatch) {
+      return '/layout'
+    }
+    if (managementCompanyHomeMatch) {
+      return '/management'
+    }
+    if (layoutRootMatch || managementRootMatch) {
       return '/workspace'
     }
     return null
-  }, [isDocPage, docTopicId, topicLibraryMatch, topicComposeMatch, topicTrainMatch, topicCompanyId, topicListMatch, companyHomeMatch])
+  }, [
+    isDocPage,
+    docTopicId,
+    layoutTopicLibraryMatch,
+    layoutTopicComposeMatch,
+    managementTopicTrainMatch,
+    topicCompanyId,
+    layoutSummaryMatch,
+    layoutTopicListMatch,
+    managementTopicListMatch,
+    layoutCompanyHomeMatch,
+    managementCompanyHomeMatch,
+    layoutRootMatch,
+    managementRootMatch,
+  ])
 
   if (location.pathname === '/' || location.pathname === '/workspace') {
     return null
@@ -98,7 +144,7 @@ export function GlobalBackButton() {
   return (
     <button
       type="button"
-      className="global-back-btn"
+      className={`global-back-btn ${variant}`}
       onClick={() => {
         if (fixedBackPath) {
           navigate(fixedBackPath)

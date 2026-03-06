@@ -111,7 +111,7 @@ class StructuredFields(BaseModel):
     signatory: str = ""
     copyNo: str = ""
     date: str = ""
-    exportWithRedhead: bool = True
+    exportWithRedhead: bool = False
     attachments: list[AttachmentItem] = Field(default_factory=list)
     topicId: str | None = None
     topicName: str | None = None

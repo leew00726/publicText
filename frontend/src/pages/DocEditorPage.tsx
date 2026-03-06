@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { Editor } from '@tiptap/react'
 
@@ -6,6 +6,7 @@ import { api } from '../api/client'
 import type { CheckIssue, GovDoc } from '../api/types'
 import { FontInstallModal } from '../components/FontInstallModal'
 import { FontStatusBar } from '../components/FontStatusBar'
+import { PageHeader } from '../components/PageHeader'
 import { StructuredFormPanel } from '../components/StructuredFormPanel'
 import { TiptapEditor } from '../components/TiptapEditor'
 import { ValidationPanel } from '../components/ValidationPanel'
@@ -70,7 +71,7 @@ export function DocEditorPage() {
 
   const loadBase = useCallback(async () => {
     if (!id) return
-    const docRes = await api.get<GovDoc>(`/api/docs/${id}`)
+    const docRes = await api.get<GovDoc>(`/api/layout/docs/${id}`)
     setDoc(normalizeDoc(docRes.data))
   }, [id])
 
@@ -96,7 +97,7 @@ export function DocEditorPage() {
         structuredFields: doc.structuredFields,
         body: doc.body,
       }
-      await api.put(`/api/docs/${doc.id}`, payload)
+      await api.put(`/api/layout/docs/${doc.id}`, payload)
     } finally {
       setSaving(false)
     }
@@ -104,7 +105,7 @@ export function DocEditorPage() {
 
   const runCheck = async () => {
     if (!doc) return
-    const res = await api.post<{ issues: CheckIssue[] }>(`/api/docs/${doc.id}/check`)
+    const res = await api.post<{ issues: CheckIssue[] }>(`/api/layout/docs/${doc.id}/check`)
     setIssues(res.data.issues)
   }
 
@@ -157,7 +158,7 @@ export function DocEditorPage() {
     }
 
     await saveDoc()
-    const res = await api.post(`/api/docs/${doc.id}/exportDocx`, null, { responseType: 'blob' })
+    const res = await api.post(`/api/layout/docs/${doc.id}/exportDocx`, null, { responseType: 'blob' })
     const blob = new Blob([res.data], {
       type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     })
@@ -192,7 +193,7 @@ export function DocEditorPage() {
         provider: string
         model: string
         rewritten: string
-      }>('/api/ai/rewrite', { text: selectedText, mode: aiMode }, { timeout: 120000 })
+      }>('/api/layout/ai/rewrite', { text: selectedText, mode: aiMode }, { timeout: 120000 })
       const rewritten = (res.data.rewritten || '').trim()
       if (!rewritten) {
         alert('智能体未返回有效文本，请重试')
@@ -261,9 +262,9 @@ export function DocEditorPage() {
     form.append('docType', doc.docType)
     form.append('title', doc.title || '导入文档')
 
-    const res = await api.post<{ docId: string; importReport: any }>('/api/docs/importDocx', form)
+    const res = await api.post<{ docId: string; importReport: any }>('/api/layout/docs/importDocx', form)
     alert(`导入完成：未识别标题 ${res.data.importReport.unrecognizedTitleCount} 段`)
-    navigate(`/docs/${res.data.docId}`)
+    navigate(`/layout/docs/${res.data.docId}`)
   }
 
   const hasFixedLeadingNodes = useMemo(() => {
@@ -279,32 +280,49 @@ export function DocEditorPage() {
   }
 
   return (
-    <div className="page doc-editor-page">
-      <div className="header-row">
-        <input
-          className="doc-title-input"
-          value={doc.title}
-          onChange={(e) => setDocField({ title: e.target.value })}
-          placeholder="文档标题"
-        />
-        <button type="button" onClick={saveDoc} disabled={saving}>
-          {saving ? '保存中...' : '保存'}
-        </button>
-        <button type="button" onClick={handleImportClick}>
-          导入 DOCX
-        </button>
-        <button type="button" onClick={exportDocx} disabled={!ready}>
-          导出 DOCX
-        </button>
-        <select value={aiMode} onChange={(e) => setAiMode(e.target.value as 'formal' | 'concise' | 'polish')} disabled={aiRewriting}>
-          <option value="formal">智能体模式：正式</option>
-          <option value="concise">智能体模式：精简</option>
-          <option value="polish">智能体模式：润色</option>
-        </select>
-        <button type="button" onClick={aiRewriteSelection} disabled={aiRewriting}>
-          {aiRewriting ? '生成预览中...' : rewritePreview ? '重新润色预览' : '智能润色选中'}
-        </button>
-      </div>
+    <main className="page doc-editor-page">
+      <PageHeader
+        eyebrow="Editor"
+        title="正文排版工作区"
+        description="保持公文字体和纸面逻辑不变，只重构壳层、工具栏和侧栏体验。"
+        meta={
+          <>
+            <span className="soft-pill">文档 {doc.title || '未命名'}</span>
+            <span className="soft-pill">类型 {doc.docType}</span>
+            <span className="soft-pill">状态 {doc.status}</span>
+          </>
+        }
+      />
+
+      <section className="glass-card editor-command-bar">
+        <div className="editor-command-row">
+          <input
+            className="doc-title-input"
+            value={doc.title}
+            onChange={(e) => setDocField({ title: e.target.value })}
+            placeholder="文档标题"
+          />
+          <div className="row-gap">
+            <button type="button" onClick={saveDoc} disabled={saving}>
+              {saving ? '保存中...' : '保存'}
+            </button>
+            <button type="button" onClick={handleImportClick}>
+              导入 DOCX
+            </button>
+            <button type="button" onClick={exportDocx} disabled={!ready}>
+              导出 DOCX
+            </button>
+            <select value={aiMode} onChange={(e) => setAiMode(e.target.value as 'formal' | 'concise' | 'polish')} disabled={aiRewriting}>
+              <option value="formal">智能体模式：正式</option>
+              <option value="concise">智能体模式：精简</option>
+              <option value="polish">智能体模式：润色</option>
+            </select>
+            <button type="button" onClick={aiRewriteSelection} disabled={aiRewriting}>
+              {aiRewriting ? '生成预览中...' : rewritePreview ? '重新润色预览' : '智能润色选中'}
+            </button>
+          </div>
+        </div>
+      </section>
 
       <input
         ref={importInputRef}
@@ -322,7 +340,7 @@ export function DocEditorPage() {
       {!ready && <div className="font-preview-warning">当前缺少必需字体，正文框预览字体可能不准确（导出会被阻断）。</div>}
 
       {rewritePreview && (
-        <div className="ai-preview-panel">
+        <div className="ai-preview-panel glass-card">
           <div className="row-between">
             <strong>智能润色预览</strong>
             <span className="ai-preview-meta">模式：{AI_MODE_LABEL[rewritePreview.mode]}</span>
@@ -384,6 +402,6 @@ export function DocEditorPage() {
           }
         }}
       />
-    </div>
+    </main>
   )
 }

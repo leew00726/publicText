@@ -8,7 +8,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Document, DocumentFile, RedheadTemplate, Unit
+from app.models import Document, DocumentFile, Unit
 from app.schemas import (
     ApiMessage,
     CheckResponse,
@@ -63,7 +63,7 @@ def create_doc(payload: DocumentCreate, db: Session = Depends(get_db)):
         title=payload.title,
         doc_type=payload.docType,
         unit_id=payload.unitId,
-        redhead_template_id=payload.redheadTemplateId,
+        redhead_template_id=None,
         status=payload.status,
         structured_fields=sf,
         body=payload.body,
@@ -96,7 +96,7 @@ def update_doc(doc_id: str, payload: DocumentUpdate, db: Session = Depends(get_d
     if "unitId" in data:
         row.unit_id = data["unitId"]
     if "redheadTemplateId" in data:
-        row.redhead_template_id = data["redheadTemplateId"]
+        row.redhead_template_id = None
     if "status" in data:
         row.status = data["status"]
     if "structuredFields" in data:
@@ -155,7 +155,7 @@ async def import_docx_api(
         title=title,
         doc_type=docType,
         unit_id=unitId,
-        redhead_template_id=redheadTemplateId,
+        redhead_template_id=None,
         status="draft",
         structured_fields=structured_fields,
         body=body,
@@ -183,20 +183,7 @@ def export_docx_api(doc_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="单位不存在")
 
     structured_fields = row.structured_fields or {}
-    include_redhead = bool(structured_fields.get("exportWithRedhead", True))
-
-    template = None
-    if include_redhead:
-        if row.redhead_template_id:
-            template = db.query(RedheadTemplate).filter(RedheadTemplate.id == row.redhead_template_id).first()
-        if not template:
-            template = (
-                db.query(RedheadTemplate)
-                .filter(RedheadTemplate.unit_id == row.unit_id, RedheadTemplate.is_default.is_(True))
-                .first()
-            )
-        if not template:
-            raise HTTPException(status_code=400, detail="未配置红头模板")
+    include_redhead = False
 
     doc_payload = {
         "id": row.id,
@@ -206,7 +193,7 @@ def export_docx_api(doc_id: str, db: Session = Depends(get_db)):
         "body": row.body,
     }
 
-    redhead_payload = {"elements": template.elements, "page": template.page} if template else {"elements": [], "page": {}}
+    redhead_payload = {"elements": [], "page": {}}
     output = export_docx(doc_payload, unit.name, redhead_payload, include_redhead=include_redhead)
 
     filename = f"{row.title or '公文'}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.docx"

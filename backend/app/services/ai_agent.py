@@ -6,7 +6,7 @@ import socket
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
-from typing import Any
+from typing import Any, Literal
 
 from app.config import Settings, get_settings
 
@@ -25,10 +25,21 @@ MODE_GUIDANCE: dict[str, str] = {
     "polish": "Improve sentence flow and clarity while preserving formal tone and meaning.",
 }
 
+SUMMARY_LENGTH_GUIDANCE: dict[str, str] = {
+    "short": "100-180字，突出核心结论。",
+    "medium": "220-320字，覆盖结论、要点、建议。",
+    "long": "380-520字，完整覆盖背景、结论、要点、建议。",
+}
+
 TOPIC_REVISION_SYSTEM_PROMPT = (
     "You are an assistant for Chinese official-document template styling."
     " Convert user intent into a minimal JSON patch for template rules."
     " Return strict JSON only, no markdown."
+)
+
+SUMMARY_SYSTEM_PROMPT = (
+    "You are an assistant for Chinese official-document summarization."
+    " Output concise Chinese summary with clear structure and factual consistency."
 )
 
 _REQUEST_EXECUTOR = ThreadPoolExecutor(max_workers=8)
@@ -154,6 +165,59 @@ def rewrite_with_deepseek(text: str, mode: str, settings: Settings | None = None
         system_prompt=cfg.deepseek_system_prompt,
     )
     return agent.rewrite(text=text, mode=mode)
+
+
+def summarize_document_with_deepseek(
+    source_text: str,
+    summary_length: Literal["short", "medium", "long"] = "medium",
+    extra_instruction: str | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    if not source_text.strip():
+        raise AgentConfigError("文档正文为空，无法生成总结。")
+
+    cfg = settings or get_settings()
+    base_url = cfg.deepseek_base_url.rstrip("/")
+    endpoint = f"{base_url}/chat/completions"
+    agent = DeepSeekAgent(
+        api_key=cfg.deepseek_api_key,
+        endpoint=endpoint,
+        model=cfg.deepseek_model,
+        timeout_sec=cfg.deepseek_timeout_sec,
+        temperature=min(cfg.deepseek_temperature, 0.3),
+        system_prompt=SUMMARY_SYSTEM_PROMPT,
+    )
+
+    length_guide = SUMMARY_LENGTH_GUIDANCE.get(summary_length, SUMMARY_LENGTH_GUIDANCE["medium"])
+    extra = (extra_instruction or "").strip()
+    extra_part = f"\n补充要求：{extra}" if extra else ""
+
+    response = agent.chat(
+        messages=[
+            {"role": "system", "content": SUMMARY_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": (
+                    "请对以下公文内容生成中文总结。\n"
+                    f"长度要求：{length_guide}\n"
+                    "输出结构：\n"
+                    "1) 核心结论（1段）\n"
+                    "2) 关键要点（3-6条）\n"
+                    "3) 后续建议（1-3条）\n"
+                    "要求忠于原文，不要编造信息。"
+                    f"{extra_part}\n\n"
+                    f"原文如下：\n{source_text}"
+                ),
+            },
+        ],
+        temperature=min(cfg.deepseek_temperature, 0.3),
+    )
+
+    return {
+        "text": response["content"],
+        "model": response["model"],
+        "usage": response["usage"],
+    }
 
 
 def _extract_json_object(raw_content: str) -> dict[str, Any]:

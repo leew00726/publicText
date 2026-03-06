@@ -161,7 +161,7 @@ def import_docx(file_bytes: bytes) -> tuple[dict[str, Any], dict[str, Any], dict
         "signatory": "",
         "copyNo": "",
         "date": "",
-        "exportWithRedhead": True,
+        "exportWithRedhead": False,
         "attachments": [],
     }
 

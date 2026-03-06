@@ -1,10 +1,20 @@
+import asyncio
+import io
 import json
 import unittest
 from unittest.mock import MagicMock, patch
 
+from docx import Document
 from fastapi import HTTPException
+from fastapi import UploadFile
 
-from app.routers.ai import RewriteRequest, rewrite_api
+from app.routers.ai import (
+    RewriteRequest,
+    SummaryDocxExportRequest,
+    export_summary_docx_api,
+    rewrite_api,
+    summarize_document_api,
+)
 from app.services.ai_agent import AgentConfigError, DeepSeekAgent, revise_topic_rules_with_deepseek
 
 
@@ -127,3 +137,54 @@ class TopicRevisionAgentTests(unittest.TestCase):
 
         self.assertEqual(result["patch"]["headings"]["level3"]["fontFamily"], "宋体")
         self.assertEqual(result["assistantReply"], "已将三级标题字体调整为宋体。")
+
+
+class AiDocumentSummaryEndpointTests(unittest.TestCase):
+    @patch("app.routers.ai.summarize_document_with_deepseek")
+    @patch("app.routers.ai.extract_text_from_uploaded_file")
+    def test_summarize_document_endpoint_returns_summary(self, mock_extract, mock_summarize):
+        mock_extract.return_value = {
+            "text": "这是提取出的正文",
+            "truncated": False,
+            "originalChars": 120,
+            "usedChars": 120,
+            "fileType": "txt",
+        }
+        mock_summarize.return_value = {
+            "text": "这是 DeepSeek 的总结结果。",
+            "model": "deepseek-chat",
+            "usage": {"total_tokens": 88},
+        }
+
+        async def _run():
+            file = UploadFile(filename="memo.txt", file=io.BytesIO("raw text".encode("utf-8")))
+            return await summarize_document_api(file=file, summaryLength="short")
+
+        body = asyncio.run(_run())
+        self.assertEqual(body["message"], "ok")
+        self.assertEqual(body["summary"], "这是 DeepSeek 的总结结果。")
+        self.assertEqual(body["model"], "deepseek-chat")
+        self.assertEqual(body["usage"]["total_tokens"], 88)
+        self.assertEqual(body["summaryLength"], "short")
+        self.assertEqual(body["source"]["fileName"], "memo.txt")
+
+    def test_export_summary_docx_endpoint_returns_valid_docx(self):
+        payload = SummaryDocxExportRequest(
+            title="公文总结",
+            summary="一、核心结论\n二、后续动作",
+            sourceFileName="memo.docx",
+        )
+        response = export_summary_docx_api(payload)
+
+        async def _collect() -> bytes:
+            chunks = []
+            async for chunk in response.body_iterator:
+                chunks.append(chunk)
+            return b"".join(chunks)
+
+        raw = asyncio.run(_collect())
+        doc = Document(io.BytesIO(raw))
+        texts = [p.text for p in doc.paragraphs if p.text]
+
+        self.assertTrue(any("公文总结" in item for item in texts))
+        self.assertTrue(any("核心结论" in item for item in texts))

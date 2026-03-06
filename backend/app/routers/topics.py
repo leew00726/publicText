@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Document, DeletionAuditEvent, RedheadTemplate, Topic, TopicTemplate, TopicTemplateDraft, Unit
+from app.models import Document, DeletionAuditEvent, Topic, TopicTemplate, TopicTemplateDraft, Unit
 from app.schemas import (
     ApiMessage,
     DeletionAuditEventOut,
@@ -621,26 +621,6 @@ def create_doc_from_topic(topic_id: str, payload: TopicCreateDocRequest, db: Ses
                 .first()
             )
 
-    redhead_template_id = payload.redheadTemplateId
-    if redhead_template_id:
-        assigned = db.query(RedheadTemplate).filter(RedheadTemplate.id == redhead_template_id).first()
-        if not assigned or assigned.unit_id != topic.company_id:
-            raise HTTPException(status_code=400, detail="指定红头模板无效")
-    else:
-        assigned = (
-            db.query(RedheadTemplate)
-            .filter(RedheadTemplate.unit_id == topic.company_id, RedheadTemplate.is_default.is_(True))
-            .first()
-        )
-        if not assigned:
-            assigned = (
-                db.query(RedheadTemplate)
-                .filter(RedheadTemplate.unit_id == topic.company_id)
-                .order_by(RedheadTemplate.created_at.asc())
-                .first()
-            )
-        redhead_template_id = assigned.id if assigned else None
-
     title = (payload.title or "").strip() or f"{topic.name}（新建）"
     doc_type = _infer_doc_type(topic.name, payload.docType)
 
@@ -652,7 +632,7 @@ def create_doc_from_topic(topic_id: str, payload: TopicCreateDocRequest, db: Ses
         "signatory": "",
         "copyNo": "",
         "date": "",
-        "exportWithRedhead": True,
+        "exportWithRedhead": False,
         "attachments": [],
         "topicId": topic.id,
         "topicName": topic.name,
@@ -665,7 +645,7 @@ def create_doc_from_topic(topic_id: str, payload: TopicCreateDocRequest, db: Ses
         title=title,
         doc_type=doc_type,
         unit_id=topic.company_id,
-        redhead_template_id=redhead_template_id,
+        redhead_template_id=None,
         status="draft",
         structured_fields=structured_fields,
         body=_build_doc_body_from_topic_rules(template.rules if template else None),

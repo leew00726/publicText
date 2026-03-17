@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { createEmployeeSession, listModulesByRole, parseEmployeeSession, validateEmployeeLogin } from '../src/utils/employeeAuth'
+import { LAYOUT_HOME_PATH } from '../src/utils/layoutNavigation'
 
 describe('employee auth helpers', () => {
   it('validates login form inputs', () => {
@@ -47,7 +48,7 @@ describe('employee auth helpers', () => {
     expect(staffModules).toHaveLength(3)
     expect(adminModules).toHaveLength(3)
     expect(staffModules.find((item) => item.key === 'summary')?.entryPath).toBe('/summary')
-    expect(staffModules.find((item) => item.key === 'layout')?.entryPath).toBe('/layout')
+    expect(staffModules.find((item) => item.key === 'layout')?.entryPath).toBe(LAYOUT_HOME_PATH)
     expect(staffModules.find((item) => item.key === 'management')?.entryPath).toBe('/management')
     expect(staffModules.find((item) => item.key === 'management')?.enabled).toBe(false)
     expect(adminModules.find((item) => item.key === 'management')?.enabled).toBe(true)

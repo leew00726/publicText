@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 
 import { clearEmployeeSession, loadEmployeeSession } from '../utils/employeeAuth'
+import { LAYOUT_HOME_PATH } from '../utils/layoutNavigation'
 import { canAccessPage, type PagePermissionKey } from '../utils/pagePermissions'
 import { GlobalBackButton } from './GlobalBackButton'
 
@@ -41,10 +42,10 @@ const NAV_ITEMS: ShellNavItem[] = [
   {
     key: 'layout',
     label: '公文排版',
-    path: '/layout',
+    path: LAYOUT_HOME_PATH,
     patterns: [
       '/layout',
-      '/layout/company-home',
+      LAYOUT_HOME_PATH,
       '/layout/companies/:companyId/topics',
       '/layout/topics/:topicId',
       '/layout/topics/:topicId/library',
@@ -82,8 +83,8 @@ const PAGE_META_ROUTES: Array<{ pattern: string; meta: PageMeta }> = [
     pattern: '/layout/company-home',
     meta: {
       kicker: 'Layout',
-      title: '所属公司公文库',
-      subtitle: '根据工号自动进入公司题材库，延续排版与文档处理流程。',
+      title: '公文排版',
+      subtitle: '直接进入所属公司题材库，继续文档排版与输出流程。',
     },
   },
   {
@@ -211,11 +212,8 @@ export function AppShell({ children }: AppShellProps) {
 
       <aside className="app-shell-sidebar">
         <div className="shell-brand">
-          <div className="shell-brand-mark">PT</div>
-          <div>
-            <p className="shell-brand-name">PublicText</p>
-            <p className="shell-brand-copy">Apple-style blue workspace for document operations.</p>
-          </div>
+          <div className="shell-brand-mark" aria-hidden="true" />
+          <p className="shell-brand-name">云矩公文管理平台</p>
         </div>
 
         <nav className="shell-nav" aria-label="主导航">

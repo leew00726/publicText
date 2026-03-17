@@ -4,7 +4,6 @@ import { AppShell } from './components/AppShell'
 import { CompanySelectPage } from './pages/CompanySelectPage'
 import { DocumentSummaryPage } from './pages/DocumentSummaryPage'
 import { DocEditorPage } from './pages/DocEditorPage'
-import { LayoutModulePage } from './pages/LayoutModulePage'
 import { LoginPage } from './pages/LoginPage'
 import { ManagementModulePage } from './pages/ManagementModulePage'
 import { ModuleHubPage } from './pages/ModuleHubPage'
@@ -14,6 +13,7 @@ import { TopicLibraryPage } from './pages/TopicLibraryPage'
 import { TopicListPage } from './pages/TopicListPage'
 import { loadEmployeeSession, saveEmployeeSession } from './utils/employeeAuth'
 import { ensureEmployeeCompany } from './utils/employeeCompany'
+import { LAYOUT_HOME_PATH } from './utils/layoutNavigation'
 import { canAccessPage, type PagePermissionKey } from './utils/pagePermissions'
 
 function RequirePageAccess({ permission, children }: { permission: PagePermissionKey; children: JSX.Element }) {
@@ -34,7 +34,7 @@ function WithShell({ children }: { children: JSX.Element }) {
 
 function AuthLandingRoute() {
   if (loadEmployeeSession()) {
-    return <Navigate to="/layout/company-home" replace />
+    return <Navigate to={LAYOUT_HOME_PATH} replace />
   }
   return <LoginPage />
 }
@@ -116,7 +116,7 @@ function LegacyDocRedirect() {
 }
 
 function FallbackRoute() {
-  return <Navigate to={loadEmployeeSession() ? '/layout/company-home' : '/'} replace />
+  return <Navigate to={loadEmployeeSession() ? LAYOUT_HOME_PATH : '/'} replace />
 }
 
 function withShell(permission: PagePermissionKey, child: JSX.Element) {
@@ -132,7 +132,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<AuthLandingRoute />} />
       <Route path="/workspace" element={withShell('workspace.home', <ModuleHubPage />)} />
-      <Route path="/layout" element={withShell('layout.home', <LayoutModulePage />)} />
+      <Route path="/layout" element={<Navigate to={LAYOUT_HOME_PATH} replace />} />
       <Route path="/layout/summary" element={withShell('layout.summary', <DocumentSummaryPage />)} />
       <Route path="/layout/company-home" element={withShell('layout.company', <EmployeeCompanyHomeRoute />)} />
       <Route path="/layout/companies" element={<Navigate to="/layout/company-home" replace />} />

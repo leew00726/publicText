@@ -70,19 +70,8 @@ def _extract_text_from_txt(file_bytes: bytes) -> str:
     return file_bytes.decode("utf-8", errors="ignore")
 
 
-def extract_text_from_uploaded_file(file_name: str, file_bytes: bytes, max_chars: int = 12000) -> dict[str, Any]:
-    ext = Path(file_name or "").suffix.lower()
-    if ext not in SUPPORTED_EXTENSIONS:
-        raise ValueError("仅支持 DOCX、PDF、TXT 文件")
-
-    if ext == ".docx":
-        raw_text = _extract_text_from_docx(file_bytes)
-    elif ext == ".pdf":
-        raw_text = _extract_text_from_pdf(file_bytes)
-    else:
-        raw_text = _extract_text_from_txt(file_bytes)
-
-    normalized = _normalize_text(raw_text)
+def prepare_summary_source_text(source_text: str, max_chars: int = 12000) -> dict[str, Any]:
+    normalized = _normalize_text(source_text)
     if not normalized:
         raise ValueError("文档内容为空，无法生成总结")
 
@@ -95,8 +84,25 @@ def extract_text_from_uploaded_file(file_name: str, file_bytes: bytes, max_chars
         "truncated": truncated,
         "originalChars": original_chars,
         "usedChars": len(text),
-        "fileType": ext.replace(".", ""),
+        "fileType": "text",
     }
+
+
+def extract_text_from_uploaded_file(file_name: str, file_bytes: bytes, max_chars: int = 12000) -> dict[str, Any]:
+    ext = Path(file_name or "").suffix.lower()
+    if ext not in SUPPORTED_EXTENSIONS:
+        raise ValueError("仅支持 DOCX、PDF、TXT 文件")
+
+    if ext == ".docx":
+        raw_text = _extract_text_from_docx(file_bytes)
+    elif ext == ".pdf":
+        raw_text = _extract_text_from_pdf(file_bytes)
+    else:
+        raw_text = _extract_text_from_txt(file_bytes)
+
+    extracted = prepare_summary_source_text(raw_text, max_chars=max_chars)
+    extracted["fileType"] = ext.replace(".", "")
+    return extracted
 
 
 def build_summary_docx(title: str, summary_text: str, source_file_name: str | None = None, generated_at: datetime | None = None) -> bytes:

@@ -35,6 +35,10 @@ TOPIC_REVISION_SYSTEM_PROMPT = (
     "You are an assistant for Chinese official-document template styling."
     " Convert user intent into a minimal JSON patch for template rules."
     " Return strict JSON only, no markdown."
+    " Use title.fontFamily for the main document title, body.fontFamily for body text, and headings.level1-4.fontFamily for heading levels."
+    " First/second/third/fourth numbering levels map to headings.level1/level2/level3/level4."
+    " fontFamily must be an actual font family name."
+    " Layout or formatting terms such as 梯形, 菱形, 居中, 全角, 阿拉伯数字, 行距, 缩进, or 标题排列 are never fontFamily values."
 )
 
 SUMMARY_SYSTEM_PROMPT = (
@@ -290,7 +294,9 @@ def revise_topic_rules_with_deepseek(
                 "要求：\n"
                 "1) patch 仅包含需要修改的字段（diff），不要返回完整规则。\n"
                 "2) 未提及的字段不要改。\n"
-                "3) 无法确定时 patch 返回空对象 {} 并在 assistantReply 说明原因。\n"
+                "3) 主标题字体写到 title.fontFamily，正文字体写到 body.fontFamily，各级标题字体写到 headings.level1-4.fontFamily。\n"
+                "4) 不能把梯形、菱形、全角、阿拉伯数字、行距、缩进、标题排列等排版术语写进 fontFamily。\n"
+                "5) 无法确定时 patch 返回空对象 {} 并在 assistantReply 说明原因。\n"
                 f"当前模板规则（JSON）:\n{json.dumps(current_rules, ensure_ascii=False)}\n\n"
                 f"最新指令:\n{instruction.strip()}"
             ),

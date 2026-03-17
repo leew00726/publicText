@@ -1,3 +1,5 @@
+import { LAYOUT_HOME_PATH } from './layoutNavigation'
+
 export type EmployeeRole = 'staff' | 'admin'
 export type ModuleKey = 'summary' | 'layout' | 'management'
 
@@ -49,7 +51,7 @@ const MODULE_DEFINITIONS: ModuleDefinition[] = [
     key: 'layout',
     title: '公文排版',
     description: '统一正文结构、格式规范和输出标准，提升发文一致性。',
-    entryPath: '/layout',
+    entryPath: LAYOUT_HOME_PATH,
     allowedRoles: ['staff', 'admin'],
   },
   {

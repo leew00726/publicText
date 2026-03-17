@@ -3,6 +3,7 @@ import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type { GovDoc } from '../api/types'
+import { resolveLayoutBackPath } from '../utils/layoutNavigation'
 
 interface GlobalBackButtonProps {
   variant?: 'floating' | 'shell'
@@ -90,14 +91,12 @@ export function GlobalBackButton({ variant = 'floating' }: GlobalBackButtonProps
   }, [currentTopicId])
 
   const fixedBackPath = useMemo(() => {
-    if (isDocPage && docTopicId) {
-      return `/layout/topics/${docTopicId}/library`
-    }
-    if (layoutTopicLibraryMatch?.params?.topicId && topicCompanyId) {
-      return `/layout/companies/${topicCompanyId}/topics`
-    }
-    if (layoutTopicComposeMatch?.params?.topicId && topicCompanyId) {
-      return `/layout/companies/${topicCompanyId}/topics`
+    const layoutBackPath = resolveLayoutBackPath(location.pathname, {
+      docTopicId,
+      topicCompanyId,
+    })
+    if (layoutBackPath) {
+      return layoutBackPath
     }
     if (managementTopicTrainMatch?.params?.topicId && topicCompanyId) {
       return `/management/companies/${topicCompanyId}/topics`
@@ -105,14 +104,8 @@ export function GlobalBackButton({ variant = 'floating' }: GlobalBackButtonProps
     if (layoutSummaryMatch) {
       return '/workspace'
     }
-    if (layoutTopicListMatch?.params?.companyId) {
-      return '/layout'
-    }
     if (managementTopicListMatch?.params?.companyId) {
       return '/management/companies'
-    }
-    if (layoutCompanyHomeMatch) {
-      return '/layout'
     }
     if (managementCompanyHomeMatch) {
       return '/management'
@@ -124,17 +117,14 @@ export function GlobalBackButton({ variant = 'floating' }: GlobalBackButtonProps
   }, [
     isDocPage,
     docTopicId,
-    layoutTopicLibraryMatch,
-    layoutTopicComposeMatch,
     managementTopicTrainMatch,
     topicCompanyId,
     layoutSummaryMatch,
-    layoutTopicListMatch,
     managementTopicListMatch,
-    layoutCompanyHomeMatch,
     managementCompanyHomeMatch,
     layoutRootMatch,
     managementRootMatch,
+    location.pathname,
   ])
 
   if (location.pathname === '/' || location.pathname === '/workspace') {

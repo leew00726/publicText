@@ -3,8 +3,6 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const pages = [
-  'ModuleHubPage.tsx',
-  'LayoutModulePage.tsx',
   'ManagementModulePage.tsx',
   'DocumentSummaryPage.tsx',
   'TopicListPage.tsx',

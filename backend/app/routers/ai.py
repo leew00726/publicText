@@ -13,7 +13,7 @@ from app.services.ai_agent import (
     rewrite_with_deepseek,
     summarize_document_with_deepseek,
 )
-from app.services.document_summary import build_summary_docx, extract_text_from_uploaded_file
+from app.services.document_summary import build_summary_docx, extract_text_from_uploaded_file, prepare_summary_source_text
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
@@ -59,22 +59,34 @@ def rewrite_api(payload: RewriteRequest):
 
 @router.post("/summarize-document")
 async def summarize_document_api(
-    file: UploadFile = File(...),
+    file: UploadFile | None = File(default=None),
+    sourceText: str | None = Form(default=None),
     summaryLength: Literal["short", "medium", "long"] = Form(default="medium"),
     extraInstruction: str | None = Form(default=None),
 ):
-    file_name = (file.filename or "").strip()
-    if not file_name:
-        raise HTTPException(status_code=400, detail="文件名不能为空")
+    pasted_text = sourceText.strip() if isinstance(sourceText, str) else ""
+    if file is None and not pasted_text:
+        raise HTTPException(status_code=400, detail="请上传文件或粘贴文本")
 
-    raw = await file.read()
-    if not raw:
-        raise HTTPException(status_code=400, detail="上传文件为空")
+    if file is not None:
+        file_name = (file.filename or "").strip()
+        if not file_name:
+            raise HTTPException(status_code=400, detail="文件名不能为空")
 
-    try:
-        extracted = extract_text_from_uploaded_file(file_name, raw)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raw = await file.read()
+        if not raw:
+            raise HTTPException(status_code=400, detail="上传文件为空")
+
+        try:
+            extracted = extract_text_from_uploaded_file(file_name, raw)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    else:
+        file_name = "直接粘贴文本"
+        try:
+            extracted = prepare_summary_source_text(pasted_text)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     try:
         result = summarize_document_with_deepseek(

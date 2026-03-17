@@ -168,6 +168,32 @@ class AiDocumentSummaryEndpointTests(unittest.TestCase):
         self.assertEqual(body["summaryLength"], "short")
         self.assertEqual(body["source"]["fileName"], "memo.txt")
 
+    @patch("app.routers.ai.summarize_document_with_deepseek")
+    def test_summarize_document_endpoint_accepts_pasted_text_and_extra_instruction(self, mock_summarize):
+        mock_summarize.return_value = {
+            "text": "这是按要求生成的总结。",
+            "model": "deepseek-chat",
+            "usage": {"total_tokens": 66},
+        }
+
+        async def _run():
+            return await summarize_document_api(
+                file=None,
+                sourceText="  第一段内容。\n\n第二段内容。  ",
+                summaryLength="medium",
+                extraInstruction="请按会议纪要格式输出，并用“结论/要点/建议”三级结构。",
+            )
+
+        body = asyncio.run(_run())
+        self.assertEqual(body["summary"], "这是按要求生成的总结。")
+        self.assertEqual(body["source"]["fileName"], "直接粘贴文本")
+        self.assertEqual(body["source"]["fileType"], "text")
+        mock_summarize.assert_called_once_with(
+            source_text="第一段内容。\n\n第二段内容。",
+            summary_length="medium",
+            extra_instruction="请按会议纪要格式输出，并用“结论/要点/建议”三级结构。",
+        )
+
     def test_export_summary_docx_endpoint_returns_valid_docx(self):
         payload = SummaryDocxExportRequest(
             title="公文总结",

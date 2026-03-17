@@ -1,6 +1,8 @@
 type AnyRecord = Record<string, any>
 
 const RULE_PATH_ORDER = [
+  'title.fontFamily',
+  'title.fontSizePt',
   'body.fontFamily',
   'body.fontSizePt',
   'body.lineSpacingPt',
@@ -22,6 +24,8 @@ const RULE_PATH_ORDER = [
 ]
 
 const PATH_LABEL: Record<string, string> = {
+  'title.fontFamily': '主标题字体',
+  'title.fontSizePt': '主标题字号',
   'body.fontFamily': '正文字体',
   'body.fontSizePt': '正文字号',
   'body.lineSpacingPt': '正文行距',

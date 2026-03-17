@@ -29,6 +29,7 @@ from app.services.topic_inference import extract_docx_features, extract_pdf_feat
 router = APIRouter(tags=["topics"])
 
 _FONT_ALIASES: dict[str, str] = {
+    "方正小标宋简体": "方正小标宋简",
     "方正小标宋简": "方正小标宋简",
     "方正小标宋": "方正小标宋简",
     "小标宋": "方正小标宋简",
@@ -41,9 +42,59 @@ _FONT_ALIASES: dict[str, str] = {
 }
 
 _SORTED_FONT_KEYS = sorted(_FONT_ALIASES.keys(), key=len, reverse=True)
+_FONT_NAME_RE = re.compile(r"^[A-Za-z0-9_\-\u4e00-\u9fa5]+$")
+_FONT_KEYWORD_RE = re.compile(
+    r"(方正|标宋|仿宋|楷体|黑体|宋体|GB2312|仿|楷|黑|宋|字体|微软雅黑|幼圆|隶书|魏碑|行楷|FangSong|KaiTi|HeiTi|SimSun|SimHei|Microsoft)"
+)
+_INVALID_FONT_TERMS = (
+    "梯形",
+    "菱形",
+    "排列",
+    "排版",
+    "居中",
+    "居左",
+    "居右",
+    "全角",
+    "半角",
+    "阿拉伯数字",
+    "空一行",
+    "左空",
+    "右空",
+    "两格",
+    "缩进",
+    "行距",
+    "段前",
+    "段后",
+    "括号",
+)
 _TRAILING_SUFFIX_RE = re.compile(
     r"^(主\s*持(?:\s*人|\s*者)?|参\s*(?:加|会)(?:\s*人|\s*人员|\s*名单)?|列\s*席(?:\s*人|\s*人员)?|出\s*席(?:\s*人|\s*人员)?|记\s*录(?:\s*人|\s*员)?|发\s*(?:送|至|文)|主\s*送|抄\s*送|分\s*送)\s*[：:]"
 )
+
+
+def _normalize_font_name(raw: str) -> str | None:
+    candidate = str(raw or "").strip().strip("：:；;，,。.")
+    if not candidate:
+        return None
+
+    candidate = re.sub(r"(?:字体|字形)$", "", candidate).strip()
+    if not candidate:
+        return None
+
+    if candidate in _FONT_ALIASES:
+        return _FONT_ALIASES[candidate]
+
+    for raw_key in _SORTED_FONT_KEYS:
+        if raw_key in candidate:
+            return _FONT_ALIASES[raw_key]
+
+    if any(term in candidate for term in _INVALID_FONT_TERMS):
+        return None
+    if not _FONT_NAME_RE.match(candidate):
+        return None
+    if not _FONT_KEYWORD_RE.search(candidate):
+        return None
+    return candidate
 
 
 def _extract_font_name(text: str) -> str | None:
@@ -62,7 +113,7 @@ def _extract_font_name(text: str) -> str | None:
     candidate = candidate.strip()
     if not candidate:
         return None
-    return _FONT_ALIASES.get(candidate, candidate)
+    return _normalize_font_name(candidate)
 
 
 def _detect_font_targets(text: str) -> set[str]:
@@ -70,57 +121,112 @@ def _detect_font_targets(text: str) -> set[str]:
     if not text:
         return targets
 
+    if re.search(r"(主标题|文件标题|文档标题|公文标题)", text):
+        targets.add("title")
+
     if re.search(r"(一级标题|1级标题|1\s*级\s*标题|一\s*级\s*标题)", text):
+        targets.add("level1")
+    if re.search(r"(第一层级|第\s*一\s*层级|第一层标题|第\s*一\s*层标题|第一层级序号|第\s*一\s*层级序号)", text):
         targets.add("level1")
     if re.search(r"(二级标题|2级标题|2\s*级\s*标题|二\s*级\s*标题)", text):
         targets.add("level2")
+    if re.search(r"(第二层级|第\s*二\s*层级|第二层标题|第\s*二\s*层标题|第二层级序号|第\s*二\s*层级序号)", text):
+        targets.add("level2")
     if re.search(r"(三级标题|3级标题|3\s*级\s*标题|三\s*级\s*标题)", text):
+        targets.add("level3")
+    if re.search(r"(第三层级|第\s*三\s*层级|第三层标题|第\s*三\s*层标题|第三层级序号|第\s*三\s*层级序号)", text):
         targets.add("level3")
     if re.search(r"(四级标题|4级标题|4\s*级\s*标题|四\s*级\s*标题)", text):
         targets.add("level4")
+    if re.search(r"(第四层级|第\s*四\s*层级|第四层标题|第\s*四\s*层标题|第四层级序号|第\s*四\s*层级序号)", text):
+        targets.add("level4")
 
-    if "正文" in text:
+    if re.search(r"(正文字体|正文(?:字号|行距|首行缩进)?\s*(?:改为|改成|设为|设置为|调整为|变为|使用|用|统一使用))", text):
         targets.add("body")
 
     has_any_heading_level = any(level in targets for level in {"level1", "level2", "level3", "level4"})
-    if "标题" in text and not has_any_heading_level:
+    has_title = "title" in targets
+    if (
+        not has_any_heading_level
+        and not has_title
+        and (
+            re.search(r"(各级标题|所有标题|全部标题)", text)
+            or ("标题" in text and re.search(r"(字体|字号|样式|统一|改为|改成|设为|设置为|调整为|变为|使用|用)", text))
+        )
+        and not re.search(r"(标题排列|标题排版)", text)
+    ):
         targets.update({"level1", "level2", "level3", "level4"})
 
     if "全文" in text:
-        targets.update({"body", "level1", "level2", "level3", "level4"})
+        targets.update({"body", "title", "level1", "level2", "level3", "level4"})
 
     return targets
+
+
+def _apply_font_patch(patch: dict, targets: set[str], font_name: str) -> None:
+    if "title" in targets:
+        patch.setdefault("title", {})["fontFamily"] = font_name
+
+    if "body" in targets:
+        patch.setdefault("body", {})["fontFamily"] = font_name
+
+    heading_targets = [target for target in targets if target.startswith("level")]
+    if heading_targets:
+        headings = patch.setdefault("headings", {})
+        for level_key in heading_targets:
+            headings.setdefault(level_key, {})["fontFamily"] = font_name
 
 
 def _build_patch_from_instruction(instruction: str) -> dict:
     patch: dict = {}
     segments = [seg.strip() for seg in re.split(r"[，,。；;\n]+", instruction or "") if seg.strip()]
+    pending_targets: set[str] = set()
 
     for seg in segments:
-        font_name = _extract_font_name(seg)
-        if not font_name:
-            continue
-
         targets = _detect_font_targets(seg)
-        if not targets:
+        font_name = _extract_font_name(seg)
+
+        if not font_name:
+            pending_targets = targets
             continue
 
-        if "body" in targets:
-            patch.setdefault("body", {})["fontFamily"] = font_name
+        effective_targets = targets or pending_targets
+        if not effective_targets:
+            pending_targets = set()
+            continue
 
-        heading_targets = [target for target in targets if target.startswith("level")]
-        if heading_targets:
-            headings = patch.setdefault("headings", {})
-            for level_key in heading_targets:
-                headings.setdefault(level_key, {})["fontFamily"] = font_name
+        _apply_font_patch(patch, effective_targets, font_name)
+        pending_targets = set()
 
     if patch:
         return patch
 
     fallback_font = _extract_font_name(instruction)
     if fallback_font:
+        fallback_targets = _detect_font_targets(instruction)
+        if fallback_targets:
+            fallback_patch: dict = {}
+            _apply_font_patch(fallback_patch, fallback_targets, fallback_font)
+            if fallback_patch:
+                return fallback_patch
         return {"body": {"fontFamily": fallback_font}}
     return {}
+
+
+def _sanitize_rule_patch(value):
+    if isinstance(value, dict):
+        sanitized: dict = {}
+        for key, item in value.items():
+            if key == "fontFamily":
+                normalized = _normalize_font_name(str(item or ""))
+                if normalized:
+                    sanitized[key] = normalized
+                continue
+            sanitized[key] = _sanitize_rule_patch(item)
+        return sanitized
+    if isinstance(value, list):
+        return [_sanitize_rule_patch(item) for item in value]
+    return value
 
 
 def _topic_out(row: Topic) -> TopicOut:
@@ -499,13 +605,10 @@ def revise_draft(topic_id: str, payload: TopicReviseRequest, db: Session = Depen
         .order_by(TopicTemplateDraft.version.desc())
         .first()
     )
-    if not latest:
-        raise HTTPException(status_code=400, detail="请先分析训练材料后再修订")
-
-    new_rules = copy.deepcopy(latest.inferred_rules)
-    patch = copy.deepcopy(payload.patch or {})
+    new_rules = copy.deepcopy(latest.inferred_rules) if latest else {}
+    patch = _sanitize_rule_patch(copy.deepcopy(payload.patch or {}))
     agent_summary = payload.instruction
-    instruction_patch = _build_patch_from_instruction(payload.instruction)
+    instruction_patch = _sanitize_rule_patch(_build_patch_from_instruction(payload.instruction))
 
     if payload.useDeepSeek:
         conversation = [{"role": msg.role, "content": msg.content} for msg in payload.conversation]
@@ -520,12 +623,12 @@ def revise_draft(topic_id: str, payload: TopicReviseRequest, db: Session = Depen
         except AgentUpstreamError as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-        ai_patch = copy.deepcopy(ai_result.get("patch") or {})
+        ai_patch = _sanitize_rule_patch(copy.deepcopy(ai_result.get("patch") or {}))
         if instruction_patch:
             _merge_patch(ai_patch, instruction_patch)
         if patch:
             _merge_patch(ai_patch, patch)
-        patch = ai_patch
+        patch = _sanitize_rule_patch(ai_patch)
         agent_summary = (
             ai_result.get("assistantReply")
             or ai_result.get("summary")
@@ -535,14 +638,14 @@ def revise_draft(topic_id: str, payload: TopicReviseRequest, db: Session = Depen
         patch = instruction_patch
 
     if patch:
-        _merge_patch(new_rules, patch)
+        _merge_patch(new_rules, _sanitize_rule_patch(patch))
 
     new_draft = TopicTemplateDraft(
         topic_id=topic_id,
-        version=latest.version + 1,
+        version=(latest.version + 1) if latest else 1,
         status="draft",
         inferred_rules=new_rules,
-        confidence_report=latest.confidence_report,
+        confidence_report=copy.deepcopy(latest.confidence_report) if latest else {},
         agent_summary=agent_summary,
     )
     db.add(new_draft)

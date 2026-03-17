@@ -19,6 +19,7 @@ os.environ["EXPORT_DIR"] = str((ROOT / "test-storage").as_posix())
 from app.database import SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import DeletionAuditEvent, DocumentFile, Topic, TopicTemplate, TopicTemplateDraft  # noqa: E402
+from app.routers.topics import _build_patch_from_instruction, _extract_font_name  # noqa: E402
 
 
 def _docx_bytes(text: str = "示例正文") -> bytes:
@@ -213,6 +214,144 @@ class TopicApiTests(unittest.TestCase):
         self.assertEqual(revised_rules["headings"]["level3"]["fontFamily"], "宋体")
         revised_body_font = (revised_rules.get("body") or {}).get("fontFamily")
         self.assertEqual(revised_body_font, initial_body_font)
+
+    def test_revise_without_analyze_creates_initial_draft_from_instruction(self) -> None:
+        company_resp = self.client.post("/api/units", json={"name": f"topic_text_only_{uuid.uuid4().hex[:8]}"})
+        self.assertEqual(company_resp.status_code, 200)
+        company_id = company_resp.json()["id"]
+
+        created = self.client.post(
+            "/api/topics",
+            json={"companyId": company_id, "name": "纯文字训练题材", "description": "测试纯文字首版草稿"},
+        )
+        self.assertEqual(created.status_code, 200)
+        topic_id = created.json()["id"]
+
+        revised = self.client.post(
+            f"/api/topics/{topic_id}/agent/revise",
+            json={"instruction": "正文字体统一改成宋体，主标题改为方正小标宋简体"},
+        )
+        self.assertEqual(revised.status_code, 200)
+        revised_draft = revised.json()
+
+        self.assertEqual(revised_draft["version"], 1)
+        self.assertEqual(revised_draft["inferredRules"]["body"]["fontFamily"], "宋体")
+        self.assertEqual(revised_draft["inferredRules"]["title"]["fontFamily"], "方正小标宋简")
+        self.assertEqual(revised_draft["confidenceReport"], {})
+        self.assertEqual(revised_draft["agentSummary"], "正文字体统一改成宋体，主标题改为方正小标宋简体")
+
+    @patch("app.routers.topics.revise_topic_rules_with_deepseek")
+    def test_revise_without_analyze_can_create_initial_draft_with_deepseek(self, mock_revise_with_deepseek) -> None:
+        mock_revise_with_deepseek.return_value = {
+            "patch": {"headings": {"level2": {"fontFamily": "楷体_GB2312"}}},
+            "assistantReply": "已根据文字指令生成首版模板草稿。",
+            "summary": "已生成首版模板草稿",
+            "model": "deepseek-chat",
+            "usage": {"total_tokens": 66},
+        }
+
+        company_resp = self.client.post("/api/units", json={"name": f"topic_text_ds_{uuid.uuid4().hex[:8]}"})
+        self.assertEqual(company_resp.status_code, 200)
+        company_id = company_resp.json()["id"]
+
+        created = self.client.post(
+            "/api/topics",
+            json={"companyId": company_id, "name": "纯文字DeepSeek题材", "description": "测试纯文字 DeepSeek 首稿"},
+        )
+        self.assertEqual(created.status_code, 200)
+        topic_id = created.json()["id"]
+
+        revised = self.client.post(
+            f"/api/topics/{topic_id}/agent/revise",
+            json={
+                "instruction": "请直接根据要求生成首版模板草稿，二级标题改为楷体_GB2312",
+                "useDeepSeek": True,
+                "conversation": [{"role": "user", "content": "现在没有上传文件，请直接生成模板"}],
+            },
+        )
+        self.assertEqual(revised.status_code, 200)
+        revised_draft = revised.json()
+
+        self.assertEqual(revised_draft["version"], 1)
+        self.assertEqual(revised_draft["inferredRules"]["headings"]["level2"]["fontFamily"], "楷体_GB2312")
+        self.assertEqual(revised_draft["agentSummary"], "已根据文字指令生成首版模板草稿。")
+        self.assertTrue(mock_revise_with_deepseek.called)
+
+    def test_build_patch_from_instruction_handles_title_and_numbering_fonts(self) -> None:
+        instruction = (
+            "一、 标题与正文字体规范 主标题：使用 方正小标宋简体 2 号。"
+            "标题排列一般采用梯形或菱形，不宜只排一行。"
+            "正文字体：统一使用 3 号仿宋_GB2312。"
+            "二、 正文层级序号规则 第一层级：序号为“一、”，使用 黑体 3 号。"
+            "第二层级：序号为“（一）”，使用 楷体_GB2312 3 号。"
+            "第三层级：序号为“1.”，使用 仿宋_GB2312 3 号。"
+            "第四层级：序号为“（1）”，使用 仿宋 3 号。"
+        )
+
+        self.assertIsNone(_extract_font_name("标题排列一般采用梯形或菱形，不宜只排一行。"))
+
+        patch = _build_patch_from_instruction(instruction)
+
+        self.assertEqual(patch["title"]["fontFamily"], "方正小标宋简")
+        self.assertEqual(patch["body"]["fontFamily"], "仿宋_GB2312")
+        self.assertEqual(patch["headings"]["level1"]["fontFamily"], "黑体")
+        self.assertEqual(patch["headings"]["level2"]["fontFamily"], "楷体_GB2312")
+        self.assertEqual(patch["headings"]["level3"]["fontFamily"], "仿宋_GB2312")
+        self.assertEqual(patch["headings"]["level4"]["fontFamily"], "仿宋_GB2312")
+
+    @patch("app.routers.topics.revise_topic_rules_with_deepseek")
+    def test_revise_with_deepseek_ignores_invalid_font_family_from_model(self, mock_revise_with_deepseek) -> None:
+        mock_revise_with_deepseek.return_value = {
+            "patch": {"headings": {"level1": {"fontFamily": "梯形或菱形"}}},
+            "assistantReply": "已根据指令更新模板规则。",
+            "summary": "模板规则已更新",
+            "model": "deepseek-chat",
+            "usage": {"total_tokens": 21},
+        }
+
+        company_resp = self.client.post("/api/units", json={"name": f"topic_invalid_font_{uuid.uuid4().hex[:8]}"})
+        self.assertEqual(company_resp.status_code, 200)
+        company_id = company_resp.json()["id"]
+
+        created = self.client.post(
+            "/api/topics",
+            json={"companyId": company_id, "name": "非法字体过滤题材", "description": "测试非法字体值过滤"},
+        )
+        self.assertEqual(created.status_code, 200)
+        topic_id = created.json()["id"]
+
+        analyze = self.client.post(
+            f"/api/topics/{topic_id}/analyze",
+            files=[
+                (
+                    "files",
+                    (
+                        "invalid-font-sample.docx",
+                        _docx_bytes_for_level3_font_test(level3_font="黑体"),
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    ),
+                ),
+            ],
+        )
+        self.assertEqual(analyze.status_code, 200)
+        initial_level1_font = (
+            ((analyze.json()["draft"]["inferredRules"] or {}).get("headings") or {}).get("level1") or {}
+        ).get("fontFamily")
+
+        revised = self.client.post(
+            f"/api/topics/{topic_id}/agent/revise",
+            json={
+                "instruction": "标题排列一般采用梯形或菱形，不宜只排一行。",
+                "useDeepSeek": True,
+            },
+        )
+        self.assertEqual(revised.status_code, 200)
+        revised_level1_font = ((((revised.json()["inferredRules"] or {}).get("headings") or {}).get("level1") or {}).get(
+            "fontFamily"
+        ))
+
+        self.assertEqual(revised_level1_font, initial_level1_font)
+        self.assertNotEqual(revised_level1_font, "梯形或菱形")
 
     @patch("app.routers.topics.revise_topic_rules_with_deepseek")
     def test_revise_with_deepseek_chat_uses_model_patch(self, mock_revise_with_deepseek) -> None:

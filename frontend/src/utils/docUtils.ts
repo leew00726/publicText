@@ -256,13 +256,51 @@ function normalizeFixedSuffixNodeAttrs(node: any, bodyRules: Record<string, any>
   return nextNode
 }
 
+function isSameTemplateBoundaryNode(currentNode: any, templateNode: any): boolean {
+  if (!currentNode || !templateNode) return false
+  if (currentNode.type !== templateNode.type) return false
+
+  const currentText = normalizeCommonText(getNodeText(currentNode))
+  const templateText = normalizeCommonText(getNodeText(templateNode))
+  const currentDivider = Boolean(currentNode?.attrs?.dividerRed)
+  const templateDivider = Boolean(templateNode?.attrs?.dividerRed)
+
+  return currentText === templateText && currentDivider === templateDivider
+}
+
+function countMatchingLeadingTemplateNodes(content: any[], preserveLeadingNodes: any[]): number {
+  const max = Math.min(content.length, preserveLeadingNodes.length)
+  let count = 0
+
+  while (count < max) {
+    if (!isSameTemplateBoundaryNode(content[count], preserveLeadingNodes[count])) break
+    count += 1
+  }
+
+  return count
+}
+
+function countMatchingTrailingTemplateNodes(content: any[], preserveTrailingNodes: any[], leadingCount: number): number {
+  const max = Math.min(Math.max(content.length - leadingCount, 0), preserveTrailingNodes.length)
+  let count = 0
+
+  while (count < max) {
+    const contentIndex = content.length - 1 - count
+    const templateIndex = preserveTrailingNodes.length - 1 - count
+    if (!isSameTemplateBoundaryNode(content[contentIndex], preserveTrailingNodes[templateIndex])) break
+    count += 1
+  }
+
+  return count
+}
+
 function applyBodyLayoutOnly(body: any, options: BodyLayoutOptions = {}): any {
   const cloned = structuredClone(body || { type: 'doc', content: [] })
   const content = Array.isArray(cloned.content) ? cloned.content : []
   const preserveLeading = Array.isArray(options.preserveLeadingNodes) ? options.preserveLeadingNodes : []
   const preserveTrailing = Array.isArray(options.preserveTrailingNodes) ? options.preserveTrailingNodes : []
-  const leadingCount = Math.min(preserveLeading.length, content.length)
-  const trailingCount = Math.min(preserveTrailing.length, Math.max(content.length - leadingCount, 0))
+  const leadingCount = countMatchingLeadingTemplateNodes(content, preserveLeading)
+  const trailingCount = countMatchingTrailingTemplateNodes(content, preserveTrailing, leadingCount)
 
   for (let i = 0; i < leadingCount; i += 1) {
     content[i] = structuredClone(preserveLeading[i])

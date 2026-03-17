@@ -9,6 +9,7 @@ import {
   validateEmployeeLogin,
 } from '../utils/employeeAuth'
 import { ensureEmployeeCompany } from '../utils/employeeCompany'
+import { LAYOUT_HOME_PATH } from '../utils/layoutNavigation'
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -21,7 +22,7 @@ export function LoginPage() {
 
   useEffect(() => {
     if (loadEmployeeSession()) {
-      navigate('/layout/company-home', { replace: true })
+      navigate(LAYOUT_HOME_PATH, { replace: true })
     }
   }, [navigate])
 
@@ -43,7 +44,7 @@ export function LoginPage() {
         name: company.name,
       })
       saveEmployeeSession(session)
-      navigate('/layout/company-home', { replace: true })
+      navigate(LAYOUT_HOME_PATH, { replace: true })
     } catch (error: any) {
       const detail = error?.response?.data?.detail || '加载所属公司失败，请联系管理员'
       alert(String(detail))

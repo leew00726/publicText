@@ -136,7 +136,7 @@ export function TopicComposePage() {
       ) : templates.length === 0 ? (
         <section className="panel">
           <h3>当前还没有可用模板</h3>
-          <p>请先上传材料训练并确认模板，然后再开始正文编辑。</p>
+          <p>请先进入模板训练页，通过文字要求直接生成模板，或上传样本提取规则后确认模板，再开始正文编辑。</p>
           {canEnterManagementTrain ? (
             <div className="row-gap">
               <button type="button" onClick={goTrainPage}>

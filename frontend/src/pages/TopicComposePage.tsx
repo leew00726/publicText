@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type { Topic, TopicTemplate } from '../api/types'
-import { PageHeader } from '../components/PageHeader'
 import { loadEmployeeSession } from '../utils/employeeAuth'
 import { canAccessPage, canPerformAction } from '../utils/pagePermissions'
 import { pickDefaultTopicTemplateId } from '../utils/topicCompose'
@@ -114,19 +113,7 @@ export function TopicComposePage() {
   }
 
   return (
-    <main className="page workspace-page">
-      <PageHeader
-        eyebrow="Compose"
-        title={`正文编辑入口${topic ? ` · ${topic.name}` : ''}`}
-        description="选择模板版本并创建新文档，后续进入统一的正文排版工作区。"
-        meta={
-          <>
-            <span className="soft-pill">模板数 {templates.length}</span>
-            <span className="soft-pill">题材 {topic?.name || '-'}</span>
-          </>
-        }
-      />
-
+    <main className="page workspace-page layout-page-scale">
       {message ? <div className="inline-status-card">{message}</div> : null}
 
       {loading ? (

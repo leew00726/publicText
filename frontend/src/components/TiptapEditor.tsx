@@ -435,6 +435,7 @@ export function TiptapEditor({
   }
 
   const bodyRules = (topicTemplateRules?.body as Record<string, unknown> | undefined) || {}
+  const titleRules = (topicTemplateRules?.title as Record<string, unknown> | undefined) || {}
   const headingRules = (topicTemplateRules?.headings as Record<string, any> | undefined) || {}
   const suffixLabelRules = (topicTemplateRules?.suffixLabel as Record<string, unknown> | undefined) || {}
   const level1Rules = (headingRules.level1 as Record<string, unknown> | undefined) || {}
@@ -495,6 +496,17 @@ export function TiptapEditor({
     ['--pt-h4-font-weight' as any]: _resolveWeight(level4Rules.bold, '400'),
     ['--pt-h4-line-height' as any]: `${h4LineHeightPt}pt`,
     ['--pt-h4-text-indent' as any]: _resolveIndent(level4Rules.firstLineIndentPt, level4Rules.firstLineIndentChars, '2em'),
+  }
+  const titlePreviewStyle: CSSProperties = {
+    fontFamily: _resolveFontFamilyWithFallback(
+      titleRules.fontFamily,
+      '"方正小标宋简", "方正小标宋简体", "方正小标宋", "小标宋", var(--font-main)',
+    ),
+    fontSize: `${_toFiniteNumber(titleRules.fontSizePt) ?? 22}pt`,
+    fontWeight: _resolveWeight(titleRules.bold, '400'),
+    lineHeight: `${_toFiniteNumber(titleRules.lineSpacingPt) ?? 28}pt`,
+    color: _toColor(titleRules.colorHex) || undefined,
+    textAlign: typeof titleRules.textAlign === 'string' && titleRules.textAlign.trim() ? (titleRules.textAlign as any) : undefined,
   }
 
   const editorContentClass = [
@@ -570,7 +582,11 @@ export function TiptapEditor({
           {hasFrontmatter && (
             <div className="frontmatter-layer" aria-hidden="true">
               <div className={`frontmatter-paper ${title ? 'has-title' : 'no-title'}`}>
-                {title && <p className="frontmatter-title">{title}</p>}
+                {title && (
+                  <p className="frontmatter-title" style={titlePreviewStyle}>
+                    {title}
+                  </p>
+                )}
                 {mainTo && <p className="frontmatter-main-to">{mainTo}</p>}
               </div>
             </div>

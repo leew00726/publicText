@@ -3,10 +3,13 @@ from datetime import UTC, datetime
 from typing import Literal
 from urllib.parse import quote
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
+from app.database import get_db
+from app.models import TopicTemplate
 from app.services.ai_agent import (
     AgentConfigError,
     AgentUpstreamError,
@@ -27,6 +30,7 @@ class SummaryDocxExportRequest(BaseModel):
     title: str = Field(default="公文总结", min_length=1, max_length=120)
     summary: str = Field(min_length=1, max_length=20000)
     sourceFileName: str | None = Field(default=None, max_length=255)
+    topicTemplateId: str | None = Field(default=None, max_length=36)
 
 
 def _safe_filename_stem(value: str) -> str:
@@ -117,11 +121,19 @@ async def summarize_document_api(
 
 
 @router.post("/export-summary-docx")
-def export_summary_docx_api(payload: SummaryDocxExportRequest):
+def export_summary_docx_api(payload: SummaryDocxExportRequest, db: Session = Depends(get_db)):
+    template_rules = None
+    if payload.topicTemplateId:
+        template = db.query(TopicTemplate).filter(TopicTemplate.id == payload.topicTemplateId).first()
+        if not template:
+            raise HTTPException(status_code=400, detail="指定导出模板不存在")
+        template_rules = template.rules if isinstance(template.rules, dict) else None
+
     output = build_summary_docx(
         title=payload.title,
         summary_text=payload.summary,
         source_file_name=payload.sourceFileName,
+        template_rules=template_rules,
     )
     stamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
     filename = f"{_safe_filename_stem(payload.title)}_{stamp}.docx"

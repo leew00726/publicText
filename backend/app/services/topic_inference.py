@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import copy
 import io
 import json
 import re
 from collections import Counter
+from difflib import SequenceMatcher
 from typing import Any
 
 from docx import Document
@@ -24,6 +26,11 @@ RE_SUFFIX_MARKER = re.compile(
 RE_SEND_LINE = re.compile(r"^发\s*(?:送|至|文)\s*[：:]")
 RE_HEADER_SIGNATORY = re.compile(r"签发人\s*[：:]")
 RE_ZH_DATE = re.compile(r"\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日")
+RE_DOC_ISSUE_LINE = re.compile(r"^(?:\d{4}\s*年第\s*[0-9一二三四五六七八九十百千]+\s*期|第\s*[0-9一二三四五六七八九十百千]+\s*期)$")
+RE_SECRET_MARKER = re.compile(r"(秘密|机密|绝密|商密)")
+RE_TITLE_KEYWORD = re.compile(
+    r"(报告|纪要|请示|函|通知|方案|总结|通报|决定|公告|意见|办法|细则|规定|计划|说明|简报|要点|清单|材料)$"
+)
 
 
 def _normalize_value(value: Any) -> Any:
@@ -203,6 +210,181 @@ def _node_text(node: dict[str, Any]) -> str:
     return "".join(part.get("text", "") for part in (node.get("content") or []) if isinstance(part, dict))
 
 
+def _looks_like_company_line(text: str) -> bool:
+    value = (text or "").replace("\u00A0", " ").strip()
+    if not value:
+        return False
+    return any(keyword in value for keyword in ["有限公司", "有限责任公司", "集团", "公司", "委员会", "办公室", "政府", "人民法院"])
+
+
+def _looks_like_issue_line(text: str) -> bool:
+    value = (text or "").replace("\u00A0", " ").strip()
+    if not value:
+        return False
+    return bool(RE_DOC_ISSUE_LINE.match(value))
+
+
+def _extract_title_rules_from_node(node: dict[str, Any]) -> dict[str, Any]:
+    attrs = node.get("attrs")
+    if not isinstance(attrs, dict):
+        return {}
+
+    allowed_keys = ["fontFamily", "fontSizePt", "bold", "colorHex", "textAlign", "lineSpacingPt"]
+    result: dict[str, Any] = {}
+    for key in allowed_keys:
+        value = attrs.get(key)
+        if value is not None:
+            result[key] = value
+    return result
+
+
+def _match_title_candidate(leading_nodes: list[dict[str, Any]]) -> dict[str, Any] | None:
+    best_candidate: dict[str, Any] | None = None
+    best_score = float("-inf")
+
+    for idx, node in enumerate(leading_nodes):
+        if not isinstance(node, dict):
+            continue
+        if node.get("type") not in {"paragraph", "heading"}:
+            continue
+
+        text = _node_text(node).replace("\u00A0", " ").strip()
+        if not text:
+            continue
+        if _looks_like_header_meta_line(text) or RE_SUFFIX_MARKER.match(text) or _looks_like_issue_line(text):
+            continue
+        if RE_SECRET_MARKER.search(text):
+            continue
+
+        attrs = node.get("attrs") if isinstance(node.get("attrs"), dict) else {}
+        font_size = attrs.get("fontSizePt")
+        font_size_num = float(font_size) if isinstance(font_size, (int, float)) else 0.0
+
+        score = 0.0
+        if RE_TITLE_KEYWORD.search(text):
+            score += 6
+        if str(attrs.get("textAlign") or "").strip().lower() == "center":
+            score += 2
+        if font_size_num:
+            score += min(font_size_num / 10, 3)
+        if _looks_like_company_line(text):
+            score -= 5
+        if len(text) < 4:
+            score -= 3
+        if len(text) > 40:
+            score -= 2
+
+        if score > best_score:
+            best_score = score
+            best_candidate = {
+                "insertIndex": idx,
+                "text": text,
+                "node": node,
+                "rules": _extract_title_rules_from_node(node),
+            }
+
+    if best_score <= 0 or not best_candidate:
+        return None
+    return best_candidate
+
+
+def _extract_title_candidate_from_content_template(content_template: dict[str, Any]) -> dict[str, Any] | None:
+    leading_nodes = content_template.get("leadingNodes")
+    if not isinstance(leading_nodes, list) or not leading_nodes:
+        return None
+
+    matched = _match_title_candidate([node for node in leading_nodes if isinstance(node, dict)])
+    if not matched:
+        return None
+
+    insert_index = int(matched["insertIndex"])
+    stripped_leading_nodes = [node for idx, node in enumerate(leading_nodes) if idx != insert_index]
+    content_template["leadingNodes"] = stripped_leading_nodes
+    content_template["titleMode"] = "dynamic"
+    return matched
+
+
+def _normalize_title_similarity_text(text: str) -> str:
+    return re.sub(r"\s+", "", (text or "").strip())
+
+
+def _titles_are_similar_enough(title_texts: list[str], threshold: float = 0.9) -> bool:
+    normalized = [_normalize_title_similarity_text(text) for text in title_texts if _normalize_title_similarity_text(text)]
+    if len(normalized) < 2:
+        return False
+
+    for idx, left in enumerate(normalized):
+        for right in normalized[idx + 1 :]:
+            if SequenceMatcher(a=left, b=right).ratio() < threshold:
+                return False
+    return True
+
+
+def _titles_match_exactly(title_texts: list[str]) -> bool:
+    normalized = [_normalize_title_similarity_text(text) for text in title_texts if _normalize_title_similarity_text(text)]
+    return len(normalized) >= 2 and len(set(normalized)) == 1
+
+
+def _tokenize_title_text(text: str) -> list[str]:
+    normalized = _normalize_title_similarity_text(text)
+    if not normalized:
+        return []
+    return re.findall(r"\d+|[A-Za-z]+|[\u4e00-\u9fff]|[^\w\s]", normalized)
+
+
+def _build_title_template_text(title_texts: list[str]) -> str | None:
+    tokenized_titles = [_tokenize_title_text(text) for text in title_texts if _normalize_title_similarity_text(text)]
+    if len(tokenized_titles) < 2 or not tokenized_titles[0]:
+        return None
+
+    first_tokens = tokenized_titles[0]
+    token_is_variable = [False] * len(first_tokens)
+    gap_has_variable = [False] * (len(first_tokens) + 1)
+
+    for other_tokens in tokenized_titles[1:]:
+        matcher = SequenceMatcher(a=first_tokens, b=other_tokens)
+        for tag, a1, a2, _b1, _b2 in matcher.get_opcodes():
+            if tag == "equal":
+                continue
+            if tag == "insert":
+                gap_has_variable[a1] = True
+                continue
+            for idx in range(a1, a2):
+                token_is_variable[idx] = True
+
+    template_parts: list[str] = []
+    placeholder_index = 1
+
+    def append_placeholder() -> None:
+        nonlocal placeholder_index
+        if template_parts and re.fullmatch(r"\{\{变量\d+\}\}", template_parts[-1]):
+            return
+        template_parts.append(f"{{{{变量{placeholder_index}}}}}")
+        placeholder_index += 1
+
+    idx = 0
+    while idx < len(first_tokens):
+        if gap_has_variable[idx]:
+            append_placeholder()
+        if token_is_variable[idx]:
+            while idx < len(first_tokens) and token_is_variable[idx]:
+                idx += 1
+            append_placeholder()
+            continue
+        template_parts.append(first_tokens[idx])
+        idx += 1
+
+    if gap_has_variable[len(first_tokens)]:
+        append_placeholder()
+
+    template_text = "".join(template_parts)
+    if not template_text or "{{变量" not in template_text:
+        return None
+    if re.fullmatch(r"\{\{变量\d+\}\}", template_text):
+        return None
+    return template_text
+
+
 def _looks_like_header_meta_line(text: str) -> bool:
     value = (text or "").replace("\u00A0", " ").strip()
     if not value:
@@ -228,7 +410,11 @@ def _looks_like_body_start(node: dict[str, Any]) -> bool:
         return False
     if RE_SUFFIX_MARKER.match(text):
         return False
+    if _looks_like_issue_line(text):
+        return False
     if _detect_heading_level_from_text(text) is not None:
+        return True
+    if len(text) >= 6 and ("。" in text or "！" in text or "？" in text):
         return True
     if len(text) >= 20 and (text.endswith("：") or text.endswith(":")):
         return True
@@ -510,8 +696,18 @@ def extract_docx_features(data: bytes) -> dict[str, Any]:
     headings = {f"level{level}": _summarize_samples(samples) for level, samples in heading_samples.items()}
     result = {"body": body, "headings": headings, "page": {"marginsCm": margins}}
     content_template = _extract_content_template_from_nodes(template_nodes)
+    title_candidate = None
     if content_template:
+        title_candidate = _extract_title_candidate_from_content_template(content_template)
+        if title_candidate and title_candidate.get("rules"):
+            result["title"] = title_candidate["rules"]
         result["contentTemplate"] = content_template
+    if title_candidate:
+        result["_titleCandidate"] = {
+            "insertIndex": title_candidate["insertIndex"],
+            "text": title_candidate["text"],
+            "node": copy.deepcopy(title_candidate["node"]),
+        }
     return result
 
 
@@ -616,6 +812,12 @@ def infer_topic_rules(features_list: list[dict[str, Any]]) -> tuple[dict[str, An
         raise ValueError("features_list is empty")
 
     rule_paths = [
+        "title.fontFamily",
+        "title.fontSizePt",
+        "title.bold",
+        "title.colorHex",
+        "title.textAlign",
+        "title.lineSpacingPt",
         "body.fontFamily",
         "body.fontSizePt",
         "body.lineSpacingPt",
@@ -636,7 +838,7 @@ def infer_topic_rules(features_list: list[dict[str, Any]]) -> tuple[dict[str, An
         "headings.level4.fontSizePt",
     ]
 
-    rules: dict[str, Any] = {"body": {}, "headings": {}, "page": {"marginsCm": {}}}
+    rules: dict[str, Any] = {"title": {}, "body": {}, "headings": {}, "page": {"marginsCm": {}}}
     confidence_report: dict[str, Any] = {}
 
     for path in rule_paths:
@@ -664,15 +866,50 @@ def infer_topic_rules(features_list: list[dict[str, Any]]) -> tuple[dict[str, An
             continue
         template_candidates.append((key, template))
 
+    selected_template: dict[str, Any] | None = None
     if template_candidates:
         key_counter = Counter(key for key, _ in template_candidates)
         selected_key, selected_count = key_counter.most_common(1)[0]
-        selected_template = next(template for key, template in template_candidates if key == selected_key)
-        rules["contentTemplate"] = selected_template
+        selected_template = copy.deepcopy(next(template for key, template in template_candidates if key == selected_key))
         confidence_report["contentTemplate"] = {
             "confidence": round(selected_count / len(template_candidates), 4),
             "samples": len(template_candidates),
         }
+
+    title_candidates = [
+        candidate
+        for candidate in (feature.get("_titleCandidate") for feature in features_list)
+        if isinstance(candidate, dict) and isinstance(candidate.get("node"), dict) and isinstance(candidate.get("text"), str)
+    ]
+    title_texts = [str(candidate.get("text") or "") for candidate in title_candidates]
+    fixed_title_enabled = _titles_match_exactly(title_texts)
+    if fixed_title_enabled and title_candidates:
+        selected_title = title_candidates[0]
+        selected_template = selected_template or {
+            "leadingNodes": [],
+            "trailingNodes": [],
+            "bodyPlaceholder": "（请在此输入正文）",
+        }
+        leading_nodes = selected_template.get("leadingNodes")
+        if not isinstance(leading_nodes, list):
+            leading_nodes = []
+        insert_index = int(selected_title.get("insertIndex") or 0)
+        insert_index = max(0, min(insert_index, len(leading_nodes)))
+        leading_nodes.insert(insert_index, copy.deepcopy(selected_title["node"]))
+        selected_template["leadingNodes"] = leading_nodes
+        selected_template["titleMode"] = "fixed"
+    elif selected_template:
+        selected_template["titleMode"] = "dynamic"
+
+    title_template_text = _build_title_template_text(title_texts)
+    if title_template_text:
+        rules.setdefault("title", {})["templateText"] = title_template_text
+
+    if selected_template and (
+        (isinstance(selected_template.get("leadingNodes"), list) and selected_template.get("leadingNodes"))
+        or (isinstance(selected_template.get("trailingNodes"), list) and selected_template.get("trailingNodes"))
+    ):
+        rules["contentTemplate"] = selected_template
 
     _normalize_content_template_suffix_styles(rules)
     return rules, confidence_report

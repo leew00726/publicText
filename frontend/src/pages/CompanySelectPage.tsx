@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type { Unit } from '../api/types'
-import { PageHeader } from '../components/PageHeader'
 import { loadEmployeeSession } from '../utils/employeeAuth'
 import { canPerformAction } from '../utils/pagePermissions'
 
@@ -87,23 +86,19 @@ export function CompanySelectPage({ mode }: CompanySelectPageProps) {
 
   return (
     <main className="page workspace-page">
-      <PageHeader
-        eyebrow={canManageCompany ? 'Companies' : 'Selection'}
-        title={canManageCompany ? '公司管理' : '公司选择'}
-        description={canManageCompany ? '维护公司主数据，并继续进入题材治理流程。' : '选择公司后进入对应题材库。'}
-        meta={
-          <>
-            <span className="soft-pill">{canManageCompany ? '治理视图' : '排版视图'}</span>
-            <span className="soft-pill">公司数 {companies.length}</span>
-          </>
-        }
-      />
-
       {canCreateCompany ? (
-        <section className="unit-editor-card">
-          <strong>新建公司</strong>
-          <div className="row-gap">
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="公司名称（必填）" />
+        <section className="unit-editor-card company-create-card">
+          <div className="company-create-copy">
+            <strong>新建公司</strong>
+            <p>新增公司后即可进入对应题材、模板与文档治理流程。</p>
+          </div>
+          <div className="company-create-form">
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="公司名称（必填）"
+              aria-label="公司名称（必填）"
+            />
             <button type="button" onClick={() => void createCompany()} disabled={creating}>
               {creating ? '创建中...' : '创建公司'}
             </button>

@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from docx import Document
+from docx.oxml.ns import qn
 from fastapi import HTTPException
 from fastapi import UploadFile
 
@@ -214,3 +215,41 @@ class AiDocumentSummaryEndpointTests(unittest.TestCase):
 
         self.assertTrue(any("公文总结" in item for item in texts))
         self.assertTrue(any("核心结论" in item for item in texts))
+
+    def test_export_summary_docx_endpoint_uses_selected_template_rules(self):
+        fake_template = type(
+            "FakeTemplate",
+            (),
+            {
+                "rules": {
+                    "title": {"fontFamily": "黑体", "fontSizePt": 24, "bold": True},
+                    "body": {"fontFamily": "仿宋_GB2312", "fontSizePt": 16},
+                    "headings": {"level1": {"fontFamily": "楷体_GB2312", "fontSizePt": 18, "bold": True}},
+                }
+            },
+        )()
+        fake_db = MagicMock()
+        fake_db.query.return_value.filter.return_value.first.return_value = fake_template
+
+        payload = SummaryDocxExportRequest(
+            title="模板总结",
+            summary="**核心结论**\n- 第一项工作",
+            sourceFileName="memo.docx",
+            topicTemplateId="tpl-1",
+        )
+        response = export_summary_docx_api(payload, db=fake_db)
+
+        async def _collect() -> bytes:
+            chunks = []
+            async for chunk in response.body_iterator:
+                chunks.append(chunk)
+            return b"".join(chunks)
+
+        raw = asyncio.run(_collect())
+        doc = Document(io.BytesIO(raw))
+        heading_paragraph = next(p for p in doc.paragraphs if p.text == "核心结论")
+        title_paragraph = next(p for p in doc.paragraphs if p.text == "模板总结")
+
+        self.assertEqual(title_paragraph.runs[0]._element.rPr.rFonts.get(qn("w:eastAsia")), "黑体")
+        self.assertEqual(heading_paragraph.runs[0]._element.rPr.rFonts.get(qn("w:eastAsia")), "楷体_GB2312")
+        self.assertFalse(any("**" in p.text for p in doc.paragraphs if p.text))

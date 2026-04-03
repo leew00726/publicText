@@ -1,5 +1,12 @@
-﻿from functools import lru_cache
+from functools import lru_cache
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+BACKEND_ROOT = PROJECT_ROOT / "backend"
+ENV_FILES = tuple(str(path) for path in (PROJECT_ROOT / ".env", BACKEND_ROOT / ".env"))
 
 
 class Settings(BaseSettings):
@@ -22,7 +29,7 @@ class Settings(BaseSettings):
     deepseek_temperature: float = 0.2
     deepseek_system_prompt: str = "You are an assistant for Chinese official-document rewriting. Return only rewritten text."
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=ENV_FILES, extra="ignore")
 
 
 @lru_cache(maxsize=1)

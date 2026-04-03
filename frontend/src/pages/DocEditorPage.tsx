@@ -6,12 +6,12 @@ import { api } from '../api/client'
 import type { CheckIssue, GovDoc } from '../api/types'
 import { FontInstallModal } from '../components/FontInstallModal'
 import { FontStatusBar } from '../components/FontStatusBar'
-import { PageHeader } from '../components/PageHeader'
 import { StructuredFormPanel } from '../components/StructuredFormPanel'
 import { TiptapEditor } from '../components/TiptapEditor'
 import { ValidationPanel } from '../components/ValidationPanel'
 import { useFontCheck } from '../hooks/useFontCheck'
 import { applyOneClickLayoutWithFields } from '../utils/docUtils'
+import type { StructuredFields } from '../api/types'
 
 const DEFAULT_STRUCTURED_FIELDS = {
   title: '',
@@ -39,16 +39,108 @@ const AI_MODE_LABEL: Record<'formal' | 'concise' | 'polish', string> = {
   polish: '润色',
 }
 
+function isTemplateBackedDoc(structuredFields: Pick<StructuredFields, 'topicTemplateRules' | 'topicTemplateId' | 'topicId' | 'topicName'> | null | undefined): boolean {
+  return Boolean(
+    structuredFields?.topicTemplateRules || structuredFields?.topicTemplateId || structuredFields?.topicId || structuredFields?.topicName,
+  )
+}
+
+function getNodeText(node: any): string {
+  return Array.isArray(node?.content)
+    ? node.content.map((part: any) => (part && typeof part === 'object' ? String(part.text || '') : '')).join('').trim()
+    : ''
+}
+
+function looksLikeStaleTitleNode(node: any): boolean {
+  if (!node || typeof node !== 'object' || !['paragraph', 'heading'].includes(String(node.type || ''))) return false
+  const text = getNodeText(node)
+  if (!text) return false
+  if (/(有限公司|有限责任公司|集团|公司|委员会|办公室|政府)/.test(text)) return false
+  if (/签发人\s*[：:]/.test(text)) return false
+  if (/^(?:\d{4}\s*年第\s*[0-9一二三四五六七八九十百千]+\s*期|第\s*[0-9一二三四五六七八九十百千]+\s*期)$/.test(text)) return false
+  return /(报告|纪要|请示|函|通知|方案|总结|通报|决定|公告|意见|办法|细则|规定|计划|说明|简报|要点|清单|材料)$/.test(text)
+}
+
+export function sanitizeTemplateBodyContent(
+  body: GovDoc['body'],
+  structuredFields:
+    | Pick<StructuredFields, 'topicTemplateRules' | 'topicTemplateId' | 'topicId' | 'topicName' | 'title'>
+    | null
+    | undefined,
+): GovDoc['body'] {
+  if (!body || typeof body !== 'object' || !Array.isArray((body as any).content)) return body
+  if (!isTemplateBackedDoc(structuredFields)) return body
+
+  const topicTemplateRules = (structuredFields?.topicTemplateRules as Record<string, any> | null | undefined) || null
+  if (hasFixedTemplateTitle(topicTemplateRules)) return body
+
+  let removed = false
+  const sanitizedContent = (body as any).content.filter((node: any) => {
+    if (removed || !looksLikeStaleTitleNode(node)) return true
+    removed = true
+    return false
+  })
+
+  if (!removed) return body
+  return {
+    ...(body as any),
+    content: sanitizedContent,
+  }
+}
+
 function normalizeDoc(doc: GovDoc): GovDoc {
+  const structuredFields = {
+    ...DEFAULT_STRUCTURED_FIELDS,
+    ...(doc.structuredFields || {}),
+    attachments: Array.isArray(doc.structuredFields?.attachments) ? doc.structuredFields.attachments : [],
+    exportWithRedhead: false,
+  }
   return {
     ...doc,
-    structuredFields: {
-      ...DEFAULT_STRUCTURED_FIELDS,
-      ...(doc.structuredFields || {}),
-      attachments: Array.isArray(doc.structuredFields?.attachments) ? doc.structuredFields.attachments : [],
-      exportWithRedhead: false,
-    },
+    structuredFields,
+    body: sanitizeTemplateBodyContent(doc.body, structuredFields),
   }
+}
+
+function hasFixedTemplateTitle(topicTemplateRules: Record<string, any> | null | undefined): boolean {
+  const contentTemplate = topicTemplateRules?.contentTemplate
+  if (!contentTemplate || typeof contentTemplate !== 'object') return false
+
+  if (contentTemplate.titleMode === 'fixed') return true
+  if (contentTemplate.titleMode === 'dynamic') return false
+
+  const leadingNodes = Array.isArray(contentTemplate.leadingNodes) ? contentTemplate.leadingNodes : []
+  return leadingNodes.some((node: any) => {
+    if (!node || typeof node !== 'object') return false
+    const text = ((node.content || []) as any[])
+      .map((part: any) => (part && typeof part === 'object' ? String(part.text || '') : ''))
+      .join('')
+      .trim()
+    if (!text) return false
+    if (/(有限公司|有限责任公司|集团|公司|委员会|办公室|政府)/.test(text)) return false
+    if (/签发人\s*[：:]/.test(text)) return false
+    if (/^(?:\d{4}\s*年第\s*[0-9一二三四五六七八九十百千]+\s*期|第\s*[0-9一二三四五六七八九十百千]+\s*期)$/.test(text)) return false
+    return /(报告|纪要|请示|函|通知|方案|总结|通报|决定|公告|意见|办法|细则|规定|计划|说明|简报|要点|清单|材料)$/.test(text)
+  })
+}
+
+export function resolvePreviewTitleText(
+  title: string,
+  structuredFields:
+    | Pick<StructuredFields, 'title' | 'topicTemplateRules' | 'topicTemplateId' | 'topicId' | 'topicName'>
+    | null
+    | undefined,
+): string {
+  const topicTemplateRules = (structuredFields?.topicTemplateRules as Record<string, any> | null | undefined) || null
+  if (hasFixedTemplateTitle(topicTemplateRules)) {
+    return ''
+  }
+
+  const structuredTitle = (structuredFields?.title || '').trim()
+  if (isTemplateBackedDoc(structuredFields)) {
+    return structuredTitle
+  }
+  return structuredTitle || title || ''
 }
 
 export function DocEditorPage() {
@@ -267,13 +359,12 @@ export function DocEditorPage() {
     navigate(`/layout/docs/${res.data.docId}`)
   }
 
-  const hasFixedLeadingNodes = useMemo(() => {
-    const rules = doc?.structuredFields?.topicTemplateRules as any
-    const leadingNodes = rules?.contentTemplate?.leadingNodes
-    return Array.isArray(leadingNodes) && leadingNodes.length > 0
-  }, [doc?.structuredFields?.topicTemplateRules])
-  const previewTitleText = hasFixedLeadingNodes ? doc?.structuredFields?.title || '' : doc?.structuredFields?.title || doc?.title || ''
-  const previewMainToText = hasFixedLeadingNodes ? '' : doc?.structuredFields?.mainTo || ''
+  const hasFixedTemplateTitleContent = useMemo(
+    () => hasFixedTemplateTitle((doc?.structuredFields?.topicTemplateRules as Record<string, any> | null | undefined) || null),
+    [doc?.structuredFields?.topicTemplateRules],
+  )
+  const previewTitleText = resolvePreviewTitleText(doc?.title || '', doc?.structuredFields || null)
+  const previewMainToText = hasFixedTemplateTitleContent ? '' : doc?.structuredFields?.mainTo || ''
 
   if (!doc) {
     return <div className="page">加载中...</div>
@@ -281,19 +372,6 @@ export function DocEditorPage() {
 
   return (
     <main className="page doc-editor-page">
-      <PageHeader
-        eyebrow="Editor"
-        title="正文排版工作区"
-        description="保持公文字体和纸面逻辑不变，只重构壳层、工具栏和侧栏体验。"
-        meta={
-          <>
-            <span className="soft-pill">文档 {doc.title || '未命名'}</span>
-            <span className="soft-pill">类型 {doc.docType}</span>
-            <span className="soft-pill">状态 {doc.status}</span>
-          </>
-        }
-      />
-
       <section className="glass-card editor-command-bar">
         <div className="editor-command-row">
           <input

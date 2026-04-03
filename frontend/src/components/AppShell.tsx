@@ -1,21 +1,11 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 
 import { clearEmployeeSession, loadEmployeeSession } from '../utils/employeeAuth'
-import { LAYOUT_HOME_PATH } from '../utils/layoutNavigation'
-import { canAccessPage, type PagePermissionKey } from '../utils/pagePermissions'
 import { GlobalBackButton } from './GlobalBackButton'
 
 type AppShellProps = {
   children: ReactNode
-}
-
-type ShellNavItem = {
-  key: string
-  label: string
-  path: string
-  patterns: string[]
-  permission?: PagePermissionKey
 }
 
 type PageMeta = {
@@ -24,51 +14,13 @@ type PageMeta = {
   subtitle: string
 }
 
-const NAV_ITEMS: ShellNavItem[] = [
-  {
-    key: 'workspace',
-    label: '工作台',
-    path: '/workspace',
-    patterns: ['/workspace'],
-    permission: 'workspace.home',
-  },
-  {
-    key: 'summary',
-    label: '公文总结',
-    path: '/layout/summary',
-    patterns: ['/layout/summary'],
-    permission: 'layout.summary',
-  },
-  {
-    key: 'layout',
-    label: '公文排版',
-    path: LAYOUT_HOME_PATH,
-    patterns: [
-      '/layout',
-      LAYOUT_HOME_PATH,
-      '/layout/companies/:companyId/topics',
-      '/layout/topics/:topicId',
-      '/layout/topics/:topicId/library',
-      '/layout/docs/:id',
-    ],
-    permission: 'layout.home',
-  },
-  {
-    key: 'management',
-    label: '公文管理',
-    path: '/management',
-    patterns: ['/management', '/management/companies', '/management/companies/:companyId/topics', '/management/topics/:topicId/train'],
-    permission: 'management.home',
-  },
-]
-
 const PAGE_META_ROUTES: Array<{ pattern: string; meta: PageMeta }> = [
   {
     pattern: '/workspace',
     meta: {
       kicker: 'Workspace',
-      title: '员工工作台',
-      subtitle: '统一进入公文总结、公文排版和公文管理模块。',
+      title: '云矩公文管理平台',
+      subtitle: '',
     },
   },
   {
@@ -77,6 +29,14 @@ const PAGE_META_ROUTES: Array<{ pattern: string; meta: PageMeta }> = [
       kicker: 'Summary',
       title: '公文总结',
       subtitle: '上传文档后调用 DeepSeek 生成结构化总结并导出。',
+    },
+  },
+  {
+    pattern: '/meeting-minutes',
+    meta: {
+      kicker: 'Meeting',
+      title: '会议纪要',
+      subtitle: '前端占位模块，预留会议纪要整理、生成与归档入口。',
     },
   },
   {
@@ -161,10 +121,6 @@ const PAGE_META_ROUTES: Array<{ pattern: string; meta: PageMeta }> = [
   },
 ]
 
-function isNavActive(pathname: string, patterns: string[]) {
-  return patterns.some((pattern) => Boolean(matchPath(pattern, pathname)))
-}
-
 function resolvePageMeta(pathname: string): PageMeta {
   for (const route of PAGE_META_ROUTES) {
     if (matchPath(route.pattern, pathname)) {
@@ -183,18 +139,8 @@ export function AppShell({ children }: AppShellProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const session = loadEmployeeSession()
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-
-  useEffect(() => {
-    setSidebarOpen(false)
-  }, [location.pathname])
-
-  const navItems = useMemo(() => {
-    if (!session) return []
-    return NAV_ITEMS.filter((item) => !item.permission || canAccessPage(session.role, item.permission))
-  }, [session])
-
   const currentMeta = useMemo(() => resolvePageMeta(location.pathname), [location.pathname])
+  const isSummaryShell = useMemo(() => Boolean(matchPath('/layout/summary', location.pathname)), [location.pathname])
   const companyName = session?.companyName || '云成数科'
 
   if (!session) {
@@ -202,56 +148,15 @@ export function AppShell({ children }: AppShellProps) {
   }
 
   return (
-    <div className={`app-shell ${sidebarOpen ? 'sidebar-open' : ''}`}>
-      <button
-        type="button"
-        aria-label="关闭导航"
-        className={`shell-sidebar-scrim ${sidebarOpen ? 'visible' : ''}`}
-        onClick={() => setSidebarOpen(false)}
-      />
-
-      <aside className="app-shell-sidebar">
-        <div className="shell-brand">
-          <div className="shell-brand-mark" aria-hidden="true" />
-          <p className="shell-brand-name">云矩公文管理平台</p>
-        </div>
-
-        <nav className="shell-nav" aria-label="主导航">
-          {navItems.map((item) => {
-            const active = isNavActive(location.pathname, item.patterns)
-            return (
-              <button
-                key={item.key}
-                type="button"
-                className={`shell-nav-button ${active ? 'active' : ''}`}
-                onClick={() => navigate(item.path)}
-              >
-                <span className="shell-nav-label">{item.label}</span>
-                <span className="shell-nav-caption">{active ? '当前页面' : '进入'}</span>
-              </button>
-            )
-          })}
-        </nav>
-
-        <div className="shell-sidebar-footer">
-          <span className="soft-pill">公司 {companyName}</span>
-          <span className={`soft-pill ${session.role === 'admin' ? 'is-admin' : ''}`}>
-            {session.role === 'admin' ? '管理员' : '普通员工'}
-          </span>
-        </div>
-      </aside>
-
-      <div className="app-shell-main">
-        <header className="app-shell-topbar">
+    <div className={`app-shell${isSummaryShell ? ' app-shell-summary' : ''}`}>
+      <div className={`app-shell-main${isSummaryShell ? ' app-shell-main-summary' : ''}`}>
+        <header className={`app-shell-topbar${isSummaryShell ? ' shell-topbar-summary' : ''}`}>
           <div className="shell-topbar-left">
-            <button type="button" className="shell-sidebar-toggle" onClick={() => setSidebarOpen((open) => !open)}>
-              导航
-            </button>
             <GlobalBackButton variant="shell" />
             <div className="shell-topbar-copy">
               <p className="shell-topbar-kicker">{currentMeta.kicker}</p>
               <h1>{currentMeta.title}</h1>
-              <p>{currentMeta.subtitle}</p>
+              {currentMeta.subtitle ? <p>{currentMeta.subtitle}</p> : null}
             </div>
           </div>
 

@@ -1,4 +1,7 @@
 .doc-editor-page {
+  --doc-editor-ui-scale: 1.2;
+  zoom: var(--doc-editor-ui-scale);
+  width: calc(100% / var(--doc-editor-ui-scale));
   gap: 18px;
 }
 

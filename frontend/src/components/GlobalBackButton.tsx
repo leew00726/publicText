@@ -108,7 +108,7 @@ export function GlobalBackButton({ variant = 'floating' }: GlobalBackButtonProps
       return '/management/companies'
     }
     if (managementCompanyHomeMatch) {
-      return '/management'
+      return '/workspace'
     }
     if (layoutRootMatch || managementRootMatch) {
       return '/workspace'

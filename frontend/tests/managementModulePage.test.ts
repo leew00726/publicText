@@ -3,10 +3,12 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 describe('management module page', () => {
-  it('does not expose redhead governance entry', () => {
-    const source = readFileSync(resolve(__dirname, '../src/pages/ManagementModulePage.tsx'), 'utf-8')
-    expect(source).not.toContain('红头模板治理')
-    expect(source).not.toContain('/management/redhead-templates')
+  it('redirects the removed management landing page directly into company management', () => {
+    const appSource = readFileSync(resolve(__dirname, '../src/App.tsx'), 'utf-8')
+    const authSource = readFileSync(resolve(__dirname, '../src/utils/employeeAuth.ts'), 'utf-8')
+
+    expect(appSource).not.toContain("import { ManagementModulePage }")
+    expect(appSource).toContain('<Route path="/management" element={<Navigate to="/management/companies" replace />} />')
+    expect(authSource).toContain("entryPath: '/management/companies'")
   })
 })
-

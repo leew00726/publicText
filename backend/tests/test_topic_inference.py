@@ -125,6 +125,46 @@ def _build_docx_with_mixed_suffix_fonts() -> bytes:
     return bio.getvalue()
 
 
+def _build_docx_with_title_sample(
+    title_text: str,
+    company_text: str = "华能云成数字产融科技（雄安）有限公司",
+    issue_text: str = "2026年第6期",
+) -> bytes:
+    doc = Document()
+
+    company = doc.add_paragraph(company_text)
+    company.alignment = 1
+    company_run = company.runs[0]
+    company_run.font.name = "方正小标宋简体"
+    company_run.font.size = Pt(22)
+    company_run.font.color.rgb = RGBColor.from_string("FF0000")
+
+    title = doc.add_paragraph(title_text)
+    title.alignment = 1
+    title_run = title.runs[0]
+    title_run.font.name = "方正小标宋简体"
+    title_run.font.size = Pt(26)
+
+    issue = doc.add_paragraph(issue_text)
+    issue.alignment = 1
+    issue_run = issue.runs[0]
+    issue_run.font.name = "黑体"
+    issue_run.font.size = Pt(16)
+
+    body = doc.add_paragraph("2月9日，公司组织召开第六期周例会，具体纪要如下：")
+    body.runs[0].font.name = "仿宋_GB2312"
+    body.runs[0].font.size = Pt(16)
+    body.paragraph_format.first_line_indent = Pt(32)
+
+    footer = doc.add_paragraph("综合管理部  2026年2月9日  签发人：")
+    footer.runs[0].font.name = "仿宋_GB2312"
+    footer.runs[0].font.size = Pt(16)
+
+    bio = io.BytesIO()
+    doc.save(bio)
+    return bio.getvalue()
+
+
 def _build_docx_without_body_with_header_and_suffix() -> bytes:
     doc = Document()
     doc.add_paragraph("普通商密★1年")
@@ -192,12 +232,28 @@ class TopicInferenceTests(unittest.TestCase):
 
         content_template = features.get("contentTemplate") or {}
         leading = content_template.get("leadingNodes") or []
-        self.assertGreaterEqual(len(leading), 3)
+        self.assertGreaterEqual(len(leading), 2)
 
         first_attrs = leading[0].get("attrs") or {}
         self.assertEqual(first_attrs.get("textAlign"), "center")
         self.assertEqual(first_attrs.get("colorHex"), "#FF0000")
         self.assertEqual(first_attrs.get("fontFamily"), "方正小标宋简体")
+
+    def test_extract_docx_features_keeps_title_style_but_not_title_content_for_single_sample(self) -> None:
+        title_text = "关于数字化治理情况的报告"
+        features = extract_docx_features(_build_docx_with_title_sample(title_text))
+
+        title_rules = features.get("title") or {}
+        self.assertEqual(title_rules.get("fontFamily"), "方正小标宋简体")
+        self.assertEqual(title_rules.get("fontSizePt"), 26.0)
+
+        content_template = features.get("contentTemplate") or {}
+        leading_texts = [
+            "".join(part.get("text", "") for part in (node.get("content") or []))
+            for node in content_template.get("leadingNodes", [])
+            if isinstance(node, dict)
+        ]
+        self.assertNotIn(title_text, leading_texts)
 
     def test_infer_topic_rules_normalizes_suffix_line_font_to_body(self) -> None:
         features = extract_docx_features(_build_docx_with_mixed_suffix_fonts())
@@ -258,6 +314,48 @@ class TopicInferenceTests(unittest.TestCase):
             node for node in trailing if isinstance(node, dict) and (node.get("attrs") or {}).get("dividerRed")
         ]
         self.assertGreaterEqual(len(trailing_dividers), 2)
+
+    def test_infer_topic_rules_keeps_fixed_title_content_when_multiple_titles_match(self) -> None:
+        title_text = "关于数字化治理情况的报告"
+        f1 = extract_docx_features(_build_docx_with_title_sample(title_text))
+        f2 = extract_docx_features(_build_docx_with_title_sample(title_text))
+
+        rules, _ = infer_topic_rules([f1, f2])
+
+        content_template = rules.get("contentTemplate") or {}
+        leading_texts = [
+            "".join(part.get("text", "") for part in (node.get("content") or []))
+            for node in content_template.get("leadingNodes", [])
+            if isinstance(node, dict)
+        ]
+        self.assertIn(title_text, leading_texts)
+
+    def test_infer_topic_rules_drops_fixed_title_content_when_titles_do_not_match(self) -> None:
+        title_a = "关于数字化治理情况的报告"
+        title_b = "关于年度审计情况的报告"
+        f1 = extract_docx_features(_build_docx_with_title_sample(title_a))
+        f2 = extract_docx_features(_build_docx_with_title_sample(title_b))
+
+        rules, _ = infer_topic_rules([f1, f2])
+
+        self.assertEqual((rules.get("title") or {}).get("fontFamily"), "方正小标宋简体")
+        content_template = rules.get("contentTemplate") or {}
+        leading_texts = [
+            "".join(part.get("text", "") for part in (node.get("content") or []))
+            for node in content_template.get("leadingNodes", [])
+            if isinstance(node, dict)
+        ]
+        self.assertNotIn(title_a, leading_texts)
+        self.assertNotIn(title_b, leading_texts)
+        self.assertEqual((rules.get("title") or {}).get("templateText"), "关于{{变量1}}情况的报告")
+
+    def test_infer_topic_rules_extracts_variable_placeholder_for_year_like_titles(self) -> None:
+        f1 = extract_docx_features(_build_docx_with_title_sample("2026年度报告"))
+        f2 = extract_docx_features(_build_docx_with_title_sample("2025年度报告"))
+
+        rules, _ = infer_topic_rules([f1, f2])
+
+        self.assertEqual((rules.get("title") or {}).get("templateText"), "{{变量1}}年度报告")
 
     @patch("app.services.topic_inference.PdfReader")
     def test_extract_pdf_features_reads_font_and_size(self, mock_reader) -> None:

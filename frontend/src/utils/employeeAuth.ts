@@ -1,7 +1,7 @@
 import { LAYOUT_HOME_PATH } from './layoutNavigation'
 
 export type EmployeeRole = 'staff' | 'admin'
-export type ModuleKey = 'summary' | 'layout' | 'management'
+export type ModuleKey = 'summary' | 'layout' | 'management' | 'meetingMinutes'
 
 export type EmployeeSession = {
   username: string
@@ -58,8 +58,15 @@ const MODULE_DEFINITIONS: ModuleDefinition[] = [
     key: 'management',
     title: '公文管理',
     description: '管理公司、题材和历史文档，支持后续权限精细化治理。',
-    entryPath: '/management',
+    entryPath: '/management/companies',
     allowedRoles: ['admin'],
+  },
+  {
+    key: 'meetingMinutes',
+    title: '会议纪要',
+    description: '会后整理会议议程、结论和待办事项，后续将接入完整纪要生成流程。',
+    entryPath: '/meeting-minutes',
+    allowedRoles: ['staff', 'admin'],
   },
 ]
 

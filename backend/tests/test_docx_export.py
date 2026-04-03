@@ -13,9 +13,9 @@ def _paragraph_texts(raw: bytes) -> list[str]:
 
 
 class DocxExportTests(unittest.TestCase):
-    def test_export_suppresses_auto_title_when_topic_has_fixed_leading_nodes(self) -> None:
+    def test_export_keeps_auto_title_when_topic_only_has_non_title_leading_nodes(self) -> None:
         payload = {
-            "title": "自动标题-不应出现",
+            "title": "自动标题-应出现",
             "structuredFields": {
                 "title": "",
                 "mainTo": "",
@@ -29,7 +29,10 @@ class DocxExportTests(unittest.TestCase):
             },
             "body": {
                 "type": "doc",
-                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "正文段落"}]}],
+                "content": [
+                    {"type": "paragraph", "content": [{"type": "text", "text": "固定头部"}]},
+                    {"type": "paragraph", "content": [{"type": "text", "text": "正文段落"}]},
+                ],
             },
         }
 
@@ -37,6 +40,36 @@ class DocxExportTests(unittest.TestCase):
         texts = _paragraph_texts(raw)
 
         self.assertIn("正文段落", texts)
+        self.assertIn("自动标题-应出现", texts)
+
+    def test_export_suppresses_auto_title_only_when_topic_marks_fixed_title(self) -> None:
+        payload = {
+            "title": "自动标题-不应出现",
+            "structuredFields": {
+                "title": "",
+                "mainTo": "",
+                "topicTemplateRules": {
+                    "contentTemplate": {
+                        "titleMode": "fixed",
+                        "leadingNodes": [{"type": "paragraph", "content": [{"type": "text", "text": "固定标题"}]}],
+                        "trailingNodes": [],
+                        "bodyPlaceholder": "（请在此输入正文）",
+                    }
+                },
+            },
+            "body": {
+                "type": "doc",
+                "content": [
+                    {"type": "paragraph", "content": [{"type": "text", "text": "固定标题"}]},
+                    {"type": "paragraph", "content": [{"type": "text", "text": "正文段落"}]},
+                ],
+            },
+        }
+
+        raw = export_docx(payload, unit_name="测试单位", redhead_template={"elements": [], "page": {}}, include_redhead=False)
+        texts = _paragraph_texts(raw)
+
+        self.assertIn("固定标题", texts)
         self.assertNotIn("自动标题-不应出现", texts)
 
     def test_export_keeps_auto_title_without_fixed_leading_nodes(self) -> None:

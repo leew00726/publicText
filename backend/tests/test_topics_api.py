@@ -175,6 +175,75 @@ class TopicApiTests(unittest.TestCase):
         self.assertEqual(sf["topicTemplateId"], first_template_id)
         self.assertEqual(sf["topicTemplateVersion"], first_template_version)
 
+    def test_topic_analyze_builds_dynamic_title_template_and_prefills_new_doc_title(self) -> None:
+        company_resp = self.client.post("/api/units", json={"name": f"topic_title_tpl_{uuid.uuid4().hex[:8]}"})
+        self.assertEqual(company_resp.status_code, 200)
+        company_id = company_resp.json()["id"]
+
+        created = self.client.post(
+            "/api/topics",
+            json={"companyId": company_id, "name": "报告题材", "description": "测试动态标题模板"},
+        )
+        self.assertEqual(created.status_code, 200)
+        topic_id = created.json()["id"]
+
+        def build_title_docx(title_text: str) -> bytes:
+            doc = Document()
+            company = doc.add_paragraph("华能云成数字产融科技（雄安）有限公司")
+            company.alignment = 1
+            company.runs[0].font.name = "方正小标宋简体"
+
+            title = doc.add_paragraph(title_text)
+            title.alignment = 1
+            title.runs[0].font.name = "方正小标宋简体"
+
+            issue = doc.add_paragraph("2026年第6期")
+            issue.alignment = 1
+            issue.runs[0].font.name = "黑体"
+
+            body = doc.add_paragraph("这是正文第一段。")
+            body.runs[0].font.name = "仿宋_GB2312"
+
+            bio = io.BytesIO()
+            doc.save(bio)
+            return bio.getvalue()
+
+        analyze = self.client.post(
+            f"/api/topics/{topic_id}/analyze",
+            files=[
+                (
+                    "files",
+                    (
+                        "report-a.docx",
+                        build_title_docx("2026年度报告"),
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    ),
+                ),
+                (
+                    "files",
+                    (
+                        "report-b.docx",
+                        build_title_docx("2025年度报告"),
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    ),
+                ),
+            ],
+        )
+        self.assertEqual(analyze.status_code, 200)
+        draft_rules = analyze.json()["draft"]["inferredRules"]
+        self.assertEqual((draft_rules.get("title") or {}).get("templateText"), "{{变量1}}年度报告")
+
+        confirm = self.client.post(f"/api/topics/{topic_id}/confirm-template")
+        self.assertEqual(confirm.status_code, 200)
+
+        create_doc = self.client.post(f"/api/topics/{topic_id}/docs", json={"title": "年度报告（新建）"})
+        self.assertEqual(create_doc.status_code, 200)
+        doc_id = create_doc.json()["id"]
+
+        created_doc = self.client.get(f"/api/docs/{doc_id}")
+        self.assertEqual(created_doc.status_code, 200)
+        self.assertEqual(created_doc.json()["structuredFields"]["title"], "{{变量1}}年度报告")
+
     def test_revise_instruction_updates_level3_heading_font_without_overriding_body(self) -> None:
         company_resp = self.client.post("/api/units", json={"name": f"topic_heading_fix_{uuid.uuid4().hex[:8]}"})
         self.assertEqual(company_resp.status_code, 200)
@@ -533,6 +602,75 @@ class TopicApiTests(unittest.TestCase):
         self.assertEqual(host_attrs.get("bold"), False)
         self.assertTrue(divider_attrs.get("dividerRed"))
         self.assertEqual(last_text, "发送：全体员工。")
+
+    def test_create_doc_from_topic_strips_title_like_leading_nodes_for_non_fixed_templates(self) -> None:
+        company_resp = self.client.post("/api/units", json={"name": f"topic_strip_title_{uuid.uuid4().hex[:8]}"})
+        self.assertEqual(company_resp.status_code, 200)
+        company_id = company_resp.json()["id"]
+
+        created = self.client.post(
+            "/api/topics",
+            json={"companyId": company_id, "name": "资源协同报告", "description": "测试动态标题剔除"},
+        )
+        self.assertEqual(created.status_code, 200)
+        topic_id = created.json()["id"]
+
+        with SessionLocal() as session:
+            template = TopicTemplate(
+                topic_id=topic_id,
+                version=1,
+                rules={
+                    "title": {"fontFamily": "方正小标宋简体"},
+                    "body": {"fontFamily": "仿宋_GB2312", "fontSizePt": 16},
+                    "contentTemplate": {
+                        "leadingNodes": [
+                            {
+                                "type": "paragraph",
+                                "attrs": {"fontFamily": "方正小标宋简体", "textAlign": "center"},
+                                "content": [{"type": "text", "text": "华能云成数字产融科技（雄安）有限公司"}],
+                            },
+                            {
+                                "type": "paragraph",
+                                "attrs": {"fontFamily": "方正小标宋简体", "textAlign": "center"},
+                                "content": [{"type": "text", "text": "云成数科2025年资源协同报告"}],
+                            },
+                            {
+                                "type": "paragraph",
+                                "attrs": {"fontFamily": "黑体", "textAlign": "center"},
+                                "content": [{"type": "text", "text": "2025年第1期"}],
+                            },
+                        ],
+                        "trailingNodes": [],
+                        "bodyPlaceholder": "（请在此输入正文）",
+                    },
+                },
+                source_draft_id=None,
+                effective=True,
+            )
+            session.add(template)
+            session.commit()
+            session.refresh(template)
+            template_id = template.id
+
+        create_doc = self.client.post(
+            f"/api/topics/{topic_id}/docs",
+            json={"topicTemplateId": template_id},
+        )
+        self.assertEqual(create_doc.status_code, 200)
+        doc_id = create_doc.json()["id"]
+
+        fetched = self.client.get(f"/api/docs/{doc_id}")
+        self.assertEqual(fetched.status_code, 200)
+        body = fetched.json()["body"]
+        body_texts = [
+            "".join(part.get("text", "") for part in (node.get("content") or []))
+            for node in body.get("content", [])
+            if isinstance(node, dict)
+        ]
+        self.assertIn("华能云成数字产融科技（雄安）有限公司", body_texts)
+        self.assertIn("2025年第1期", body_texts)
+        self.assertIn("（请在此输入正文）", body_texts)
+        self.assertNotIn("云成数科2025年资源协同报告", body_texts)
 
     def test_delete_topic_removes_related_rows(self) -> None:
         company_resp = self.client.post("/api/units", json={"name": f"topic_delete_{uuid.uuid4().hex[:8]}"})

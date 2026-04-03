@@ -21,6 +21,11 @@ RE_SUFFIX_LINE = re.compile(
 RE_SUFFIX_LINE_CAPTURE = re.compile(
     r"^((?:主\s*持(?:\s*人|\s*者)?|参\s*(?:加|会)(?:\s*人|\s*人员|\s*名单)?|列\s*席(?:\s*人|\s*人员)?|出\s*席(?:\s*人|\s*人员)?|记\s*录(?:\s*人|\s*员)?|发\s*(?:送|至|文)|主\s*送|抄\s*送|分\s*送)\s*[：:])(\s*.*)$"
 )
+RE_DOC_ISSUE_LINE = re.compile(r"^(?:\d{4}\s*年第\s*[0-9一二三四五六七八九十百千]+\s*期|第\s*[0-9一二三四五六七八九十百千]+\s*期)$")
+RE_HEADER_SIGNATORY = re.compile(r"签发人\s*[：:]")
+RE_TITLE_KEYWORD = re.compile(
+    r"(报告|纪要|请示|函|通知|方案|总结|通报|决定|公告|意见|办法|细则|规定|计划|说明|简报|要点|清单|材料)$"
+)
 
 
 def _set_run_font(run, family: str, size_pt: float, bold: bool = False, color_hex: str | None = None):
@@ -240,15 +245,32 @@ def _resolve_topic_style_rules(structured_fields: dict[str, Any]) -> tuple[dict[
     return body, headings
 
 
-def _has_fixed_leading_content(structured_fields: dict[str, Any]) -> bool:
+def _looks_like_fixed_title_node(node: dict[str, Any]) -> bool:
+    text = _node_text(node).replace("\u00A0", " ").strip()
+    if not text:
+        return False
+    if RE_HEADER_SIGNATORY.search(text) or RE_DOC_ISSUE_LINE.match(text) or _is_suffix_line(text):
+        return False
+    if any(keyword in text for keyword in ["有限公司", "有限责任公司", "集团", "公司", "委员会", "办公室", "政府"]):
+        return False
+    return bool(RE_TITLE_KEYWORD.search(text))
+
+
+def _has_fixed_title_content(structured_fields: dict[str, Any]) -> bool:
     rules = structured_fields.get("topicTemplateRules")
     if not isinstance(rules, dict):
         return False
     content_template = rules.get("contentTemplate")
     if not isinstance(content_template, dict):
         return False
+    if content_template.get("titleMode") == "fixed":
+        return True
+    if content_template.get("titleMode") == "dynamic":
+        return False
     leading_nodes = content_template.get("leadingNodes")
-    return isinstance(leading_nodes, list) and len(leading_nodes) > 0
+    if not isinstance(leading_nodes, list):
+        return False
+    return any(isinstance(node, dict) and _looks_like_fixed_title_node(node) for node in leading_nodes)
 
 
 def _apply_body_paragraph_style(paragraph, body_style: dict[str, Any]):
@@ -404,7 +426,13 @@ def export_docx(
 
     structured_fields = document_data.get("structuredFields", {})
     body_style, heading_styles = _resolve_topic_style_rules(structured_fields)
-    suppress_auto_frontmatter = _has_fixed_leading_content(structured_fields)
+    topic_template_rules = structured_fields.get("topicTemplateRules") if isinstance(structured_fields, dict) else {}
+    if not isinstance(topic_template_rules, dict):
+        topic_template_rules = {}
+    title_style = topic_template_rules.get("title")
+    if not isinstance(title_style, dict):
+        title_style = {}
+    suppress_auto_frontmatter = _has_fixed_title_content(structured_fields)
     if include_redhead:
         _apply_header_template(doc, redhead_template, structured_fields, unit_name)
 
@@ -414,9 +442,15 @@ def export_docx(
     if title:
         p_title = doc.add_paragraph()
         p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p_title.paragraph_format.line_spacing = Pt(28)
+        p_title.paragraph_format.line_spacing = Pt(_safe_float(title_style.get("lineSpacingPt"), 28))
         run = p_title.add_run(title)
-        _set_run_font(run, "方正小标宋简", 22)
+        _set_run_font(
+            run,
+            str(title_style.get("fontFamily") or "方正小标宋简"),
+            _safe_float(title_style.get("fontSizePt"), 22),
+            bool(title_style.get("bold", False)),
+            color_hex=_normalize_color_hex(title_style.get("colorHex")),
+        )
 
     main_to = ""
     if not suppress_auto_frontmatter:

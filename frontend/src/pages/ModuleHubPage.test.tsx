@@ -1,8 +1,12 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 
 import { ModuleHubPage } from './ModuleHubPage'
+
+const pagesCssPath = path.resolve(__dirname, '../styles/pages.css')
 
 vi.mock('../utils/employeeAuth', () => ({
   loadEmployeeSession: vi.fn(() => ({
@@ -33,37 +37,50 @@ vi.mock('../utils/employeeAuth', () => ({
       entryPath: '/management',
       enabled: true,
     },
+    {
+      key: 'meetingMinutes',
+      title: '会议纪要',
+      description: '会后整理会议议程、结论和待办事项，后续将接入完整纪要生成流程。',
+      entryPath: '/meeting-minutes',
+      enabled: true,
+    },
   ]),
 }))
 
 describe('ModuleHubPage', () => {
-  it('renders the interactive 中国华能 hologram without restoring the removed workspace cards', () => {
+  it('renders a redesigned workspace dashboard without the hologram banner', () => {
     const html = renderToStaticMarkup(
       <MemoryRouter initialEntries={['/workspace']}>
         <ModuleHubPage />
       </MemoryRouter>,
     )
 
-    expect(html).toContain('data-testid="module-h-hero"')
-    expect(html).toContain('aria-label="中国华能全息投影主视觉"')
-    expect(html).toContain('data-testid="module-h-canvas"')
-    expect(html).toContain('data-particle-shape="中国华能"')
-    expect(html).toContain('data-particle-style="tech-blue-cyan"')
-    expect(html).toContain('data-particle-count-min="5000"')
-    expect(html).toContain('data-background-style="deep-navy"')
-    expect(html).toContain('data-effect-style="digital-stream"')
-    expect(html).toContain('data-glow-mode="per-particle"')
-    expect(html).toContain('data-wave-mode="energy-scanline"')
-    expect(html).toContain('data-node-layout="structured-grid"')
-    expect(html).toContain('中国华能')
-    expect(html).toContain('class="module-h-scanlines"')
+    expect(html).toContain('workspace-hero')
+    expect(html).toContain('今日工作台')
+    expect(html).toContain('当前可用模块')
+    expect(html).toContain('欢迎回来，treter')
+    expect(html).toContain('公司归属')
+    expect(html).toContain('当前可用 4 个模块')
     expect(html).toContain('公文总结')
     expect(html).toContain('公文排版')
     expect(html).toContain('公文管理')
+    expect(html).toContain('会议纪要')
+    expect(html).toContain('进入公文总结')
+    expect(html).toContain('进入公文排版')
+    expect(html).toContain('进入会议纪要')
+    expect(html).not.toContain('模块总数')
+    expect(html).not.toContain('统一进入公文总结、公文排版和公文管理模块。')
+    expect(html).not.toContain('这里不再放装饰横幅')
+    expect(html).not.toContain('workspace-quick-grid')
 
-    expect(html).not.toContain('全息 H 投影主视觉')
-    expect(html).not.toContain('员工工作台')
-    expect(html).not.toContain('统一的蓝白工作台')
-    expect(html).not.toContain('登录后已自动识别所属公司')
+    expect(html).not.toContain('中国华能')
+    expect(html).not.toContain('module-h-hero')
+    expect(html).not.toContain('data-particle-shape=')
+  })
+
+  it('uses a four-column workspace module grid on desktop when four modules are available', () => {
+    const styles = fs.readFileSync(pagesCssPath, 'utf8')
+
+    expect(styles).toMatch(/\.workspace-module-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);/)
   })
 })

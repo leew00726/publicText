@@ -3,8 +3,6 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const pages = [
-  'ManagementModulePage.tsx',
-  'DocumentSummaryPage.tsx',
   'TopicListPage.tsx',
   'TopicComposePage.tsx',
   'TopicLibraryPage.tsx',
@@ -14,10 +12,10 @@ const pages = [
 ]
 
 describe('shared page header adoption', () => {
-  it('uses the shared page header across the redesigned workflow pages', () => {
+  it('no longer uses the shared page header across workflow pages', () => {
     for (const fileName of pages) {
       const source = readFileSync(resolve(__dirname, `../src/pages/${fileName}`), 'utf-8')
-      expect(source).toContain('PageHeader')
+      expect(source).not.toContain('PageHeader')
     }
   })
 })

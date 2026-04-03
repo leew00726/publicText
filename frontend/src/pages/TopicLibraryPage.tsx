@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type { GovDoc, Topic } from '../api/types'
-import { PageHeader } from '../components/PageHeader'
 import { loadEmployeeSession } from '../utils/employeeAuth'
 import { canPerformAction } from '../utils/pagePermissions'
 import { formatServerDateTime } from '../utils/time'
@@ -62,24 +61,7 @@ export function TopicLibraryPage() {
   }
 
   return (
-    <main className="page workspace-page">
-      <PageHeader
-        eyebrow="Library"
-        title={`文档库${topic ? ` · ${topic.name}` : ''}`}
-        description="按题材查看既有文档，并继续进入正文排版工作区。"
-        meta={
-          <>
-            <span className="soft-pill">题材 {topic?.name || '-'}</span>
-            <span className="soft-pill">文档数 {docs.length}</span>
-          </>
-        }
-        actions={
-          <button type="button" onClick={() => navigate(`/layout/topics/${topicId}`)}>
-            新建/进入正文编辑
-          </button>
-        }
-      />
-
+    <main className="page workspace-page layout-page-scale">
       <section className="workspace-table-card">
         {loading ? (
           <p>加载中...</p>
@@ -104,6 +86,9 @@ export function TopicLibraryPage() {
                   <td>{formatServerDateTime(doc.updatedAt)}</td>
                   <td>
                     <div className="row-gap table-actions">
+                      <button type="button" onClick={() => navigate(`/layout/topics/${topicId}`)}>
+                        新建/进入正文编辑
+                      </button>
                       <button type="button" onClick={() => navigate(`/layout/docs/${doc.id}`)}>
                         打开编辑
                       </button>

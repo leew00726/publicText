@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type { Topic, Unit } from '../api/types'
-import { PageHeader } from '../components/PageHeader'
 import { loadEmployeeSession } from '../utils/employeeAuth'
 import { canPerformAction } from '../utils/pagePermissions'
 import { formatServerDateTime } from '../utils/time'
@@ -101,19 +100,7 @@ export function TopicListPage({ mode }: TopicListPageProps) {
   }
 
   return (
-    <main className="page workspace-page">
-      <PageHeader
-        eyebrow={canManageTopic ? 'Governance' : 'Topics'}
-        title={`${canManageTopic ? '题材管理' : '题材库'}${currentCompany ? ` · ${currentCompany.name}` : ''}`}
-        description={canManageTopic ? '维护题材、模板版本和文档流转入口。' : '从题材库进入文档库或正文编辑入口。'}
-        meta={
-          <>
-            <span className="soft-pill">题材数 {topics.length}</span>
-            <span className="soft-pill">{canManageTopic ? '管理模式' : '排版模式'}</span>
-          </>
-        }
-      />
-
+    <main className={`page workspace-page${mode === 'layout' ? ' layout-page-scale' : ''}`}>
       {canCreateTopic ? (
         <section className="unit-editor-card">
           <strong>新建题材</strong>

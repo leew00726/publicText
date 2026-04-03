@@ -5,7 +5,7 @@ import { CompanySelectPage } from './pages/CompanySelectPage'
 import { DocumentSummaryPage } from './pages/DocumentSummaryPage'
 import { DocEditorPage } from './pages/DocEditorPage'
 import { LoginPage } from './pages/LoginPage'
-import { ManagementModulePage } from './pages/ManagementModulePage'
+import { MeetingMinutesPage } from './pages/MeetingMinutesPage'
 import { ModuleHubPage } from './pages/ModuleHubPage'
 import { TopicComposePage } from './pages/TopicComposePage'
 import { TopicDetailPage } from './pages/TopicDetailPage'
@@ -34,7 +34,7 @@ function WithShell({ children }: { children: JSX.Element }) {
 
 function AuthLandingRoute() {
   if (loadEmployeeSession()) {
-    return <Navigate to={LAYOUT_HOME_PATH} replace />
+    return <Navigate to="/workspace" replace />
   }
   return <LoginPage />
 }
@@ -116,7 +116,7 @@ function LegacyDocRedirect() {
 }
 
 function FallbackRoute() {
-  return <Navigate to={loadEmployeeSession() ? LAYOUT_HOME_PATH : '/'} replace />
+  return <Navigate to={loadEmployeeSession() ? '/workspace' : '/'} replace />
 }
 
 function withShell(permission: PagePermissionKey, child: JSX.Element) {
@@ -132,6 +132,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<AuthLandingRoute />} />
       <Route path="/workspace" element={withShell('workspace.home', <ModuleHubPage />)} />
+      <Route path="/meeting-minutes" element={withShell('workspace.meetingMinutes', <MeetingMinutesPage />)} />
       <Route path="/layout" element={<Navigate to={LAYOUT_HOME_PATH} replace />} />
       <Route path="/layout/summary" element={withShell('layout.summary', <DocumentSummaryPage />)} />
       <Route path="/layout/company-home" element={withShell('layout.company', <EmployeeCompanyHomeRoute />)} />
@@ -140,7 +141,7 @@ export default function App() {
       <Route path="/layout/topics/:topicId" element={withShell('layout.topicCompose', <TopicComposePage />)} />
       <Route path="/layout/topics/:topicId/library" element={withShell('layout.topicLibrary', <TopicLibraryPage />)} />
       <Route path="/layout/docs/:id" element={withShell('layout.docEditor', <DocEditorPage />)} />
-      <Route path="/management" element={withShell('management.home', <ManagementModulePage />)} />
+      <Route path="/management" element={<Navigate to="/management/companies" replace />} />
       <Route path="/management/companies" element={withShell('management.company', <CompanySelectPage mode="management" />)} />
       <Route
         path="/management/companies/:companyId/topics"

@@ -70,6 +70,10 @@ _INVALID_FONT_TERMS = (
 _TRAILING_SUFFIX_RE = re.compile(
     r"^(主\s*持(?:\s*人|\s*者)?|参\s*(?:加|会)(?:\s*人|\s*人员|\s*名单)?|列\s*席(?:\s*人|\s*人员)?|出\s*席(?:\s*人|\s*人员)?|记\s*录(?:\s*人|\s*员)?|发\s*(?:送|至|文)|主\s*送|抄\s*送|分\s*送)\s*[：:]"
 )
+_DOC_ISSUE_LINE_RE = re.compile(r"^(?:\d{4}\s*年第\s*[0-9一二三四五六七八九十百千]+\s*期|第\s*[0-9一二三四五六七八九十百千]+\s*期)$")
+_TITLE_KEYWORD_RE = re.compile(
+    r"(报告|纪要|请示|函|通知|方案|总结|通报|决定|公告|意见|办法|细则|规定|计划|说明|简报|要点|清单|材料)$"
+)
 
 
 def _normalize_font_name(raw: str) -> str | None:
@@ -321,6 +325,37 @@ def _node_text(node: dict) -> str:
     return "".join(str(part.get("text") or "") for part in content if isinstance(part, dict)).strip()
 
 
+def _looks_like_title_template_node(node: dict) -> bool:
+    if node.get("type") not in {"paragraph", "heading"}:
+        return False
+
+    text = _node_text(node).replace("\u00A0", " ").strip()
+    if not text:
+        return False
+    if _TRAILING_SUFFIX_RE.match(text) or _DOC_ISSUE_LINE_RE.match(text):
+        return False
+    if re.search(r"签发人\s*[：:]", text):
+        return False
+    if any(keyword in text for keyword in ["有限公司", "有限责任公司", "集团", "公司", "委员会", "办公室", "政府"]):
+        return False
+    return bool(_TITLE_KEYWORD_RE.search(text))
+
+
+def _sanitize_template_leading_nodes(leading_nodes: list[dict], content_template: dict[str, object]) -> list[dict]:
+    title_mode = str(content_template.get("titleMode") or "").strip().lower()
+    if title_mode == "fixed":
+        return [copy.deepcopy(node) for node in leading_nodes if isinstance(node, dict)]
+
+    sanitized: list[dict] = []
+    for node in leading_nodes:
+        if not isinstance(node, dict):
+            continue
+        if _looks_like_title_template_node(node):
+            continue
+        sanitized.append(copy.deepcopy(node))
+    return sanitized
+
+
 def _normalize_trailing_suffix_node(node: dict, body_style: dict, force: bool = False) -> dict:
     if node.get("type") not in {"paragraph", "heading"}:
         return node
@@ -381,7 +416,7 @@ def _build_doc_body_from_topic_rules(rules: dict[str, object] | None) -> dict:
 
     body_style = rules.get("body") if isinstance(rules.get("body"), dict) else {}
     content: list[dict] = []
-    content.extend(copy.deepcopy(node) for node in leading_nodes if isinstance(node, dict))
+    content.extend(_sanitize_template_leading_nodes(leading_nodes, content_template))
 
     placeholder_text = str(content_template.get("bodyPlaceholder") or "（请在此输入正文）")
     content.append(
@@ -419,6 +454,22 @@ def _infer_doc_type(topic_name: str, preferred_doc_type: str | None) -> str:
     if "函" in name:
         return "han"
     return "tongzhi"
+
+
+def _resolve_initial_structured_title(template: TopicTemplate | None) -> str:
+    if template is None or not isinstance(template.rules, dict):
+        return ""
+
+    title_rules = template.rules.get("title")
+    if not isinstance(title_rules, dict):
+        return ""
+
+    content_template = template.rules.get("contentTemplate")
+    if isinstance(content_template, dict) and content_template.get("titleMode") == "fixed":
+        return ""
+
+    template_text = title_rules.get("templateText")
+    return str(template_text).strip() if isinstance(template_text, str) else ""
 
 
 @router.get("/api/companies", response_model=list[UnitOut])
@@ -728,7 +779,7 @@ def create_doc_from_topic(topic_id: str, payload: TopicCreateDocRequest, db: Ses
     doc_type = _infer_doc_type(topic.name, payload.docType)
 
     structured_fields = {
-        "title": "",
+        "title": _resolve_initial_structured_title(template),
         "mainTo": "",
         "signOff": "",
         "docNo": "",

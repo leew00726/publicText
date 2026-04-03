@@ -3,7 +3,6 @@ import { useParams } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type { DeletionAuditEvent, TopicAnalyzeResponse, TopicConfirmResponse, TopicDraft, TopicTemplate } from '../api/types'
-import { PageHeader } from '../components/PageHeader'
 import { formatApiErrorDetail, getApiErrorMessage } from '../utils/apiError'
 import { formatServerDateTime } from '../utils/time'
 import { summarizeConfidenceAsNarrative, summarizeRulesAsNarrative } from '../utils/topicNarrative'
@@ -205,19 +204,6 @@ export function TopicDetailPage() {
 
   return (
     <main className="page workspace-page">
-      <PageHeader
-        eyebrow="Training"
-        title="模板训练"
-        description="先用文字要求快速生成首版模板草稿；手头有标准样稿时，再补充样本分析校准规则。"
-        meta={
-          <>
-            <span className="soft-pill">题材 ID {topicId}</span>
-            <span className="soft-pill">零留存模式</span>
-            <span className="soft-pill">模板数 {templates.length}</span>
-          </>
-        }
-      />
-
       {message ? <div className="inline-status-card">{message}</div> : null}
 
       <section className="workspace-grid workspace-grid-two">

@@ -9,7 +9,6 @@ import {
   validateEmployeeLogin,
 } from '../utils/employeeAuth'
 import { ensureEmployeeCompany } from '../utils/employeeCompany'
-import { LAYOUT_HOME_PATH } from '../utils/layoutNavigation'
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -22,7 +21,7 @@ export function LoginPage() {
 
   useEffect(() => {
     if (loadEmployeeSession()) {
-      navigate(LAYOUT_HOME_PATH, { replace: true })
+      navigate('/workspace', { replace: true })
     }
   }, [navigate])
 
@@ -44,7 +43,7 @@ export function LoginPage() {
         name: company.name,
       })
       saveEmployeeSession(session)
-      navigate(LAYOUT_HOME_PATH, { replace: true })
+      navigate('/workspace', { replace: true })
     } catch (error: any) {
       const detail = error?.response?.data?.detail || '加载所属公司失败，请联系管理员'
       alert(String(detail))
@@ -60,13 +59,13 @@ export function LoginPage() {
           <p className="auth-kicker">PublicText Office Suite</p>
           <h1 className="auth-title">更轻、更清晰的公文工作台</h1>
           <p className="auth-subtitle">
-            使用工号登录后，系统会自动识别所属公司，直接进入该公司的公文库与题材流程。
+            使用工号登录后，系统会自动识别所属公司，并统一进入首页工作台，再进入各业务模块。
           </p>
 
           <div className="auth-metric-grid">
             <div className="auth-metric">
               <strong>自动识别公司</strong>
-              <span>登录后直接落到公司题材库，不再二次选择。</span>
+              <span>登录后自动匹配所属公司，进入工作台后再进入对应业务流程。</span>
             </div>
             <div className="auth-metric">
               <strong>统一工作台</strong>

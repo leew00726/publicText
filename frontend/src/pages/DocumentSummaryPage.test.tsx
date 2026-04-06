@@ -9,35 +9,34 @@ import { DocumentSummaryPage } from './DocumentSummaryPage'
 const pagesCssPath = path.resolve(__dirname, '../styles/pages.css')
 
 describe('DocumentSummaryPage', () => {
-  it('renders a dedicated class for the selected-file pill', () => {
-    const html = renderToStaticMarkup(<DocumentSummaryPage />)
-
-    expect(html).toContain('summary-file-pill')
-  })
-
   it('renders a single input-source panel instead of a permanent pasted-text block', () => {
     const html = renderToStaticMarkup(<DocumentSummaryPage />)
     const source = fs.readFileSync(path.resolve(__dirname, './DocumentSummaryPage.tsx'), 'utf8')
 
-    expect(html).toContain('上传文件或粘贴文本')
+    expect(html).toContain('输入源')
+    expect(html).toContain('拖拽或点击选择文件')
     expect(html).not.toContain('summary-source-textarea')
     expect(source).not.toContain('summary-text-source')
+    expect(html).not.toContain('单文件处理，建议内容不超过 12,000 字符。')
+    expect(html).not.toContain('summary-file-pill')
   })
 
   it('renders a simplified agent requirement area without helper copy or empty thread panel', () => {
     const html = renderToStaticMarkup(<DocumentSummaryPage />)
 
-    expect(html).toContain('智能体要求')
+    expect(html).toContain('补充要求')
     expect(html).not.toContain('summary-agent-thread')
     expect(html).not.toContain('告诉智能体你希望的总结格式')
-    expect(html).toContain('要求输入')
+    expect(html).toContain('placeholder="例如：突出结论、关键事项、时间节点。"')
+    expect(html).not.toContain('要求输入')
   })
 
-  it('renders an export template selector before docx export', () => {
+  it('hides the export template selector when no templates are available', () => {
     const html = renderToStaticMarkup(<DocumentSummaryPage />)
 
-    expect(html).toContain('导出模板')
-    expect(html).toContain('summary-template-select')
+    expect(html).not.toContain('导出模板')
+    expect(html).not.toContain('summary-template-select')
+    expect(html).not.toContain('无可用模板，按默认格式导出')
   })
 
   it('renders a distinct two-panel studio chrome for the summary workspace', () => {
@@ -49,6 +48,27 @@ describe('DocumentSummaryPage', () => {
     expect(html).toContain('summary-panel-index')
     expect(html).toContain('输入控制台')
     expect(html).toContain('输出工作区')
+    expect(html).not.toContain('>输入<')
+    expect(html).not.toContain('>输出<')
+    expect(html).not.toContain('>Input<')
+    expect(html).not.toContain('>Output<')
+    expect(html).not.toContain('选择输入源、补充要求，然后生成当前总结。')
+    expect(html).not.toContain('校对生成结果，选择模板，然后导出 DOCX。')
+  })
+
+  it('removes the extra summary editor label and relies on the textarea aria label', () => {
+    const html = renderToStaticMarkup(<DocumentSummaryPage />)
+
+    expect(html).toContain('aria-label="总结内容"')
+    expect(html).not.toContain('<label for="summary-textarea">总结内容</label>')
+    expect(html).not.toContain('placeholder="生成结果显示在这里"')
+  })
+
+  it('keeps the empty state to a single short title', () => {
+    const html = renderToStaticMarkup(<DocumentSummaryPage />)
+
+    expect(html).toContain('暂无结果')
+    expect(html).not.toContain('生成后显示在这里。')
   })
 
   it('guards the summary grid against long filename overflow', () => {

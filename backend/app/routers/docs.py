@@ -143,16 +143,18 @@ async def import_docx_api(
     docType: str = Form("qingshi"),
     title: str = Form("导入文档"),
     redheadTemplateId: str | None = Form(default=None),
+    preserveFormatting: bool = Form(default=True),
     db: Session = Depends(get_db),
 ):
     if not file.filename.lower().endswith(".docx"):
         raise HTTPException(status_code=400, detail="仅支持 DOCX")
 
     data = await file.read()
-    body, structured_fields, report = import_docx(data)
+    body, structured_fields, report = import_docx(data, preserve_formatting=preserveFormatting)
+    resolved_title = (structured_fields.get("title") or "").strip() or title
 
     row = Document(
-        title=title,
+        title=resolved_title,
         doc_type=docType,
         unit_id=unitId,
         redhead_template_id=None,

@@ -55,41 +55,17 @@ export function DocumentSummaryPage() {
   const [templateOptions, setTemplateOptions] = useState<SummaryExportTemplateOption[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [templatesLoading, setTemplatesLoading] = useState(false)
-  const [templateStatusMessage, setTemplateStatusMessage] = useState('')
 
   const normalizedSourceText = sourceText.trim()
   const canSummarize = Boolean(sourceMode === 'file' ? selectedFile : normalizedSourceText) && !summarizing
   const canExport = summary.trim().length > 0 && !exporting && (templateOptions.length === 0 || Boolean(selectedTemplateId))
+  const showTemplateSelector = templateOptions.length > 0
 
   const usageSummary = useMemo(() => {
     if (!resultMeta) return ''
     const totalTokens = resultMeta.usage?.total_tokens
     return typeof totalTokens === 'number' ? `Token 消耗：${totalTokens}` : ''
   }, [resultMeta])
-
-  const activeSourceSummary = useMemo(() => {
-    if (sourceMode === 'file') {
-      return selectedFile ? selectedFile.name : '未选择文件'
-    }
-    return normalizedSourceText ? `已粘贴 ${normalizedSourceText.length} 字` : '未粘贴文本'
-  }, [normalizedSourceText, selectedFile, sourceMode])
-
-  const selectedTemplate = useMemo(
-    () => templateOptions.find((item) => item.id === selectedTemplateId) || null,
-    [selectedTemplateId, templateOptions],
-  )
-
-  const exportTemplateHint = useMemo(() => {
-    if (templatesLoading) return '正在加载当前公司已创建模板...'
-    if (templateStatusMessage) return templateStatusMessage
-    if (selectedTemplate) {
-      return `当前导出将套用“${selectedTemplate.topicName}”模板的标题、标题层级和正文样式。`
-    }
-    if (templateOptions.length === 0) {
-      return '当前公司暂无已创建模板，导出将使用默认总结样式。'
-    }
-    return '请选择导出模板后再导出总结。'
-  }, [selectedTemplate, templateOptions.length, templateStatusMessage, templatesLoading])
 
   useEffect(() => {
     let cancelled = false
@@ -99,12 +75,10 @@ export function DocumentSummaryPage() {
       if (!companyId) {
         setTemplateOptions([])
         setSelectedTemplateId('')
-        setTemplateStatusMessage('未识别到当前公司，导出将使用默认总结样式。')
         return
       }
 
       setTemplatesLoading(true)
-      setTemplateStatusMessage('')
       try {
         const topicsRes = await api.get<Topic[]>('/api/management/topics', {
           params: { companyId },
@@ -137,14 +111,10 @@ export function DocumentSummaryPage() {
           if (current && nextOptions.some((item) => item.id === current)) return current
           return pickDefaultTopicTemplateId(nextOptions)
         })
-        if (nextOptions.length === 0) {
-          setTemplateStatusMessage('当前公司暂无已创建模板，导出将使用默认总结样式。')
-        }
       } catch {
         if (cancelled) return
         setTemplateOptions([])
         setSelectedTemplateId('')
-        setTemplateStatusMessage('模板列表加载失败，当前将按默认总结样式导出。')
       } finally {
         if (!cancelled) {
           setTemplatesLoading(false)
@@ -292,16 +262,13 @@ export function DocumentSummaryPage() {
             <div className="summary-panel-header">
               <span className="summary-panel-index">01</span>
               <div className="summary-panel-copy">
-                <span className="summary-panel-kicker">Input</span>
                 <strong>输入控制台</strong>
-                <p>选择输入源、补充要求，然后生成当前总结。</p>
               </div>
             </div>
 
             <div className="summary-panel-body">
               <div className="summary-section-heading">
                 <strong>输入源</strong>
-                <span>上传文件或粘贴文本，二选一后开始总结</span>
               </div>
 
               <div className="summary-source-switch" role="tablist" aria-label="总结输入方式">
@@ -337,8 +304,7 @@ export function DocumentSummaryPage() {
                   }}
                   onDrop={handleDrop}
                 >
-                  <p>{selectedFile ? `已选择：${selectedFile.name}` : '拖拽 DOCX / PDF / TXT 文件到这里，或点击选择文件'}</p>
-                  <small>单文件处理，建议内容不超过 12,000 字符。</small>
+                  <p>{selectedFile ? `已选择：${selectedFile.name}` : '拖拽或点击选择文件'}</p>
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -353,12 +319,12 @@ export function DocumentSummaryPage() {
                 </section>
               ) : (
                 <section className="summary-source-panel summary-text-panel">
-                  <label htmlFor="summary-source-textarea">正文文本</label>
+                  <label htmlFor="summary-source-textarea">正文</label>
                   <textarea
                     id="summary-source-textarea"
                     value={sourceText}
                     rows={10}
-                    placeholder="把需要总结的正文直接粘贴到这里"
+                    placeholder="粘贴需要总结的正文"
                     onChange={(event) => {
                       setSourceText(event.target.value)
                       if (event.target.value.trim()) {
@@ -366,13 +332,8 @@ export function DocumentSummaryPage() {
                       }
                     }}
                   />
-                  <small>直接粘贴需要总结的正文内容，不上传文件也可以开始总结。</small>
                 </section>
               )}
-
-              <div className="summary-side-note">
-                <span className="soft-pill summary-file-pill">{activeSourceSummary}</span>
-              </div>
 
               <label>
                 总结长度
@@ -385,15 +346,15 @@ export function DocumentSummaryPage() {
 
               <section className="summary-agent-card">
                 <div className="summary-section-heading">
-                  <strong>智能体要求</strong>
+                  <strong>补充要求</strong>
                 </div>
 
-                <label htmlFor="summary-agent-draft">要求输入</label>
+                <label htmlFor="summary-agent-draft">要求</label>
                 <textarea
                   id="summary-agent-draft"
                   value={agentDraft}
                   rows={4}
-                  placeholder="例如：按“核心结论 / 关键要点 / 执行建议”格式总结，并保留原文中的时间节点。"
+                  placeholder="例如：突出结论、关键事项、时间节点。"
                   onChange={(event) => setAgentDraft(event.target.value)}
                 />
 
@@ -408,7 +369,7 @@ export function DocumentSummaryPage() {
                     }}
                     disabled={!agentDraft.trim()}
                   >
-                    添加要求
+                    添加
                   </button>
                   <button
                     type="button"
@@ -419,7 +380,7 @@ export function DocumentSummaryPage() {
                     }}
                     disabled={agentMessages.length === 0 && !agentDraft.trim()}
                   >
-                    清空要求
+                    清空
                   </button>
                 </div>
               </section>
@@ -440,16 +401,13 @@ export function DocumentSummaryPage() {
             <div className="summary-panel-header">
               <span className="summary-panel-index">02</span>
               <div className="summary-panel-copy">
-                <span className="summary-panel-kicker">Output</span>
                 <strong>输出工作区</strong>
-                <p>校对生成结果，选择模板，然后导出 DOCX。</p>
               </div>
             </div>
 
             <div className="summary-panel-body">
               <div className="summary-section-heading">
                 <strong>总结结果</strong>
-                <span>结果可直接编辑，再导出为 DOCX</span>
               </div>
 
               {resultMeta ? (
@@ -462,44 +420,39 @@ export function DocumentSummaryPage() {
                 </section>
               ) : (
                 <div className="empty-state">
-                  <strong>尚未生成总结</strong>
-                  <p>上传文件或粘贴文本并点击“开始总结”后，结果会在这里显示。</p>
+                  <strong>暂无结果</strong>
                 </div>
               )}
 
               <section className="summary-editor">
-                <label htmlFor="summary-textarea">总结内容（可编辑后导出）</label>
                 <textarea
                   id="summary-textarea"
+                  aria-label="总结内容"
                   rows={16}
                   value={summary}
                   onChange={(event) => setSummary(event.target.value)}
-                  placeholder="总结结果将显示在这里"
                 />
               </section>
 
-              <section className="summary-template-panel">
-                <label htmlFor="summary-template-select">导出模板</label>
-                <select
-                  id="summary-template-select"
-                  className="summary-template-select"
-                  value={selectedTemplateId}
-                  onChange={(event) => setSelectedTemplateId(event.target.value)}
-                  disabled={templatesLoading || templateOptions.length === 0}
-                >
-                  {templateOptions.length === 0 ? (
-                    <option value="">{templatesLoading ? '模板加载中...' : '暂无已创建模板，按默认格式导出'}</option>
-                  ) : (
-                    templateOptions.map((option) => (
+              {showTemplateSelector ? (
+                <section className="summary-template-panel">
+                  <label htmlFor="summary-template-select">导出模板</label>
+                  <select
+                    id="summary-template-select"
+                    className="summary-template-select"
+                    value={selectedTemplateId}
+                    onChange={(event) => setSelectedTemplateId(event.target.value)}
+                    disabled={templatesLoading}
+                  >
+                    {templateOptions.map((option) => (
                       <option key={option.id} value={option.id}>
                         {option.topicName} · v{option.version}
                         {option.effective ? '（当前生效）' : ''}
                       </option>
-                    ))
-                  )}
-                </select>
-                <small>{exportTemplateHint}</small>
-              </section>
+                    ))}
+                  </select>
+                </section>
+              ) : null}
 
               <div className="row-gap">
                 <button

@@ -59,4 +59,43 @@ describe('applyOneClickLayoutWithFields', () => {
     expect(textLines.some((line) => line.includes('当前董事会系统开发存在约500个bug'))).toBe(true)
     expect(textLines.some((line) => line.includes('测试团队主要精力集中在主流程测试'))).toBe(true)
   })
+
+  it('normalizes references and attachment formatting according to template rules', () => {
+    const body = {
+      type: 'doc',
+      content: [
+        paragraph('请参照华能（2026）3号《试点工作通知》执行。'),
+        paragraph('附件：'),
+        paragraph('1. 《实施方案》'),
+      ],
+    }
+
+    const structuredFields: StructuredFields = {
+      title: '',
+      mainTo: '',
+      signOff: '',
+      docNo: '',
+      signatory: '',
+      copyNo: '',
+      date: '',
+      exportWithRedhead: false,
+      attachments: [],
+      topicTemplateRules: {
+        references: {
+          citationOrder: 'titleThenDocNo',
+          yearBrackets: '〔〕',
+        },
+        attachments: {
+          itemSuffixPunctuation: 'none',
+          useBookTitleMarks: false,
+        },
+      },
+    }
+
+    const result = applyOneClickLayoutWithFields(body, structuredFields)
+    const textLines = collectText(result.body)
+
+    expect(textLines).toContain('请参照《试点工作通知》（华能〔2026〕3号）执行。')
+    expect(result.structuredFields.attachments).toEqual([{ index: 1, name: '实施方案' }])
+  })
 })

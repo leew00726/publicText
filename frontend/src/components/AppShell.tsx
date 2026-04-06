@@ -2,6 +2,7 @@ import { useMemo, type ReactNode } from 'react'
 import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 
 import { clearEmployeeSession, loadEmployeeSession } from '../utils/employeeAuth'
+import { LAYOUT_HOME_PATH } from '../utils/layoutNavigation'
 import { GlobalBackButton } from './GlobalBackButton'
 
 type AppShellProps = {
@@ -14,9 +15,9 @@ type PageMeta = {
   subtitle: string
 }
 
-const PAGE_META_ROUTES: Array<{ pattern: string; meta: PageMeta }> = [
+const PAGE_META_ROUTES: Array<{ path: string; meta: PageMeta }> = [
   {
-    pattern: '/workspace',
+    path: '/workspace',
     meta: {
       kicker: 'Workspace',
       title: '云矩公文管理平台',
@@ -24,15 +25,15 @@ const PAGE_META_ROUTES: Array<{ pattern: string; meta: PageMeta }> = [
     },
   },
   {
-    pattern: '/layout/summary',
+    path: '/layout/summary',
     meta: {
-      kicker: 'Summary',
+      kicker: '',
       title: '公文总结',
-      subtitle: '上传文档后调用 DeepSeek 生成结构化总结并导出。',
+      subtitle: '',
     },
   },
   {
-    pattern: '/meeting-minutes',
+    path: '/meeting-minutes',
     meta: {
       kicker: 'Meeting',
       title: '会议纪要',
@@ -40,7 +41,7 @@ const PAGE_META_ROUTES: Array<{ pattern: string; meta: PageMeta }> = [
     },
   },
   {
-    pattern: '/layout/company-home',
+    path: LAYOUT_HOME_PATH,
     meta: {
       kicker: 'Layout',
       title: '公文排版',
@@ -48,7 +49,7 @@ const PAGE_META_ROUTES: Array<{ pattern: string; meta: PageMeta }> = [
     },
   },
   {
-    pattern: '/layout',
+    path: '/layout',
     meta: {
       kicker: 'Layout',
       title: '公文排版',
@@ -56,7 +57,7 @@ const PAGE_META_ROUTES: Array<{ pattern: string; meta: PageMeta }> = [
     },
   },
   {
-    pattern: '/layout/companies/:companyId/topics',
+    path: '/layout/companies/:companyId/topics',
     meta: {
       kicker: 'Topics',
       title: '题材库',
@@ -64,7 +65,7 @@ const PAGE_META_ROUTES: Array<{ pattern: string; meta: PageMeta }> = [
     },
   },
   {
-    pattern: '/layout/topics/:topicId',
+    path: '/layout/topics/:topicId',
     meta: {
       kicker: 'Compose',
       title: '正文编辑入口',
@@ -72,7 +73,7 @@ const PAGE_META_ROUTES: Array<{ pattern: string; meta: PageMeta }> = [
     },
   },
   {
-    pattern: '/layout/topics/:topicId/library',
+    path: '/layout/topics/:topicId/library',
     meta: {
       kicker: 'Library',
       title: '文档库',
@@ -80,7 +81,7 @@ const PAGE_META_ROUTES: Array<{ pattern: string; meta: PageMeta }> = [
     },
   },
   {
-    pattern: '/layout/docs/:id',
+    path: '/layout/docs/:id',
     meta: {
       kicker: 'Editor',
       title: '正文排版工作区',
@@ -88,7 +89,7 @@ const PAGE_META_ROUTES: Array<{ pattern: string; meta: PageMeta }> = [
     },
   },
   {
-    pattern: '/management',
+    path: '/management',
     meta: {
       kicker: 'Management',
       title: '公文管理',
@@ -96,7 +97,7 @@ const PAGE_META_ROUTES: Array<{ pattern: string; meta: PageMeta }> = [
     },
   },
   {
-    pattern: '/management/companies',
+    path: '/management/companies',
     meta: {
       kicker: 'Companies',
       title: '公司管理',
@@ -104,7 +105,7 @@ const PAGE_META_ROUTES: Array<{ pattern: string; meta: PageMeta }> = [
     },
   },
   {
-    pattern: '/management/companies/:companyId/topics',
+    path: '/management/companies/:companyId/topics',
     meta: {
       kicker: 'Governance',
       title: '题材治理',
@@ -112,7 +113,7 @@ const PAGE_META_ROUTES: Array<{ pattern: string; meta: PageMeta }> = [
     },
   },
   {
-    pattern: '/management/topics/:topicId/train',
+    path: '/management/topics/:topicId/train',
     meta: {
       kicker: 'Training',
       title: '模板训练',
@@ -123,7 +124,7 @@ const PAGE_META_ROUTES: Array<{ pattern: string; meta: PageMeta }> = [
 
 function resolvePageMeta(pathname: string): PageMeta {
   for (const route of PAGE_META_ROUTES) {
-    if (matchPath(route.pattern, pathname)) {
+    if (matchPath(route.path, pathname)) {
       return route.meta
     }
   }
@@ -141,6 +142,7 @@ export function AppShell({ children }: AppShellProps) {
   const session = loadEmployeeSession()
   const currentMeta = useMemo(() => resolvePageMeta(location.pathname), [location.pathname])
   const isSummaryShell = useMemo(() => Boolean(matchPath('/layout/summary', location.pathname)), [location.pathname])
+  const showWorkspaceTitleLogo = useMemo(() => Boolean(matchPath('/workspace', location.pathname)), [location.pathname])
   const companyName = session?.companyName || '云成数科'
 
   if (!session) {
@@ -154,8 +156,11 @@ export function AppShell({ children }: AppShellProps) {
           <div className="shell-topbar-left">
             <GlobalBackButton variant="shell" />
             <div className="shell-topbar-copy">
-              <p className="shell-topbar-kicker">{currentMeta.kicker}</p>
-              <h1>{currentMeta.title}</h1>
+              {currentMeta.kicker ? <p className="shell-topbar-kicker">{currentMeta.kicker}</p> : null}
+              <div className={`shell-topbar-title-row${showWorkspaceTitleLogo ? ' is-brand' : ''}`}>
+                {showWorkspaceTitleLogo ? <img className="shell-topbar-title-logo" src="/huaneng-logo.jpg" alt="华能标志" /> : null}
+                <h1>{currentMeta.title}</h1>
+              </div>
               {currentMeta.subtitle ? <p>{currentMeta.subtitle}</p> : null}
             </div>
           </div>

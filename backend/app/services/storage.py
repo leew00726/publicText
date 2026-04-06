@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from minio import Minio
-from minio.error import S3Error
 
 from app.config import get_settings
 
@@ -36,8 +35,8 @@ class StorageService:
                 exists = self.client.bucket_exists(self.bucket)
                 if not exists:
                     self.client.make_bucket(self.bucket)
-            except S3Error:
-                # 启动时 MinIO 尚未就绪时，后续请求重试
+            except Exception:
+                # 启动时 MinIO 或其 DNS 尚未就绪时，后续请求再重试。
                 self.client = None
 
     def _ensure_minio(self) -> Minio:

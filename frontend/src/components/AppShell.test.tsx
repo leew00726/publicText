@@ -46,6 +46,9 @@ describe('AppShell chrome', () => {
 
     expect(html).toContain('app-shell app-shell-summary')
     expect(html).toContain('app-shell-topbar shell-topbar-summary')
+    expect(html).toContain('公文总结')
+    expect(html).not.toContain('>Summary<')
+    expect(html).not.toContain('上传文档后调用 DeepSeek 生成结构化总结并导出。')
   })
 
   it('styles the summary shell as a blue and white minimal chrome', () => {

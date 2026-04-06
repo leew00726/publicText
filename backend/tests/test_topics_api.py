@@ -522,6 +522,151 @@ class TopicApiTests(unittest.TestCase):
         self.assertEqual(revised_rules["body"]["lineSpacingPt"], 28)
         self.assertTrue(mock_revise_with_deepseek.called)
 
+    @patch("app.routers.topics.revise_topic_rules_with_deepseek")
+    def test_revise_with_deepseek_instruction_parser_fills_missing_advanced_rules(self, mock_revise_with_deepseek) -> None:
+        mock_revise_with_deepseek.return_value = {
+            "patch": {"title": {"fontFamily": "方正小标宋简"}},
+            "assistantReply": "已根据指令更新模板规则。",
+            "summary": "模板规则已更新",
+            "model": "deepseek-chat",
+            "usage": {"total_tokens": 96},
+        }
+
+        company_resp = self.client.post("/api/units", json={"name": f"topic_deepseek_parse_{uuid.uuid4().hex[:8]}"})
+        self.assertEqual(company_resp.status_code, 200)
+        company_id = company_resp.json()["id"]
+
+        created = self.client.post(
+            "/api/topics",
+            json={"companyId": company_id, "name": "DeepSeek指令解析题材", "description": "测试高级规则指令解析"},
+        )
+        self.assertEqual(created.status_code, 200)
+        topic_id = created.json()["id"]
+
+        revised = self.client.post(
+            f"/api/topics/{topic_id}/agent/revise",
+            json={
+                "instruction": (
+                    "标题使用方正小标宋简体2号，采用梯形排列并居中；"
+                    "正文统一使用3号仿宋_GB2312字体，行间距设为固定值28磅，首行左空两格；"
+                    "文中引用公文需先引标题后引发号，年份需使用六角括号〔 〕；"
+                    "第一层标题为黑体3号（不加标点），第二层为楷体3号，第三、四层均为仿宋3号（必须加标点）；"
+                    "附件部分需与正文空一行，左空两格起排，序号末尾不加标点，回行需与文字对齐，且附件名不加书名号；"
+                    "最后，落款盖章处需与上文空两行。"
+                ),
+                "useDeepSeek": True,
+            },
+        )
+        self.assertEqual(revised.status_code, 200)
+        revised_rules = revised.json()["inferredRules"]
+
+        self.assertEqual(revised_rules["title"]["fontFamily"], "方正小标宋简")
+        self.assertEqual(revised_rules["title"]["fontSizePt"], 22)
+        self.assertEqual(revised_rules["title"]["textAlign"], "center")
+        self.assertEqual(revised_rules["title"]["arrangement"], "trapezoid")
+        self.assertEqual(revised_rules["body"]["fontFamily"], "仿宋_GB2312")
+        self.assertEqual(revised_rules["body"]["lineSpacingPt"], 28)
+        self.assertEqual(revised_rules["body"]["firstLineIndentChars"], 2)
+        self.assertEqual(revised_rules["headings"]["level1"]["fontFamily"], "黑体")
+        self.assertEqual(revised_rules["headings"]["level1"]["punctuation"], False)
+        self.assertEqual(revised_rules["headings"]["level2"]["fontFamily"], "楷体_GB2312")
+        self.assertEqual(revised_rules["headings"]["level3"]["fontFamily"], "仿宋_GB2312")
+        self.assertEqual(revised_rules["headings"]["level3"]["punctuation"], True)
+        self.assertEqual(revised_rules["headings"]["level4"]["fontFamily"], "仿宋_GB2312")
+        self.assertEqual(revised_rules["references"]["citationOrder"], "titleThenDocNo")
+        self.assertEqual(revised_rules["references"]["yearBrackets"], "〔〕")
+        self.assertEqual(revised_rules["attachments"]["spacingBeforeLines"], 1)
+        self.assertEqual(revised_rules["attachments"]["indentChars"], 2)
+        self.assertEqual(revised_rules["attachments"]["itemSuffixPunctuation"], "none")
+        self.assertEqual(revised_rules["attachments"]["wrapAlign"], "text")
+        self.assertFalse(revised_rules["attachments"]["useBookTitleMarks"])
+        self.assertEqual(revised_rules["signature"]["spacingBeforeLines"], 2)
+        self.assertTrue(mock_revise_with_deepseek.called)
+
+    @patch("app.routers.topics.revise_topic_rules_with_deepseek")
+    def test_revise_with_deepseek_normalizes_natural_language_patch_values(self, mock_revise_with_deepseek) -> None:
+        mock_revise_with_deepseek.return_value = {
+            "patch": {
+                "title": {
+                    "fontFamily": "方正小标宋简体",
+                    "fontSize": "2号",
+                    "textAlign": "居中",
+                    "arrangement": "梯形",
+                },
+                "body": {
+                    "fontFamily": "仿宋",
+                    "fontSize": "3号",
+                    "lineHeight": "固定值28磅",
+                    "textIndent": "左空两格",
+                },
+                "headings": {
+                    "level1": {"fontFamily": "黑体", "fontSize": "3号", "punctuation": False},
+                    "level2": {"fontFamily": "楷体", "fontSize": "3号"},
+                    "level3": {"fontFamily": "仿宋", "fontSize": "3号", "punctuation": True},
+                    "level4": {"fontFamily": "仿宋", "fontSize": "3号", "punctuation": True},
+                },
+                "references": {"citationOrder": "先引标题后引发号", "yearBrackets": "〔 〕"},
+                "attachments": {
+                    "spacingBefore": "1行",
+                    "indent": "左空两格",
+                    "itemSuffixPunctuation": "不加标点",
+                    "wrapAlign": "与文字对齐",
+                    "useBookTitleMarks": "不加书名号",
+                },
+                "signature": {"spacingBeforeLines": "2行"},
+            },
+            "assistantReply": "已根据指令更新模板规则。",
+            "summary": "模板规则已更新",
+            "model": "deepseek-chat",
+            "usage": {"total_tokens": 128},
+        }
+
+        company_resp = self.client.post("/api/units", json={"name": f"topic_rule_norm_{uuid.uuid4().hex[:8]}"})
+        self.assertEqual(company_resp.status_code, 200)
+        company_id = company_resp.json()["id"]
+
+        created = self.client.post(
+            "/api/topics",
+            json={"companyId": company_id, "name": "规则归一化题材", "description": "测试自然语言补丁归一化"},
+        )
+        self.assertEqual(created.status_code, 200)
+        topic_id = created.json()["id"]
+
+        revised = self.client.post(
+            f"/api/topics/{topic_id}/agent/revise",
+            json={
+                "instruction": (
+                    "标题使用方正小标宋简体2号并居中；正文统一使用3号仿宋_GB2312字体，"
+                    "行间距固定值28磅，首行左空两格。"
+                ),
+                "useDeepSeek": True,
+            },
+        )
+        self.assertEqual(revised.status_code, 200)
+        revised_rules = revised.json()["inferredRules"]
+
+        self.assertEqual(revised_rules["title"]["fontFamily"], "方正小标宋简")
+        self.assertEqual(revised_rules["title"]["fontSizePt"], 22)
+        self.assertEqual(revised_rules["title"]["textAlign"], "center")
+        self.assertEqual(revised_rules["title"]["arrangement"], "trapezoid")
+        self.assertEqual(revised_rules["body"]["fontFamily"], "仿宋_GB2312")
+        self.assertEqual(revised_rules["body"]["fontSizePt"], 16)
+        self.assertEqual(revised_rules["body"]["lineSpacingPt"], 28)
+        self.assertEqual(revised_rules["body"]["firstLineIndentChars"], 2)
+        self.assertEqual(revised_rules["headings"]["level2"]["fontFamily"], "楷体_GB2312")
+        self.assertEqual(revised_rules["headings"]["level3"]["fontSizePt"], 16)
+        self.assertEqual(revised_rules["references"]["citationOrder"], "titleThenDocNo")
+        self.assertEqual(revised_rules["references"]["yearBrackets"], "〔〕")
+        self.assertEqual(revised_rules["attachments"]["spacingBeforeLines"], 1)
+        self.assertEqual(revised_rules["attachments"]["indentChars"], 2)
+        self.assertEqual(revised_rules["attachments"]["itemSuffixPunctuation"], "none")
+        self.assertEqual(revised_rules["attachments"]["wrapAlign"], "text")
+        self.assertFalse(revised_rules["attachments"]["useBookTitleMarks"])
+        self.assertEqual(revised_rules["signature"]["spacingBeforeLines"], 2)
+        self.assertNotIn("fontSize", revised_rules["title"])
+        self.assertNotIn("lineHeight", revised_rules["body"])
+        self.assertNotIn("textIndent", revised_rules["body"])
+
     def test_create_doc_from_topic_prefills_body_with_fixed_template_blocks(self) -> None:
         company_resp = self.client.post("/api/units", json={"name": f"topic_body_scaffold_{uuid.uuid4().hex[:8]}"})
         self.assertEqual(company_resp.status_code, 200)

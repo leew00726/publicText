@@ -75,6 +75,305 @@ _TITLE_KEYWORD_RE = re.compile(
     r"(报告|纪要|请示|函|通知|方案|总结|通报|决定|公告|意见|办法|细则|规定|计划|说明|简报|要点|清单|材料)$"
 )
 
+_FONT_SIZE_PT_ALIASES: dict[str, float] = {
+    "初号": 42,
+    "小初": 36,
+    "一号": 26,
+    "小一": 24,
+    "二号": 22,
+    "2号": 22,
+    "小二": 18,
+    "三号": 16,
+    "3号": 16,
+    "小三": 15,
+    "四号": 14,
+    "4号": 14,
+    "小四": 12,
+    "五号": 10.5,
+    "5号": 10.5,
+    "小五": 9,
+    "六号": 7.5,
+    "6号": 7.5,
+    "小六": 6.5,
+    "七号": 5.5,
+    "7号": 5.5,
+    "八号": 5,
+    "8号": 5,
+}
+
+_ALIGN_ALIASES: dict[str, str] = {
+    "left": "left",
+    "居左": "left",
+    "左对齐": "left",
+    "center": "center",
+    "居中": "center",
+    "居中对齐": "center",
+    "right": "right",
+    "居右": "right",
+    "右对齐": "right",
+    "justify": "justify",
+    "两端对齐": "justify",
+}
+
+_SMALL_CHINESE_NUMBER_ALIASES: dict[str, float] = {
+    "一": 1,
+    "二": 2,
+    "两": 2,
+    "三": 3,
+    "四": 4,
+    "五": 5,
+    "六": 6,
+    "七": 7,
+    "八": 8,
+    "九": 9,
+    "十": 10,
+}
+
+_TITLE_ARRANGEMENT_ALIASES: dict[str, str] = {
+    "trapezoid": "trapezoid",
+    "梯形": "trapezoid",
+    "梯形排列": "trapezoid",
+    "梯形居中": "trapezoid",
+    "standard": "standard",
+    "标准": "standard",
+    "普通": "standard",
+    "常规": "standard",
+}
+
+_REFERENCE_ORDER_ALIASES: dict[str, str] = {
+    "titleThenDocNo": "titleThenDocNo",
+    "标题后文号": "titleThenDocNo",
+    "标题后引发号": "titleThenDocNo",
+    "先引标题后引发号": "titleThenDocNo",
+    "先引标题后引文号": "titleThenDocNo",
+    "title-first": "titleThenDocNo",
+    "docNoThenTitle": "docNoThenTitle",
+    "文号后标题": "docNoThenTitle",
+    "先引发号后引标题": "docNoThenTitle",
+}
+
+_ATTACHMENT_ITEM_PUNCTUATION_ALIASES: dict[str, str] = {
+    "none": "none",
+    "不加标点": "none",
+    "不加标点符号": "none",
+    "无标点": "none",
+    "不用标点": "none",
+    "dot": "dot",
+    "句点": "dot",
+    "点号": "dot",
+    "顿号": "dot",
+}
+
+_WRAP_ALIGN_ALIASES: dict[str, str] = {
+    "text": "text",
+    "withText": "text",
+    "与文字对齐": "text",
+    "回行与文字对齐": "text",
+    "文字对齐": "text",
+    "hanging": "text",
+    "indent": "indent",
+    "按缩进": "indent",
+}
+
+
+def _is_plain_number(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _normalize_font_size_pt(value) -> float | None:
+    if _is_plain_number(value):
+        return float(value)
+
+    text = str(value or "").strip()
+    if not text:
+        return None
+
+    compact = re.sub(r"\s+", "", text)
+    compact = compact.replace("号字", "号").replace("字号", "号")
+    if compact in _FONT_SIZE_PT_ALIASES:
+        return _FONT_SIZE_PT_ALIASES[compact]
+
+    for alias, size in _FONT_SIZE_PT_ALIASES.items():
+        if alias in compact:
+            return size
+
+    match = re.search(r"(-?\d+(?:\.\d+)?)\s*(?:pt|磅)$", compact, flags=re.IGNORECASE)
+    if match:
+        return float(match.group(1))
+    return None
+
+
+def _normalize_spacing_pt(value) -> float | None:
+    if _is_plain_number(value):
+        return float(value)
+
+    text = str(value or "").strip()
+    if not text:
+        return None
+
+    compact = re.sub(r"\s+", "", text)
+    match = re.search(r"(-?\d+(?:\.\d+)?)\s*(?:pt|磅)", compact, flags=re.IGNORECASE)
+    if match:
+        return float(match.group(1))
+    if re.fullmatch(r"-?\d+(?:\.\d+)?", compact):
+        return float(compact)
+    return None
+
+
+def _normalize_indent_chars(value) -> float | None:
+    if _is_plain_number(value):
+        return float(value)
+
+    text = str(value or "").strip()
+    if not text:
+        return None
+
+    compact = re.sub(r"\s+", "", text)
+
+    match = re.search(r"(-?\d+(?:\.\d+)?)\s*(?:字符|字|格)", compact)
+    if match:
+        return float(match.group(1))
+
+    match = re.search(r"([一二两三四五六七八九十]+)\s*(?:字符|字|格)", compact)
+    if match:
+        return _SMALL_CHINESE_NUMBER_ALIASES.get(match.group(1))
+
+    if any(token in compact for token in ("左空两格", "首行左空两格", "首行空两格", "首行缩进两格", "缩进两格", "空两格")):
+        return 2.0
+    return None
+
+
+def _normalize_text_align(value) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+
+    normalized = _ALIGN_ALIASES.get(text.lower())
+    if normalized:
+        return normalized
+    normalized = _ALIGN_ALIASES.get(text)
+    if normalized:
+        return normalized
+
+    for alias, align in _ALIGN_ALIASES.items():
+        if alias in text:
+            return align
+    return None
+
+
+def _normalize_line_count(value) -> int | None:
+    if _is_plain_number(value):
+        return max(int(round(float(value))), 0)
+
+    text = str(value or "").strip()
+    if not text:
+        return None
+
+    compact = re.sub(r"\s+", "", text)
+    match = re.search(r"(-?\d+(?:\.\d+)?)\s*(?:行|段)", compact)
+    if match:
+        return max(int(round(float(match.group(1)))), 0)
+
+    match = re.search(r"([一二两三四五六七八九十]+)\s*(?:行|段)", compact)
+    if match:
+        mapped = _SMALL_CHINESE_NUMBER_ALIASES.get(match.group(1))
+        if mapped is not None:
+            return max(int(round(mapped)), 0)
+    return None
+
+
+def _normalize_title_arrangement(value) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+
+    normalized = _TITLE_ARRANGEMENT_ALIASES.get(text.lower())
+    if normalized:
+        return normalized
+
+    for alias, arrangement in _TITLE_ARRANGEMENT_ALIASES.items():
+        if alias in text:
+            return arrangement
+    return None
+
+
+def _normalize_reference_order(value) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+
+    normalized = _REFERENCE_ORDER_ALIASES.get(text)
+    if normalized:
+        return normalized
+    normalized = _REFERENCE_ORDER_ALIASES.get(text.lower())
+    if normalized:
+        return normalized
+
+    for alias, order in _REFERENCE_ORDER_ALIASES.items():
+        if alias in text:
+            return order
+    return None
+
+
+def _normalize_year_brackets(value) -> str | None:
+    text = re.sub(r"\s+", "", str(value or "").strip())
+    if not text:
+        return None
+    if "〔" in text or "〕" in text or "六角括号" in text:
+        return "〔〕"
+    return None
+
+
+def _normalize_boolish(value) -> bool | None:
+    if isinstance(value, bool):
+        return value
+
+    text = str(value or "").strip()
+    if not text:
+        return None
+
+    if any(token in text for token in ("否", "不要", "不加书名号", "不用书名号", "取消书名号")):
+        return False
+    if any(token in text for token in ("是", "需要", "保留", "加书名号", "使用书名号")):
+        return True
+    return None
+
+
+def _normalize_attachment_item_punctuation(value) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+
+    normalized = _ATTACHMENT_ITEM_PUNCTUATION_ALIASES.get(text)
+    if normalized:
+        return normalized
+    normalized = _ATTACHMENT_ITEM_PUNCTUATION_ALIASES.get(text.lower())
+    if normalized:
+        return normalized
+
+    for alias, punctuation in _ATTACHMENT_ITEM_PUNCTUATION_ALIASES.items():
+        if alias in text:
+            return punctuation
+    return None
+
+
+def _normalize_wrap_align(value) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+
+    normalized = _WRAP_ALIGN_ALIASES.get(text)
+    if normalized:
+        return normalized
+    normalized = _WRAP_ALIGN_ALIASES.get(text.lower())
+    if normalized:
+        return normalized
+
+    for alias, wrap_align in _WRAP_ALIGN_ALIASES.items():
+        if alias in text:
+            return wrap_align
+    return None
+
 
 def _normalize_font_name(raw: str) -> str | None:
     candidate = str(raw or "").strip().strip("：:；;，,。.")
@@ -150,6 +449,15 @@ def _detect_font_targets(text: str) -> set[str]:
 
     has_any_heading_level = any(level in targets for level in {"level1", "level2", "level3", "level4"})
     has_title = "title" in targets
+    generic_title_looks_like_main_title = bool(
+        "标题" in text
+        and re.search(r"(小标宋|方正|梯形|菱形|居中|2号|二号)", text)
+        and not re.search(r"(各级标题|所有标题|全部标题)", text)
+    )
+    if not has_any_heading_level and not has_title and generic_title_looks_like_main_title:
+        targets.add("title")
+        has_title = True
+
     if (
         not has_any_heading_level
         and not has_title
@@ -181,26 +489,156 @@ def _apply_font_patch(patch: dict, targets: set[str], font_name: str) -> None:
             headings.setdefault(level_key, {})["fontFamily"] = font_name
 
 
+def _detect_instruction_targets(text: str) -> set[str]:
+    targets = set(_detect_font_targets(text))
+    if not text:
+        return targets
+
+    if re.search(r"(第一层(?:标题)?|一级标题|第1层(?:标题)?)", text):
+        targets.add("level1")
+    if re.search(r"(第二层(?:标题)?|二级标题|第2层(?:标题)?)", text):
+        targets.add("level2")
+    if re.search(r"(第三、四层|第三和第四层|第三与第四层|第三四层)", text):
+        targets.update({"level3", "level4"})
+    if re.search(r"(第三层(?:标题)?|三级标题|第3层(?:标题)?)", text):
+        targets.add("level3")
+    if re.search(r"(第四层(?:标题)?|四级标题|第4层(?:标题)?)", text):
+        targets.add("level4")
+
+    if re.search(r"(文中引用公文|引用公文|引标题|引发号|文号|六角括号|年份)", text):
+        targets.add("references")
+    if "附件" in text:
+        targets.add("attachments")
+    if re.search(r"(落款|盖章)", text):
+        targets.add("signature")
+
+    if (
+        "标题" in text
+        and not any(level in targets for level in {"level1", "level2", "level3", "level4"})
+        and re.search(r"(方正|小标宋|梯形|菱形|居中|二号|2号|标题使用)", text)
+    ):
+        targets.add("title")
+
+    return targets
+
+
+def _extract_heading_punctuation(text: str) -> bool | None:
+    if not text:
+        return None
+    if re.search(r"(不加标点|不带标点|不加句号|不加标点符号)", text):
+        return False
+    if re.search(r"(必须加标点|加标点|带标点|加句号)", text):
+        return True
+    return None
+
+
+def _apply_scalar_patch(patch: dict, targets: set[str], key: str, value) -> None:
+    if "title" in targets:
+        patch.setdefault("title", {})[key] = value
+
+    if "body" in targets:
+        patch.setdefault("body", {})[key] = value
+
+    heading_targets = [target for target in targets if target.startswith("level")]
+    if heading_targets:
+        headings = patch.setdefault("headings", {})
+        for level_key in heading_targets:
+            headings.setdefault(level_key, {})[key] = value
+
+
+def _apply_instruction_clause_patch(patch: dict, targets: set[str], text: str) -> None:
+    scalar_targets = {target for target in targets if target in {"title", "body"} or target.startswith("level")}
+
+    font_name = _extract_font_name(text)
+    if font_name and scalar_targets:
+        _apply_font_patch(patch, scalar_targets, font_name)
+
+    font_size_pt = None
+    if re.search(r"(字号|[0-9一二三四五六七八九十两]+号|小[一二三四五六]|方正|小标宋|仿宋|楷体|黑体|宋体)", text):
+        font_size_pt = _normalize_font_size_pt(text)
+    if font_size_pt is not None and scalar_targets:
+        _apply_scalar_patch(patch, scalar_targets, "fontSizePt", font_size_pt)
+
+    if "title" in targets:
+        text_align = _normalize_text_align(text)
+        if text_align:
+            patch.setdefault("title", {})["textAlign"] = text_align
+
+        arrangement = _normalize_title_arrangement(text)
+        if arrangement:
+            patch.setdefault("title", {})["arrangement"] = arrangement
+
+    if "body" in targets:
+        if re.search(r"(行间距|行距|磅|pt)", text, flags=re.IGNORECASE):
+            line_spacing_pt = _normalize_spacing_pt(text)
+            if line_spacing_pt is not None:
+                patch.setdefault("body", {})["lineSpacingPt"] = line_spacing_pt
+
+        indent_chars = _normalize_indent_chars(text)
+        if indent_chars is not None:
+            patch.setdefault("body", {})["firstLineIndentChars"] = indent_chars
+
+    heading_targets = [target for target in targets if target.startswith("level")]
+    if heading_targets:
+        punctuation = _extract_heading_punctuation(text)
+        if punctuation is not None:
+            headings = patch.setdefault("headings", {})
+            for level_key in heading_targets:
+                headings.setdefault(level_key, {})["punctuation"] = punctuation
+
+    if "references" in targets:
+        citation_order = _normalize_reference_order(text)
+        if citation_order:
+            patch.setdefault("references", {})["citationOrder"] = citation_order
+
+        year_brackets = _normalize_year_brackets(text)
+        if year_brackets:
+            patch.setdefault("references", {})["yearBrackets"] = year_brackets
+
+    if "attachments" in targets:
+        if re.search(r"(空.*行|与正文空)", text):
+            spacing_before_lines = _normalize_line_count(text)
+            if spacing_before_lines is not None:
+                patch.setdefault("attachments", {})["spacingBeforeLines"] = spacing_before_lines
+
+        indent_chars = _normalize_indent_chars(text)
+        if indent_chars is not None:
+            patch.setdefault("attachments", {})["indentChars"] = indent_chars
+
+        item_suffix_punctuation = _normalize_attachment_item_punctuation(text)
+        if item_suffix_punctuation:
+            patch.setdefault("attachments", {})["itemSuffixPunctuation"] = item_suffix_punctuation
+
+        wrap_align = _normalize_wrap_align(text)
+        if wrap_align:
+            patch.setdefault("attachments", {})["wrapAlign"] = wrap_align
+
+        if "书名号" in text:
+            use_book_title_marks = _normalize_boolish(text)
+            if use_book_title_marks is not None:
+                patch.setdefault("attachments", {})["useBookTitleMarks"] = use_book_title_marks
+
+    if "signature" in targets:
+        spacing_before_lines = _normalize_line_count(text)
+        if spacing_before_lines is not None:
+            patch.setdefault("signature", {})["spacingBeforeLines"] = spacing_before_lines
+
+
 def _build_patch_from_instruction(instruction: str) -> dict:
     patch: dict = {}
-    segments = [seg.strip() for seg in re.split(r"[，,。；;\n]+", instruction or "") if seg.strip()]
-    pending_targets: set[str] = set()
+    segments = [seg.strip() for seg in re.split(r"[；;\n。]+", instruction or "") if seg.strip()]
 
     for seg in segments:
-        targets = _detect_font_targets(seg)
-        font_name = _extract_font_name(seg)
-
-        if not font_name:
-            pending_targets = targets
-            continue
-
-        effective_targets = targets or pending_targets
-        if not effective_targets:
-            pending_targets = set()
-            continue
-
-        _apply_font_patch(patch, effective_targets, font_name)
-        pending_targets = set()
+        pending_targets: set[str] = set()
+        clauses = [clause.strip() for clause in re.split(r"[，,]+", seg) if clause.strip()]
+        for clause in clauses:
+            targets = _detect_instruction_targets(clause)
+            effective_targets = targets or pending_targets
+            if not effective_targets:
+                continue
+            _apply_instruction_clause_patch(patch, effective_targets, clause)
+            if targets:
+                pending_targets = targets
 
     if patch:
         return patch
@@ -225,6 +663,83 @@ def _sanitize_rule_patch(value):
                 normalized = _normalize_font_name(str(item or ""))
                 if normalized:
                     sanitized[key] = normalized
+                continue
+            if key in {"fontSize", "fontSizePt"}:
+                normalized = _normalize_font_size_pt(item)
+                if normalized is not None:
+                    sanitized["fontSizePt"] = normalized
+                continue
+            if key in {"lineHeight", "lineSpacing", "lineSpacingPt"}:
+                normalized = _normalize_spacing_pt(item)
+                if normalized is not None:
+                    sanitized["lineSpacingPt"] = normalized
+                continue
+            if key in {"firstLineIndentPt", "spaceBeforePt", "spaceAfterPt"}:
+                normalized = _normalize_spacing_pt(item)
+                if normalized is not None:
+                    sanitized[key] = normalized
+                continue
+            if key in {"textIndent", "firstLineIndent", "firstLineIndentChars"}:
+                indent_chars = _normalize_indent_chars(item)
+                if indent_chars is not None:
+                    sanitized["firstLineIndentChars"] = indent_chars
+                    sanitized.pop("firstLineIndentPt", None)
+                    continue
+
+                indent_pt = _normalize_spacing_pt(item)
+                if indent_pt is not None:
+                    sanitized["firstLineIndentPt"] = indent_pt
+                    sanitized.pop("firstLineIndentChars", None)
+                continue
+            if key == "textAlign":
+                normalized = _normalize_text_align(item)
+                if normalized:
+                    sanitized["textAlign"] = normalized
+                continue
+            if key in {"arrangement", "titleArrangement"}:
+                normalized = _normalize_title_arrangement(item)
+                if normalized:
+                    sanitized["arrangement"] = normalized
+                continue
+            if key in {"citationOrder", "order"}:
+                normalized = _normalize_reference_order(item)
+                if normalized:
+                    sanitized["citationOrder"] = normalized
+                continue
+            if key == "yearBrackets":
+                normalized = _normalize_year_brackets(item)
+                if normalized:
+                    sanitized["yearBrackets"] = normalized
+                continue
+            if key in {"spacingBeforeLines", "blankLinesBefore"}:
+                normalized = _normalize_line_count(item)
+                if normalized is not None:
+                    sanitized["spacingBeforeLines"] = normalized
+                continue
+            if key in {"spacingBefore", "spacingAfter"}:
+                line_count = _normalize_line_count(item)
+                if line_count is not None:
+                    sanitized[f"{key}Lines"] = line_count
+                    continue
+            if key in {"indentChars", "indent"}:
+                normalized = _normalize_indent_chars(item)
+                if normalized is not None:
+                    sanitized["indentChars"] = normalized
+                continue
+            if key in {"itemSuffixPunctuation", "sequenceSuffixPunctuation"}:
+                normalized = _normalize_attachment_item_punctuation(item)
+                if normalized:
+                    sanitized["itemSuffixPunctuation"] = normalized
+                continue
+            if key == "wrapAlign":
+                normalized = _normalize_wrap_align(item)
+                if normalized:
+                    sanitized["wrapAlign"] = normalized
+                continue
+            if key == "useBookTitleMarks":
+                normalized = _normalize_boolish(item)
+                if normalized is not None:
+                    sanitized["useBookTitleMarks"] = normalized
                 continue
             sanitized[key] = _sanitize_rule_patch(item)
         return sanitized

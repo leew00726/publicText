@@ -9,7 +9,9 @@ const RE_H4 = /^[（(]\d+[）)]/
 const RE_SUFFIX_MARKER =
   /^(主\s*持(?:\s*人|\s*者)?|参\s*(?:加|会)(?:\s*人|\s*人员|\s*名单)?|列\s*席(?:\s*人|\s*人员)?|出\s*席(?:\s*人|\s*人员)?|记\s*录(?:\s*人|\s*员)?|发\s*(?:送|至|文)|主\s*送|抄\s*送|分\s*送)\s*[：:]/
 const RE_ATTACHMENT_LABEL = /^附件\s*[:：]\s*(.*)$/
-const RE_ATTACHMENT_ITEM = /^(\d+)[\.．、]\s*(.+)$/
+const RE_ATTACHMENT_ITEM = /^(\d+)(?:[\.．、])?\s+(.+)$/
+const RE_REFERENCE_DOCNO_FIRST = /([A-Za-z0-9\u4e00-\u9fa5〔〕\-\u2014]+〔\d{2,4}〕[0-9一二三四五六七八九十百千]+号)\s*[《〈]([^》〉]+)[》〉]/g
+const REFERENCE_LEAD_PREFIXES = ['请参照', '参照', '按照', '根据', '依照', '依据', '遵照', '对照', '参见'] as const
 
 function toZh(num: number): string {
   const map = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九']
@@ -143,8 +145,51 @@ function detectHeadingLevel(text: string): 1 | 2 | 3 | 4 | null {
 function normalizeAttachmentName(name: string): string {
   return name
     .trim()
+    .replace(/^[《〈]+|[》〉]+$/g, '')
     .replace(/\.[a-zA-Z0-9]{1,8}$/g, '')
     .replace(/[。；，、,.!?？！：:;]+$/g, '')
+}
+
+function normalizeReferenceText(text: string, referencesRules: Record<string, any>): string {
+  let next = normalizeCommonText(text)
+  if (!next) return next
+
+  if (referencesRules?.yearBrackets === '〔〕') {
+    next = next.replace(/\(([0-9]{2,4})\)/g, '〔$1〕').replace(/（([0-9]{2,4})）/g, '〔$1〕')
+  }
+
+  if (referencesRules?.citationOrder === 'titleThenDocNo') {
+    next = next.replace(RE_REFERENCE_DOCNO_FIRST, (_, rawDocNo: string, title: string) => {
+      let docNo = rawDocNo
+      let leadPrefix = ''
+      for (const prefix of REFERENCE_LEAD_PREFIXES) {
+        if (docNo.startsWith(prefix) && docNo.length > prefix.length) {
+          leadPrefix = prefix
+          docNo = docNo.slice(prefix.length)
+          break
+        }
+      }
+      return `${leadPrefix}《${title}》（${docNo}）`
+    })
+  }
+  return next
+}
+
+function normalizeLineCount(value: unknown, fallback: number): number {
+  const num = Number(value)
+  if (Number.isNaN(num) || !Number.isFinite(num)) return fallback
+  return Math.max(Math.round(num), 0)
+}
+
+function formatAttachmentNameByRules(name: string, attachmentRules: Record<string, any>): string {
+  const normalized = normalizeAttachmentName(name)
+  if (!normalized) return ''
+  return attachmentRules?.useBookTitleMarks === true ? `《${normalized}》` : normalized
+}
+
+function formatAttachmentLine(index: number, name: string, attachmentRules: Record<string, any>): string {
+  const prefix = attachmentRules?.itemSuffixPunctuation === 'none' ? `${index} ` : `${index}. `
+  return `${prefix}${formatAttachmentNameByRules(name, attachmentRules)}`
 }
 
 function isLikelyTitleLine(text: string): boolean {
@@ -154,6 +199,7 @@ function isLikelyTitleLine(text: string): boolean {
   if (detectHeadingLevel(t)) return false
   if (RE_ATTACHMENT_LABEL.test(t)) return false
   if (t.endsWith('：')) return false
+  if (/[。！？；]$/.test(t)) return false
   return /关于|通知|请示|函|纪要/.test(t)
 }
 
@@ -209,6 +255,9 @@ function trimLeadingBlankParagraphs(docJson: any): any {
 type BodyLayoutOptions = {
   preserveLeadingNodes?: any[]
   preserveTrailingNodes?: any[]
+  bodyRules?: Record<string, any>
+  referencesRules?: Record<string, any>
+  attachmentRules?: Record<string, any>
 }
 
 function normalizeParagraphAttrs(rawAttrs: any, defaultIndentChars: number = 2): Record<string, any> {
@@ -299,8 +348,14 @@ function applyBodyLayoutOnly(body: any, options: BodyLayoutOptions = {}): any {
   const content = Array.isArray(cloned.content) ? cloned.content : []
   const preserveLeading = Array.isArray(options.preserveLeadingNodes) ? options.preserveLeadingNodes : []
   const preserveTrailing = Array.isArray(options.preserveTrailingNodes) ? options.preserveTrailingNodes : []
+  const bodyRules = options.bodyRules && typeof options.bodyRules === 'object' ? options.bodyRules : {}
+  const referencesRules = options.referencesRules && typeof options.referencesRules === 'object' ? options.referencesRules : {}
+  const attachmentRules = options.attachmentRules && typeof options.attachmentRules === 'object' ? options.attachmentRules : {}
+  const suffixTemplateStart = preserveTrailing.findIndex((node: any) => RE_SUFFIX_MARKER.test(normalizeCommonText(getNodeText(node))))
+  const suffixTemplateNodes = suffixTemplateStart >= 0 ? preserveTrailing.slice(suffixTemplateStart).map((node: any) => structuredClone(node)) : []
   const leadingCount = countMatchingLeadingTemplateNodes(content, preserveLeading)
   const trailingCount = countMatchingTrailingTemplateNodes(content, preserveTrailing, leadingCount)
+  let suffixHostIndex = -1
 
   for (let i = 0; i < leadingCount; i += 1) {
     content[i] = structuredClone(preserveLeading[i])
@@ -334,7 +389,7 @@ function applyBodyLayoutOnly(body: any, options: BodyLayoutOptions = {}): any {
       node.type = 'paragraph'
       node.attrs = normalizeParagraphAttrs(node.attrs, 2)
       const rest = (attachmentLabel[1] || '').trim()
-      setNodeText(node, rest ? `附件：${normalizeAttachmentName(rest)}` : '附件：')
+      setNodeText(node, rest ? `附件：${formatAttachmentNameByRules(rest, attachmentRules)}` : '附件：')
       continue
     }
 
@@ -344,23 +399,40 @@ function applyBodyLayoutOnly(body: any, options: BodyLayoutOptions = {}): any {
         node.type = 'paragraph'
         node.attrs = normalizeParagraphAttrs(node.attrs, 2)
         const attachmentIndex = Number(attachmentItem[1])
-        const name = normalizeAttachmentName(attachmentItem[2])
-        setNodeText(node, `${attachmentIndex}. ${name}`)
+        const name = formatAttachmentNameByRules(attachmentItem[2], attachmentRules)
+        setNodeText(node, formatAttachmentLine(attachmentIndex, name, attachmentRules))
         continue
       }
       inAttachmentBlock = false
+    }
+
+    if (RE_SUFFIX_MARKER.test(text)) {
+      const normalizedNode = normalizeFixedSuffixNodeAttrs(node, bodyRules, true)
+      node.type = normalizedNode.type
+      node.attrs = normalizedNode.attrs
+      setNodeText(node, normalizeReferenceText(normalizeTailPunctuation(text), referencesRules))
+      if (suffixHostIndex < 0) suffixHostIndex = index
+      continue
     }
 
     const level = detectHeadingLevel(text)
     if (level) {
       node.type = 'heading'
       node.attrs = { level }
-      setNodeText(node, normalizeHeadingPunctuation(level, text))
+      setNodeText(node, normalizeReferenceText(normalizeHeadingPunctuation(level, text), referencesRules))
     } else {
       node.type = 'paragraph'
       node.attrs = normalizeParagraphAttrs(node.attrs, 2)
-      setNodeText(node, normalizeTailPunctuation(text))
+      setNodeText(node, normalizeReferenceText(normalizeTailPunctuation(text), referencesRules))
     }
+  }
+
+  if (suffixHostIndex >= 0 && suffixTemplateNodes.length > 1) {
+    const normalizedSuffixTail = suffixTemplateNodes
+      .slice(1)
+      .map((node: any) => normalizeFixedSuffixNodeAttrs(node, bodyRules, true))
+      .map((node: any) => structuredClone(node))
+    content.splice(suffixHostIndex + 1, Math.max(content.length - suffixHostIndex - 1, 0), ...normalizedSuffixTail)
   }
 
   return ensureAttachmentBlankLine(renumberHeadings(trimLeadingBlankParagraphs(cloned)))
@@ -458,6 +530,8 @@ export function applyOneClickLayoutWithFields(body: any, structuredFields: Struc
   const rules = (structuredFields as any)?.topicTemplateRules
   const contentTemplate = rules && typeof rules === 'object' ? (rules as any).contentTemplate : null
   const bodyRules = rules && typeof rules === 'object' && (rules as any).body && typeof (rules as any).body === 'object' ? (rules as any).body : {}
+  const referencesRules = rules && typeof rules === 'object' && (rules as any).references && typeof (rules as any).references === 'object' ? (rules as any).references : {}
+  const attachmentRules = rules && typeof rules === 'object' && (rules as any).attachments && typeof (rules as any).attachments === 'object' ? (rules as any).attachments : {}
   const preserveLeadingNodes =
     contentTemplate && Array.isArray(contentTemplate.leadingNodes)
       ? contentTemplate.leadingNodes.filter((node: any) => node && typeof node === 'object')
@@ -478,7 +552,13 @@ export function applyOneClickLayoutWithFields(body: any, structuredFields: Struc
       : []
 
   return {
-    body: applyBodyLayoutOnly(extracted.body, { preserveLeadingNodes, preserveTrailingNodes }),
+    body: applyBodyLayoutOnly(extracted.body, {
+      preserveLeadingNodes,
+      preserveTrailingNodes,
+      bodyRules,
+      referencesRules,
+      attachmentRules,
+    }),
     structuredFields: extracted.structuredFields,
   }
 }

@@ -62,6 +62,7 @@ export type StructuredFields = {
   topicTemplateId?: string | null
   topicTemplateVersion?: number | null
   topicTemplateRules?: Record<string, any> | null
+  importedTitleAttrs?: Record<string, any> | null
 }
 
 export type GovDoc = {

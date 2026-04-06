@@ -352,10 +352,22 @@ export function DocEditorPage() {
     form.append('file', file)
     form.append('unitId', doc.unitId)
     form.append('docType', doc.docType)
+    form.append('preserveFormatting', 'true')
     form.append('title', doc.title || '导入文档')
 
     const res = await api.post<{ docId: string; importReport: any }>('/api/layout/docs/importDocx', form)
-    alert(`导入完成：未识别标题 ${res.data.importReport.unrecognizedTitleCount} 段`)
+    const report = res.data.importReport || {}
+    const messages: string[] = []
+    if ((report.unrecognizedTitleCount || 0) > 0) {
+      messages.push(`未识别标题 ${report.unrecognizedTitleCount} 段`)
+    }
+    if (Array.isArray(report.numberingWarnings) && report.numberingWarnings.length > 0) {
+      messages.push(`标题编号提醒 ${report.numberingWarnings.length} 项`)
+    }
+    if (Array.isArray(report.tableWarnings) && report.tableWarnings.length > 0) {
+      messages.push(`表格提醒 ${report.tableWarnings.length} 项`)
+    }
+    alert(messages.length > 0 ? `导入完成：${messages.join('；')}` : '导入完成')
     navigate(`/layout/docs/${res.data.docId}`)
   }
 
@@ -451,6 +463,7 @@ export function DocEditorPage() {
         <StructuredFormPanel value={doc.structuredFields} onChange={(next) => setDocField({ structuredFields: { ...next } })} />
 
         <TiptapEditor
+          key={doc.id}
           value={doc.body}
           syncToken={syncToken}
           onChange={(json) => setDocField({ body: json })}
@@ -463,6 +476,7 @@ export function DocEditorPage() {
           dateText={doc.structuredFields.date}
           attachments={doc.structuredFields.attachments}
           topicTemplateRules={doc.structuredFields.topicTemplateRules || null}
+          importedTitleAttrs={doc.structuredFields.importedTitleAttrs || null}
         />
 
         <ValidationPanel issues={issues} onCheck={runCheck} onOneClickLayout={doOneClickLayout} onLocate={locatePath} />

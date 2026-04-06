@@ -118,6 +118,7 @@ class StructuredFields(BaseModel):
     topicTemplateId: str | None = None
     topicTemplateVersion: int | None = None
     topicTemplateRules: dict[str, Any] | None = None
+    importedTitleAttrs: dict[str, Any] | None = None
 
 
 class DocumentBase(BaseModel):

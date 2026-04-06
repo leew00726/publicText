@@ -175,6 +175,69 @@ class DocxExportTests(unittest.TestCase):
 
         self.assertTrue(divider_found)
 
+    def test_export_applies_title_reference_attachment_and_signature_rules(self) -> None:
+        title_text = "关于推进云矩公文管理平台试点应用的通知"
+        payload = {
+            "title": title_text,
+            "structuredFields": {
+                "title": title_text,
+                "mainTo": "",
+                "signOff": "资本公司党委",
+                "date": "2026-04-05",
+                "attachments": [{"index": 1, "name": "《实施方案》.docx"}],
+                "topicTemplateRules": {
+                    "title": {"fontFamily": "方正小标宋简", "fontSizePt": 22, "arrangement": "trapezoid"},
+                    "references": {"citationOrder": "titleThenDocNo", "yearBrackets": "〔〕"},
+                    "attachments": {
+                        "spacingBeforeLines": 1,
+                        "indentChars": 2,
+                        "itemSuffixPunctuation": "none",
+                        "wrapAlign": "text",
+                        "useBookTitleMarks": False,
+                    },
+                    "signature": {"spacingBeforeLines": 2},
+                },
+            },
+            "body": {
+                "type": "doc",
+                "content": [
+                    {"type": "paragraph", "content": [{"type": "text", "text": "请参照华能（2026）3号《试点工作通知》执行。"}]},
+                ],
+            },
+        }
+
+        raw = export_docx(payload, unit_name="测试单位", redhead_template={"elements": [], "page": {}}, include_redhead=False)
+        doc = Document(io.BytesIO(raw))
+        texts = [p.text for p in doc.paragraphs]
+
+        title_lines: list[str] = []
+        for paragraph in doc.paragraphs:
+            text = paragraph.text.strip()
+            if not text:
+                continue
+            if "试点工作通知" in text or "请参照" in text:
+                break
+            title_lines.append(text)
+        self.assertGreaterEqual(len(title_lines), 2)
+        self.assertEqual("".join(title_lines), title_text)
+        self.assertLessEqual(len(title_lines[0]), len(title_lines[-1]))
+
+        body_paragraph = next((p for p in doc.paragraphs if "试点工作通知" in p.text), None)
+        self.assertIsNotNone(body_paragraph)
+        self.assertEqual(body_paragraph.text, "请参照《试点工作通知》（华能〔2026〕3号）执行。")
+
+        sign_idx = texts.index("资本公司党委")
+        self.assertEqual(texts[sign_idx - 1], "")
+        self.assertEqual(texts[sign_idx - 2], "")
+
+        attachment_paragraph = next((p for p in doc.paragraphs if p.text.strip().startswith("1 ")), None)
+        self.assertIsNotNone(attachment_paragraph)
+        self.assertEqual(attachment_paragraph.text.strip(), "1 实施方案")
+        self.assertIsNotNone(attachment_paragraph.paragraph_format.left_indent)
+        self.assertIsNotNone(attachment_paragraph.paragraph_format.first_line_indent)
+        self.assertGreater(float(attachment_paragraph.paragraph_format.left_indent.pt), 0)
+        self.assertLess(float(attachment_paragraph.paragraph_format.first_line_indent.pt), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

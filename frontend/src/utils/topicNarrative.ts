@@ -3,12 +3,23 @@ type AnyRecord = Record<string, any>
 const RULE_PATH_ORDER = [
   'title.fontFamily',
   'title.fontSizePt',
+  'title.textAlign',
+  'title.arrangement',
   'body.fontFamily',
   'body.fontSizePt',
   'body.lineSpacingPt',
   'body.spaceBeforePt',
   'body.spaceAfterPt',
+  'body.firstLineIndentChars',
   'body.firstLineIndentPt',
+  'references.citationOrder',
+  'references.yearBrackets',
+  'attachments.spacingBeforeLines',
+  'attachments.indentChars',
+  'attachments.itemSuffixPunctuation',
+  'attachments.wrapAlign',
+  'attachments.useBookTitleMarks',
+  'signature.spacingBeforeLines',
   'page.marginsCm.top',
   'page.marginsCm.bottom',
   'page.marginsCm.left',
@@ -26,12 +37,23 @@ const RULE_PATH_ORDER = [
 const PATH_LABEL: Record<string, string> = {
   'title.fontFamily': '主标题字体',
   'title.fontSizePt': '主标题字号',
+  'title.textAlign': '主标题对齐方式',
+  'title.arrangement': '主标题排列方式',
   'body.fontFamily': '正文字体',
   'body.fontSizePt': '正文字号',
   'body.lineSpacingPt': '正文行距',
   'body.spaceBeforePt': '正文段前间距',
   'body.spaceAfterPt': '正文段后间距',
+  'body.firstLineIndentChars': '正文首行缩进',
   'body.firstLineIndentPt': '正文首行缩进',
+  'references.citationOrder': '引用公文顺序',
+  'references.yearBrackets': '文号年份括号',
+  'attachments.spacingBeforeLines': '附件前空行',
+  'attachments.indentChars': '附件缩进',
+  'attachments.itemSuffixPunctuation': '附件序号后标点',
+  'attachments.wrapAlign': '附件回行对齐',
+  'attachments.useBookTitleMarks': '附件名称书名号',
+  'signature.spacingBeforeLines': '落款前空行',
   'page.marginsCm.top': '页面上边距',
   'page.marginsCm.bottom': '页面下边距',
   'page.marginsCm.left': '页面左边距',
@@ -60,11 +82,59 @@ function readPath(source: AnyRecord, path: string): unknown {
 
 function formatRuleLine(path: string, value: unknown): string {
   const label = PATH_LABEL[path] || path
+  if (path === 'title.arrangement' && typeof value === 'string') {
+    const arrangementLabel: Record<string, string> = {
+      trapezoid: '梯形排列',
+      standard: '常规排列',
+    }
+    return `${label}建议为 ${arrangementLabel[value] || value}。`
+  }
+
+  if (path === 'title.textAlign' && typeof value === 'string') {
+    const alignLabel: Record<string, string> = {
+      left: '左对齐',
+      center: '居中',
+      right: '右对齐',
+      justify: '两端对齐',
+    }
+    return `${label}建议为 ${alignLabel[value] || value}。`
+  }
+
+  if (path === 'body.firstLineIndentChars' && typeof value === 'number') {
+    return `${label}建议为首行左空 ${value} 格。`
+  }
+
+  if (path === 'references.citationOrder' && typeof value === 'string') {
+    const orderLabel: Record<string, string> = {
+      titleThenDocNo: '先引标题后引发号',
+      docNoThenTitle: '先引发号后引标题',
+    }
+    return `${label}建议为 ${orderLabel[value] || value}。`
+  }
+
+  if (path === 'references.yearBrackets' && typeof value === 'string') {
+    return `${label}建议使用 ${value}。`
+  }
+
+  if (path === 'attachments.itemSuffixPunctuation' && typeof value === 'string') {
+    return `${label}建议为 ${value === 'none' ? '不加标点' : '加句点'}。`
+  }
+
+  if (path === 'attachments.wrapAlign' && typeof value === 'string') {
+    return `${label}建议为 ${value === 'text' ? '与文字对齐' : '按段落缩进对齐'}。`
+  }
+
+  if (path === 'attachments.useBookTitleMarks' && typeof value === 'boolean') {
+    return `${label}建议${value ? '保留' : '不加'}书名号。`
+  }
+
   if (typeof value === 'string') {
     return `${label}建议使用 ${value}。`
   }
 
   if (typeof value === 'number') {
+    if (path.endsWith('Lines')) return `${label}建议为 ${value} 行。`
+    if (path === 'attachments.indentChars') return `${label}建议为左空 ${value} 格。`
     if (path.includes('marginsCm')) return `${label}建议为 ${value} 厘米。`
     return `${label}建议为 ${value} 磅。`
   }

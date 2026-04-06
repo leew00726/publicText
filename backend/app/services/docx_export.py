@@ -26,6 +26,20 @@ RE_HEADER_SIGNATORY = re.compile(r"签发人\s*[：:]")
 RE_TITLE_KEYWORD = re.compile(
     r"(报告|纪要|请示|函|通知|方案|总结|通报|决定|公告|意见|办法|细则|规定|计划|说明|简报|要点|清单|材料)$"
 )
+RE_REFERENCE_DOCNO_FIRST = re.compile(
+    r"(?P<docno>[A-Za-z0-9\u4e00-\u9fa5〔〕\-\u2014]+〔\d{2,4}〕[0-9一二三四五六七八九十百千]+号)\s*[《〈](?P<title>[^》〉]+)[》〉]"
+)
+REFERENCE_LEAD_PREFIXES = (
+    "请参照",
+    "参照",
+    "按照",
+    "根据",
+    "依照",
+    "依据",
+    "遵照",
+    "对照",
+    "参见",
+)
 
 
 def _set_run_font(run, family: str, size_pt: float, bold: bool = False, color_hex: str | None = None):
@@ -94,6 +108,120 @@ def _format_zh_date(date_text: str) -> str:
     month = int(m.group(2))
     day = int(m.group(3))
     return f"{year}年{month}月{day}日"
+
+
+def _normalize_line_count(value: Any, default: int) -> int:
+    try:
+        if value is None:
+            raise ValueError
+        return max(int(round(float(value))), 0)
+    except (TypeError, ValueError):
+        return default
+
+
+def _format_attachment_name(name: str, use_book_title_marks: bool = False) -> str:
+    value = os.path.splitext(str(name or ""))[0].strip()
+    value = value.strip("《》〈〉")
+    value = re.sub(r"[。；，、.!?！？：:;]+$", "", value)
+    if not value:
+        return ""
+    if use_book_title_marks:
+        return f"《{value}》"
+    return value
+
+
+def _format_attachment_prefix(index: Any, item_suffix_punctuation: str = "dot") -> str:
+    idx = str(index or "").strip() or "1"
+    return f"{idx}. " if item_suffix_punctuation == "dot" else f"{idx} "
+
+
+def _normalize_reference_text(text: str, reference_rules: dict[str, Any]) -> str:
+    value = str(text or "")
+    if not value:
+        return value
+
+    if str(reference_rules.get("yearBrackets") or "").strip() == "〔〕":
+        value = normalize_doc_no_brackets(value)
+
+    if str(reference_rules.get("citationOrder") or "").strip() == "titleThenDocNo":
+        def _replace(match: re.Match[str]) -> str:
+            docno = match.group("docno")
+            lead_prefix = ""
+            for prefix in REFERENCE_LEAD_PREFIXES:
+                if docno.startswith(prefix) and len(docno) > len(prefix):
+                    lead_prefix = prefix
+                    docno = docno[len(prefix) :]
+                    break
+            return f"{lead_prefix}《{match.group('title')}》（{docno}）"
+
+        value = RE_REFERENCE_DOCNO_FIRST.sub(_replace, value)
+    return value
+
+
+def _resolve_title_lines(title: str, arrangement: str | None) -> list[str]:
+    raw = str(title or "").strip()
+    if not raw:
+        return []
+    compact = re.sub(r"\s+", "", raw)
+    if arrangement != "trapezoid" or len(compact) < 8:
+        return [raw]
+
+    best_lines: list[str] = [compact]
+    best_score = float("inf")
+    total = len(compact)
+    candidate_line_counts = [2] if total < 12 else [2, 3]
+
+    for line_count in candidate_line_counts:
+        if total < line_count * 3:
+            continue
+
+        if line_count == 2:
+            for first_len in range(3, total - 2):
+                lengths = [first_len, total - first_len]
+                if lengths[0] > lengths[1]:
+                    continue
+                score = (lengths[1] - lengths[0]) * 4 + abs(lengths[0] - total / 2) * 2
+                if score < best_score:
+                    best_score = score
+                    best_lines = [compact[:first_len], compact[first_len:]]
+        else:
+            for first_len in range(3, total - 5):
+                for second_len in range(first_len, total - first_len - 2):
+                    third_len = total - first_len - second_len
+                    lengths = [first_len, second_len, third_len]
+                    if third_len < second_len:
+                        continue
+                    score = (lengths[-1] - lengths[0]) * 4 + sum(abs(length - total / 3) for length in lengths)
+                    if score < best_score:
+                        best_score = score
+                        best_lines = [
+                            compact[:first_len],
+                            compact[first_len : first_len + second_len],
+                            compact[first_len + second_len :],
+                        ]
+
+    return best_lines
+
+
+def _apply_attachment_paragraph_style(
+    paragraph,
+    indent_chars: float,
+    font_size_pt: float,
+    prefix_text: str,
+    wrap_align: str,
+):
+    paragraph.paragraph_format.line_spacing = Pt(28)
+    paragraph.paragraph_format.space_before = Pt(0)
+    paragraph.paragraph_format.space_after = Pt(0)
+
+    if wrap_align == "text":
+        prefix_width_pt = max(len(prefix_text), 1) * font_size_pt
+        paragraph.paragraph_format.left_indent = Pt((indent_chars * font_size_pt) + prefix_width_pt)
+        paragraph.paragraph_format.first_line_indent = Pt(-prefix_width_pt)
+        return
+
+    paragraph.paragraph_format.left_indent = Pt(0)
+    paragraph.paragraph_format.first_line_indent = Pt(indent_chars * font_size_pt)
 
 
 def _extract_bind_map(structured_fields: dict[str, Any], unit_name: str) -> dict[str, str]:
@@ -275,7 +403,12 @@ def _has_fixed_title_content(structured_fields: dict[str, Any]) -> bool:
 
 def _apply_body_paragraph_style(paragraph, body_style: dict[str, Any]):
     paragraph.paragraph_format.line_spacing = Pt(_safe_float(body_style.get("lineSpacingPt"), 28))
-    paragraph.paragraph_format.first_line_indent = Pt(_safe_float(body_style.get("firstLineIndentPt"), 32))
+    first_indent_pt = _safe_float_or_none(body_style.get("firstLineIndentPt"))
+    if first_indent_pt is not None:
+        paragraph.paragraph_format.first_line_indent = Pt(first_indent_pt)
+    else:
+        first_indent_chars = _safe_float_or_none(body_style.get("firstLineIndentChars"))
+        paragraph.paragraph_format.first_line_indent = Pt((first_indent_chars if first_indent_chars is not None else 2) * 16)
     paragraph.paragraph_format.space_before = Pt(_safe_float(body_style.get("spaceBeforePt"), 0))
     paragraph.paragraph_format.space_after = Pt(_safe_float(body_style.get("spaceAfterPt"), 0))
 
@@ -285,7 +418,12 @@ def _apply_heading_style(paragraph, level: int, heading_styles: dict[str, Any]):
     level_style = heading_styles.get(level_key) if isinstance(heading_styles.get(level_key), dict) else {}
 
     paragraph.paragraph_format.line_spacing = Pt(_safe_float(level_style.get("lineSpacingPt"), 28))
-    paragraph.paragraph_format.first_line_indent = Pt(_safe_float(level_style.get("firstLineIndentPt"), 32))
+    first_indent_pt = _safe_float_or_none(level_style.get("firstLineIndentPt"))
+    if first_indent_pt is not None:
+        paragraph.paragraph_format.first_line_indent = Pt(first_indent_pt)
+    else:
+        first_indent_chars = _safe_float_or_none(level_style.get("firstLineIndentChars"))
+        paragraph.paragraph_format.first_line_indent = Pt((first_indent_chars if first_indent_chars is not None else 2) * 16)
     paragraph.paragraph_format.space_before = Pt(_safe_float(level_style.get("spaceBeforePt"), 0))
     paragraph.paragraph_format.space_after = Pt(_safe_float(level_style.get("spaceAfterPt"), 0))
 
@@ -324,6 +462,22 @@ def _apply_node_paragraph_overrides(paragraph, node_attrs: dict[str, Any], defau
     line_spacing_pt = _safe_float_or_none(node_attrs.get("lineSpacingPt"))
     if line_spacing_pt is not None:
         paragraph.paragraph_format.line_spacing = Pt(line_spacing_pt)
+
+    space_before_pt = _safe_float_or_none(node_attrs.get("spaceBeforePt"))
+    if space_before_pt is not None:
+        paragraph.paragraph_format.space_before = Pt(space_before_pt)
+
+    space_after_pt = _safe_float_or_none(node_attrs.get("spaceAfterPt"))
+    if space_after_pt is not None:
+        paragraph.paragraph_format.space_after = Pt(space_after_pt)
+
+    left_indent_pt = _safe_float_or_none(node_attrs.get("leftIndentPt"))
+    if left_indent_pt is not None:
+        paragraph.paragraph_format.left_indent = Pt(left_indent_pt)
+
+    right_indent_pt = _safe_float_or_none(node_attrs.get("rightIndentPt"))
+    if right_indent_pt is not None:
+        paragraph.paragraph_format.right_indent = Pt(right_indent_pt)
 
     first_indent_pt = _safe_float_or_none(node_attrs.get("firstLineIndentPt"))
     if first_indent_pt is not None:
@@ -432,6 +586,18 @@ def export_docx(
     title_style = topic_template_rules.get("title")
     if not isinstance(title_style, dict):
         title_style = {}
+    imported_title_style = structured_fields.get("importedTitleAttrs")
+    if not isinstance(imported_title_style, dict):
+        imported_title_style = {}
+    references_rules = topic_template_rules.get("references")
+    if not isinstance(references_rules, dict):
+        references_rules = {}
+    attachments_rules = topic_template_rules.get("attachments")
+    if not isinstance(attachments_rules, dict):
+        attachments_rules = {}
+    signature_rules = topic_template_rules.get("signature")
+    if not isinstance(signature_rules, dict):
+        signature_rules = {}
     suppress_auto_frontmatter = _has_fixed_title_content(structured_fields)
     if include_redhead:
         _apply_header_template(doc, redhead_template, structured_fields, unit_name)
@@ -440,17 +606,30 @@ def export_docx(
     if not suppress_auto_frontmatter:
         title = structured_fields.get("title") or document_data.get("title") or ""
     if title:
-        p_title = doc.add_paragraph()
-        p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p_title.paragraph_format.line_spacing = Pt(_safe_float(title_style.get("lineSpacingPt"), 28))
-        run = p_title.add_run(title)
-        _set_run_font(
-            run,
-            str(title_style.get("fontFamily") or "方正小标宋简"),
-            _safe_float(title_style.get("fontSizePt"), 22),
-            bool(title_style.get("bold", False)),
-            color_hex=_normalize_color_hex(title_style.get("colorHex")),
-        )
+        title_lines = _resolve_title_lines(title, str(title_style.get("arrangement") or "").strip())
+        title_align = str(title_style.get("textAlign") or imported_title_style.get("textAlign") or "center").strip().lower()
+        title_alignment = {
+            "left": WD_ALIGN_PARAGRAPH.LEFT,
+            "right": WD_ALIGN_PARAGRAPH.RIGHT,
+            "justify": WD_ALIGN_PARAGRAPH.JUSTIFY,
+        }.get(title_align, WD_ALIGN_PARAGRAPH.CENTER)
+
+        for title_line in title_lines:
+            p_title = doc.add_paragraph()
+            p_title.alignment = title_alignment
+            p_title.paragraph_format.line_spacing = Pt(
+                _safe_float(title_style.get("lineSpacingPt"), _safe_float(imported_title_style.get("lineSpacingPt"), 28))
+            )
+            p_title.paragraph_format.space_before = Pt(0)
+            p_title.paragraph_format.space_after = Pt(0)
+            run = p_title.add_run(title_line)
+            _set_run_font(
+                run,
+                str(title_style.get("fontFamily") or imported_title_style.get("fontFamily") or "方正小标宋简"),
+                _safe_float(title_style.get("fontSizePt"), _safe_float(imported_title_style.get("fontSizePt"), 22)),
+                bool(title_style.get("bold", imported_title_style.get("bold", False))),
+                color_hex=_normalize_color_hex(title_style.get("colorHex") or imported_title_style.get("colorHex")),
+            )
 
     main_to = ""
     if not suppress_auto_frontmatter:
@@ -473,7 +652,7 @@ def export_docx(
             family, size, bold = _apply_heading_style(p, level, heading_styles)
             family, size, bold, color_hex = _resolve_node_run_style(node_attrs, family, size, bold)
             _apply_node_paragraph_overrides(p, node_attrs, size)
-            text = _node_text(node)
+            text = _normalize_reference_text(_node_text(node), references_rules)
             r = p.add_run(text)
             _set_run_font(r, family, size, bold, color_hex=color_hex)
             continue
@@ -488,7 +667,7 @@ def export_docx(
             default_family = body_style.get("fontFamily", "仿宋_GB2312")
             default_size = _safe_float(body_style.get("fontSizePt"), 16)
             default_bold = bool(body_style.get("bold", False))
-            text = _node_text(node)
+            text = _normalize_reference_text(_node_text(node), references_rules)
             if _is_suffix_line(text):
                 in_suffix_block = True
             if in_suffix_block and text.strip():
@@ -534,7 +713,8 @@ def export_docx(
     sign_off = (structured_fields.get("signOff", "") or "").strip()
     date_text = _format_zh_date(structured_fields.get("date", ""))
     if sign_off or date_text:
-        for _ in range(2):
+        sign_spacing_before_lines = _normalize_line_count(signature_rules.get("spacingBeforeLines"), 2)
+        for _ in range(sign_spacing_before_lines):
             p_blank = doc.add_paragraph()
             p_blank.paragraph_format.line_spacing = Pt(28)
             p_blank.paragraph_format.first_line_indent = Pt(0)
@@ -559,26 +739,38 @@ def export_docx(
 
     attachments = structured_fields.get("attachments") or []
     if attachments:
-        doc.add_paragraph("")
+        attachments_spacing_before_lines = _normalize_line_count(attachments_rules.get("spacingBeforeLines"), 1)
+        attachment_indent_chars = _safe_float(attachments_rules.get("indentChars"), 2)
+        attachment_item_suffix = str(attachments_rules.get("itemSuffixPunctuation") or "dot").strip() or "dot"
+        attachment_wrap_align = str(attachments_rules.get("wrapAlign") or "indent").strip() or "indent"
+        attachment_use_book_title_marks = attachments_rules.get("useBookTitleMarks") is True
+        for _ in range(attachments_spacing_before_lines):
+            doc.add_paragraph("")
         attach_label = doc.add_paragraph()
         attach_label.paragraph_format.line_spacing = Pt(28)
-        attach_label.paragraph_format.first_line_indent = Pt(32)
+        attach_label.paragraph_format.first_line_indent = Pt(attachment_indent_chars * 16)
         r = attach_label.add_run("附件：")
         _set_run_font(r, "仿宋_GB2312", 16)
 
         for item in attachments:
             idx = item.get("index")
-            name = _strip_attachment_ext(item.get("name", ""))
+            name = _format_attachment_name(item.get("name", ""), attachment_use_book_title_marks)
+            prefix_text = _format_attachment_prefix(idx, attachment_item_suffix)
             p_attach = doc.add_paragraph()
-            p_attach.paragraph_format.line_spacing = Pt(28)
-            p_attach.paragraph_format.first_line_indent = Pt(32)
-            rr = p_attach.add_run(f"{idx}. {name}")
+            _apply_attachment_paragraph_style(
+                p_attach,
+                attachment_indent_chars,
+                16,
+                prefix_text,
+                attachment_wrap_align,
+            )
+            rr = p_attach.add_run(f"{prefix_text}{name}")
             _set_run_font(rr, "仿宋_GB2312", 16)
 
         for item in attachments:
             doc.add_page_break()
             idx = item.get("index")
-            title_text = _strip_attachment_ext(item.get("name", ""))
+            title_text = _format_attachment_name(item.get("name", ""), attachment_use_book_title_marks)
 
             p_mark = doc.add_paragraph()
             p_mark.paragraph_format.line_spacing = Pt(28)
@@ -593,7 +785,7 @@ def export_docx(
             _set_run_font(r_title, "方正小标宋简", 22)
 
             p_body = doc.add_paragraph()
-            _apply_body_paragraph_style(p_body)
+            _apply_body_paragraph_style(p_body, body_style)
             r_body = p_body.add_run("（附件正文请在此处编辑）")
             _set_run_font(r_body, "仿宋_GB2312", 16)
 

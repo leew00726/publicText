@@ -53,22 +53,16 @@ function EmployeeCompanyHomeRoute() {
       }
     }
 
-    if (session.companyId) {
-      setTargetPath(`/layout/companies/${session.companyId}/topics`)
-      return () => {
-        cancelled = true
-      }
-    }
-
     void ensureEmployeeCompany(session.username)
       .then((company) => {
         if (cancelled) return
-        saveEmployeeSession({
+        const nextSession = {
           ...session,
           companyId: company.id,
           companyName: company.name,
-        })
-        setTargetPath(`/layout/companies/${company.id}/topics`)
+        }
+        saveEmployeeSession(nextSession)
+        setTargetPath(`/layout/companies/${nextSession.companyId}/topics`)
       })
       .catch((error: any) => {
         if (cancelled) return

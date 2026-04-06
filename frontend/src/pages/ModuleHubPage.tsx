@@ -103,7 +103,6 @@ function ModuleCard({ moduleItem, onEnter }: { moduleItem: EmployeeModule; onEnt
         <span className="module-card-eyebrow">{presentation.eyebrow}</span>
         <h2>{moduleItem.title}</h2>
         <strong>{presentation.heading}</strong>
-        <p>{presentation.summary}</p>
       </div>
 
       <ul className="module-card-steps" aria-label={`${moduleItem.title}流程概览`}>
@@ -113,7 +112,6 @@ function ModuleCard({ moduleItem, onEnter }: { moduleItem: EmployeeModule; onEnt
       </ul>
 
       <div className="module-card-footer">
-        <p>{moduleItem.description}</p>
         <button type="button" className="module-enter-btn" disabled={!moduleItem.enabled} onClick={onEnter}>
           {moduleItem.enabled ? `进入${moduleItem.title}` : '暂无权限'}
         </button>

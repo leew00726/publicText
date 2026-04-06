@@ -32,6 +32,7 @@ interface Props {
   unitName?: string
   signatory?: string
   topicTemplateRules?: Record<string, any> | null
+  importedTitleAttrs?: Record<string, any> | null
 }
 
 const ALLOWED_TAGS = new Set([
@@ -101,6 +102,7 @@ function sanitizeHtmlForPaste(html: string): string {
 function normalizeAttachmentName(name: string): string {
   return (name || '')
     .trim()
+    .replace(/^[《〈]+|[》〉]+$/g, '')
     .replace(/\.[a-zA-Z0-9]{1,8}$/g, '')
     .replace(/[。；，、.!?！？;:]+$/g, '')
 }
@@ -113,6 +115,71 @@ function formatDateZh(dateStr?: string): string {
   const month = Number(m[2])
   const day = Number(m[3])
   return `${year}年${month}月${day}日`
+}
+
+function _normalizeLineCount(value: unknown, fallback: number): number {
+  const num = _toFiniteNumber(value)
+  if (num === null) return fallback
+  return Math.max(Math.round(num), 0)
+}
+
+function _normalizeAttachmentDisplayName(name: string, useBookTitleMarks: boolean): string {
+  const normalized = normalizeAttachmentName(name)
+  if (!normalized) return ''
+  return useBookTitleMarks ? `《${normalized}》` : normalized
+}
+
+function _formatAttachmentPrefix(index: number, itemSuffixPunctuation: string): string {
+  return itemSuffixPunctuation === 'none' ? `${index} ` : `${index}. `
+}
+
+function _resolveTitleLines(title: string, arrangement: unknown): string[] {
+  const raw = (title || '').trim()
+  if (!raw) return []
+
+  const compact = raw.replace(/\s+/g, '')
+  if (arrangement !== 'trapezoid' || compact.length < 8) return [raw]
+
+  let bestLines = [compact]
+  let bestScore = Number.POSITIVE_INFINITY
+  const total = compact.length
+  const lineCounts = total < 12 ? [2] : [2, 3]
+
+  for (const lineCount of lineCounts) {
+    if (total < lineCount * 3) continue
+
+    if (lineCount === 2) {
+      for (let firstLen = 3; firstLen < total - 2; firstLen += 1) {
+        const lengths = [firstLen, total - firstLen]
+        if (lengths[0] > lengths[1]) continue
+        const score = (lengths[1] - lengths[0]) * 4 + Math.abs(lengths[0] - total / 2) * 2
+        if (score < bestScore) {
+          bestScore = score
+          bestLines = [compact.slice(0, firstLen), compact.slice(firstLen)]
+        }
+      }
+      continue
+    }
+
+    for (let firstLen = 3; firstLen < total - 5; firstLen += 1) {
+      for (let secondLen = firstLen; secondLen < total - firstLen - 2; secondLen += 1) {
+        const thirdLen = total - firstLen - secondLen
+        if (thirdLen < secondLen) continue
+        const lengths = [firstLen, secondLen, thirdLen]
+        const score = (lengths[2] - lengths[0]) * 4 + lengths.reduce((sum, len) => sum + Math.abs(len - total / 3), 0)
+        if (score < bestScore) {
+          bestScore = score
+          bestLines = [
+            compact.slice(0, firstLen),
+            compact.slice(firstLen, firstLen + secondLen),
+            compact.slice(firstLen + secondLen),
+          ]
+        }
+      }
+    }
+  }
+
+  return bestLines
 }
 
 function _toFiniteNumber(value: unknown): number | null {
@@ -198,6 +265,18 @@ function _buildInlineStyle(attrs: Record<string, unknown>, nodeText: string = ''
 
   const lineSpacingPt = _toFiniteNumber(attrs.lineSpacingPt)
   if (lineSpacingPt !== null) styles.push(`line-height:${lineSpacingPt}pt`)
+
+  const spaceBeforePt = _toFiniteNumber(attrs.spaceBeforePt)
+  if (spaceBeforePt !== null) styles.push(`margin-top:${spaceBeforePt}pt`)
+
+  const spaceAfterPt = _toFiniteNumber(attrs.spaceAfterPt)
+  if (spaceAfterPt !== null) styles.push(`margin-bottom:${spaceAfterPt}pt`)
+
+  const leftIndentPt = _toFiniteNumber(attrs.leftIndentPt)
+  if (leftIndentPt !== null) styles.push(`margin-left:${leftIndentPt}pt`)
+
+  const rightIndentPt = _toFiniteNumber(attrs.rightIndentPt)
+  if (rightIndentPt !== null) styles.push(`margin-right:${rightIndentPt}pt`)
 
   if (textAlign === 'center' || textAlign === 'right') {
     styles.push('text-indent:0')
@@ -369,6 +448,7 @@ export function TiptapEditor({
   unitName,
   signatory,
   topicTemplateRules,
+  importedTitleAttrs,
 }: Props) {
   const editor = useEditor({
     extensions: [
@@ -415,9 +495,21 @@ export function TiptapEditor({
 
   const previewSignOff = (signOffText || '').trim()
   const previewDate = formatDateZh(dateText)
+  const attachmentsRules = (topicTemplateRules?.attachments as Record<string, unknown> | undefined) || {}
+  const signatureRules = (topicTemplateRules?.signature as Record<string, unknown> | undefined) || {}
+  const attachmentItemSuffix = String(attachmentsRules.itemSuffixPunctuation || 'dot').trim() || 'dot'
+  const attachmentUseBookTitleMarks = attachmentsRules.useBookTitleMarks === true
+  const attachmentIndentChars = _toFiniteNumber(attachmentsRules.indentChars) ?? 2
+  const attachmentSpacingBeforeLines = _normalizeLineCount(attachmentsRules.spacingBeforeLines, 1)
+  const attachmentWrapAlign = String(attachmentsRules.wrapAlign || 'indent').trim() || 'indent'
+  const signSpacingBeforeLines = _normalizeLineCount(signatureRules.spacingBeforeLines, 2)
   const previewAttachments = (attachments || [])
     .filter((item) => normalizeAttachmentName(item.name))
-    .map((item, idx) => ({ index: idx + 1, name: normalizeAttachmentName(item.name) }))
+    .map((item, idx) => ({
+      index: idx + 1,
+      name: _normalizeAttachmentDisplayName(item.name, attachmentUseBookTitleMarks),
+      prefix: _formatAttachmentPrefix(idx + 1, attachmentItemSuffix),
+    }))
 
   const hasSignDateBlock = Boolean(previewSignOff || previewDate)
   const hasTailmatter = Boolean(hasSignDateBlock || previewAttachments.length)
@@ -436,6 +528,7 @@ export function TiptapEditor({
 
   const bodyRules = (topicTemplateRules?.body as Record<string, unknown> | undefined) || {}
   const titleRules = (topicTemplateRules?.title as Record<string, unknown> | undefined) || {}
+  const importedTitleRules = (importedTitleAttrs as Record<string, unknown> | undefined) || {}
   const headingRules = (topicTemplateRules?.headings as Record<string, any> | undefined) || {}
   const suffixLabelRules = (topicTemplateRules?.suffixLabel as Record<string, unknown> | undefined) || {}
   const level1Rules = (headingRules.level1 as Record<string, unknown> | undefined) || {}
@@ -499,14 +592,27 @@ export function TiptapEditor({
   }
   const titlePreviewStyle: CSSProperties = {
     fontFamily: _resolveFontFamilyWithFallback(
-      titleRules.fontFamily,
+      titleRules.fontFamily || importedTitleRules.fontFamily,
       '"方正小标宋简", "方正小标宋简体", "方正小标宋", "小标宋", var(--font-main)',
     ),
-    fontSize: `${_toFiniteNumber(titleRules.fontSizePt) ?? 22}pt`,
-    fontWeight: _resolveWeight(titleRules.bold, '400'),
-    lineHeight: `${_toFiniteNumber(titleRules.lineSpacingPt) ?? 28}pt`,
-    color: _toColor(titleRules.colorHex) || undefined,
-    textAlign: typeof titleRules.textAlign === 'string' && titleRules.textAlign.trim() ? (titleRules.textAlign as any) : undefined,
+    fontSize: `${_toFiniteNumber(titleRules.fontSizePt) ?? _toFiniteNumber(importedTitleRules.fontSizePt) ?? 22}pt`,
+    fontWeight: _resolveWeight(titleRules.bold ?? importedTitleRules.bold, '400'),
+    lineHeight: `${_toFiniteNumber(titleRules.lineSpacingPt) ?? _toFiniteNumber(importedTitleRules.lineSpacingPt) ?? 28}pt`,
+    color: _toColor(titleRules.colorHex || importedTitleRules.colorHex) || undefined,
+    textAlign:
+      typeof titleRules.textAlign === 'string' && titleRules.textAlign.trim()
+        ? (titleRules.textAlign as any)
+        : typeof importedTitleRules.textAlign === 'string' && importedTitleRules.textAlign.trim()
+          ? (importedTitleRules.textAlign as any)
+          : undefined,
+    whiteSpace: 'pre-line',
+  }
+  const titlePreviewLines = _resolveTitleLines(title, titleRules.arrangement)
+  const signDateStyle: CSSProperties = {
+    marginTop: `${signSpacingBeforeLines * 28}pt`,
+  }
+  const attachmentsStyle: CSSProperties = {
+    marginTop: `${attachmentSpacingBeforeLines * 28}pt`,
   }
 
   const editorContentClass = [
@@ -584,7 +690,7 @@ export function TiptapEditor({
               <div className={`frontmatter-paper ${title ? 'has-title' : 'no-title'}`}>
                 {title && (
                   <p className="frontmatter-title" style={titlePreviewStyle}>
-                    {title}
+                    {titlePreviewLines.join('\n')}
                   </p>
                 )}
                 {mainTo && <p className="frontmatter-main-to">{mainTo}</p>}
@@ -597,18 +703,32 @@ export function TiptapEditor({
           {hasTailmatter && (
             <div className="tailmatter-section" aria-hidden="true">
               {hasSignDateBlock && (
-                <div className="tailmatter-sign-date">
+                <div className="tailmatter-sign-date" style={signDateStyle}>
                   {previewSignOff && <p className="tailmatter-signoff">{previewSignOff}</p>}
                   {previewDate && <p className="tailmatter-date">{previewDate}</p>}
                 </div>
               )}
 
               {previewAttachments.length > 0 && (
-                <div className="tailmatter-attachments">
+                <div className="tailmatter-attachments" style={attachmentsStyle}>
                   <p className="tailmatter-attach-label">附件：</p>
                   {previewAttachments.map((item) => (
-                    <p key={`tail-attachment-${item.index}`} className="tailmatter-attach-item">
-                      {item.index}. {item.name}
+                    <p
+                      key={`tail-attachment-${item.index}`}
+                      className="tailmatter-attach-item"
+                      style={
+                        attachmentWrapAlign === 'text'
+                          ? {
+                              paddingLeft: `${attachmentIndentChars + item.prefix.length}em`,
+                              textIndent: `-${item.prefix.length}em`,
+                            }
+                          : {
+                              textIndent: `${attachmentIndentChars}em`,
+                            }
+                      }
+                    >
+                      {item.prefix}
+                      {item.name}
                     </p>
                   ))}
                 </div>

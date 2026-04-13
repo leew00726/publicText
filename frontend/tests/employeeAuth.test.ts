@@ -27,12 +27,13 @@ describe('employee auth helpers', () => {
     const session = createEmployeeSession(
       'alice',
       'staff',
-      { id: 'company-yc', name: '云成数科' },
+      { id: 'company-yc', name: '云成数科', employeeName: '张三' },
       new Date('2026-03-02T08:00:00.000Z'),
     )
     const parsed = parseEmployeeSession(JSON.stringify(session))
     expect(parsed?.companyId).toBe('company-yc')
     expect(parsed?.companyName).toBe('云成数科')
+    expect(parsed?.displayName).toBe('张三')
   })
 
   it('returns null for malformed session payload', () => {

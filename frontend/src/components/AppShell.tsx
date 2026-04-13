@@ -144,6 +144,7 @@ export function AppShell({ children }: AppShellProps) {
   const isSummaryShell = useMemo(() => Boolean(matchPath('/layout/summary', location.pathname)), [location.pathname])
   const showWorkspaceTitleLogo = useMemo(() => Boolean(matchPath('/workspace', location.pathname)), [location.pathname])
   const companyName = session?.companyName || '云成数科'
+  const displayName = session?.displayName || session?.username || ''
 
   if (!session) {
     return <>{children}</>
@@ -168,7 +169,7 @@ export function AppShell({ children }: AppShellProps) {
           <div className="shell-topbar-right">
             <div className="shell-session-card">
               <span className="shell-session-label">{companyName}</span>
-              <strong>{session.username}</strong>
+              <strong>{displayName}</strong>
             </div>
             <button
               type="button"

@@ -5,6 +5,7 @@ export type ModuleKey = 'summary' | 'layout' | 'management' | 'meetingMinutes'
 
 export type EmployeeSession = {
   username: string
+  displayName?: string
   role: EmployeeRole
   loginAt: string
   companyId?: string
@@ -33,6 +34,7 @@ export type EmployeeLoginValidation = {
 export type EmployeeCompanyRef = {
   id: string
   name: string
+  employeeName?: string
 }
 
 export const EMPLOYEE_SESSION_STORAGE_KEY = 'public_text_employee_session'
@@ -97,6 +99,7 @@ export function createEmployeeSession(
   const company = companyOrNow instanceof Date ? null : companyOrNow || null
   return {
     username: username.trim(),
+    ...(company?.employeeName ? { displayName: company.employeeName.trim() } : {}),
     role,
     loginAt: now.toISOString(),
     ...(company
@@ -115,6 +118,7 @@ export function parseEmployeeSession(payload: string | null | undefined): Employ
     const parsed = JSON.parse(payload) as Partial<EmployeeSession>
     if (!parsed || typeof parsed !== 'object') return null
     if (typeof parsed.username !== 'string' || !parsed.username.trim()) return null
+    if (parsed.displayName !== undefined && typeof parsed.displayName !== 'string') return null
     if (!isEmployeeRole(parsed.role)) return null
     if (typeof parsed.loginAt !== 'string' || Number.isNaN(Date.parse(parsed.loginAt))) return null
     if (parsed.companyId !== undefined && typeof parsed.companyId !== 'string') return null
@@ -126,6 +130,11 @@ export function parseEmployeeSession(payload: string | null | undefined): Employ
 
     return {
       username: parsed.username.trim(),
+      ...(typeof parsed.displayName === 'string' && parsed.displayName.trim()
+        ? {
+            displayName: parsed.displayName.trim(),
+          }
+        : {}),
       role: parsed.role,
       loginAt: parsed.loginAt,
       ...(companyId && companyName

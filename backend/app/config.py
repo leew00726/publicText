@@ -4,8 +4,8 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-BACKEND_ROOT = PROJECT_ROOT / "backend"
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = BACKEND_ROOT.parent
 ENV_FILES = tuple(str(path) for path in (PROJECT_ROOT / ".env", BACKEND_ROOT / ".env"))
 
 
@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     deepseek_timeout_sec: float = 45
     deepseek_temperature: float = 0.2
     deepseek_system_prompt: str = "You are an assistant for Chinese official-document rewriting. Return only rewritten text."
+    employee_directory_path: str = str(BACKEND_ROOT / "assets" / "employee_directory.json")
 
     model_config = SettingsConfigDict(env_file=ENV_FILES, extra="ignore")
 

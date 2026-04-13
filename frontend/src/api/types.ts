@@ -2,6 +2,13 @@
   id: string
   name: string
 }
+export type AuthLoginResponse = {
+  employeeNo: string
+  name: string
+  role: 'staff' | 'admin'
+  companyId: string
+  companyName: string
+}
 
 export type RedheadElement = {
   id: string

@@ -184,6 +184,19 @@ class ApiMessage(BaseModel):
     message: str
 
 
+class AuthLoginRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=50)
+    password: str = Field(min_length=1, max_length=100)
+
+
+class AuthLoginResponse(BaseModel):
+    employeeNo: str
+    name: str
+    role: Literal["staff", "admin"]
+    companyId: str
+    companyName: str
+
+
 class TopicCreate(BaseModel):
     companyId: str
     name: str = Field(min_length=1, max_length=200)

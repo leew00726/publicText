@@ -12,6 +12,7 @@ vi.mock('../utils/employeeAuth', () => ({
   clearEmployeeSession: vi.fn(),
   loadEmployeeSession: vi.fn(() => ({
     username: 'tester',
+    displayName: '张三',
     role: 'admin',
     loginAt: '2026-03-09T00:00:00.000Z',
     companyName: '云矩科技',
@@ -33,6 +34,7 @@ describe('AppShell chrome', () => {
     expect(html).not.toContain('shell-sidebar-toggle')
     expect(html).toContain('shell-topbar-copy')
     expect(html).toContain('云矩公文管理平台')
+    expect(html).toContain('张三')
   })
 
   it('adds a summary-specific shell class on the summary route', () => {

@@ -260,6 +260,17 @@ type BodyLayoutOptions = {
   attachmentRules?: Record<string, any>
 }
 
+function flattenListContentNode(node: any): any[] {
+  if (!node || typeof node !== 'object') return []
+
+  if (node.type === 'orderedList' || node.type === 'bulletList' || node.type === 'listItem') {
+    const nested = Array.isArray(node.content) ? node.content : []
+    return nested.flatMap((child: any) => flattenListContentNode(child))
+  }
+
+  return [structuredClone(node)]
+}
+
 function normalizeParagraphAttrs(rawAttrs: any, defaultIndentChars: number = 2): Record<string, any> {
   const textAlign = typeof rawAttrs?.textAlign === 'string' ? rawAttrs.textAlign.trim().toLowerCase() : ''
   if (textAlign === 'center' || textAlign === 'right') {
@@ -345,7 +356,8 @@ function countMatchingTrailingTemplateNodes(content: any[], preserveTrailingNode
 
 function applyBodyLayoutOnly(body: any, options: BodyLayoutOptions = {}): any {
   const cloned = structuredClone(body || { type: 'doc', content: [] })
-  const content = Array.isArray(cloned.content) ? cloned.content : []
+  const content = Array.isArray(cloned.content) ? cloned.content.flatMap((node: any) => flattenListContentNode(node)) : []
+  cloned.content = content
   const preserveLeading = Array.isArray(options.preserveLeadingNodes) ? options.preserveLeadingNodes : []
   const preserveTrailing = Array.isArray(options.preserveTrailingNodes) ? options.preserveTrailingNodes : []
   const bodyRules = options.bodyRules && typeof options.bodyRules === 'object' ? options.bodyRules : {}

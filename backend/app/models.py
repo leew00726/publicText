@@ -19,6 +19,7 @@ class Unit(Base):
     documents: Mapped[list["Document"]] = relationship("Document", back_populates="unit")
     topics: Mapped[list["Topic"]] = relationship("Topic", back_populates="company")
     deletion_audits: Mapped[list["DeletionAuditEvent"]] = relationship("DeletionAuditEvent", back_populates="company")
+    employees: Mapped[list["Employee"]] = relationship("Employee", back_populates="company")
 
 
 class RedheadTemplate(Base):
@@ -139,3 +140,22 @@ class DeletionAuditEvent(Base):
 
     company: Mapped[Unit] = relationship("Unit", back_populates="deletion_audits")
     topic: Mapped[Topic | None] = relationship("Topic", back_populates="deletion_audits")
+
+
+class Employee(Base):
+    __tablename__ = "employees"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    employee_no: Mapped[str] = mapped_column(String(50), nullable=False, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    company_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("units.id"), nullable=True, index=True)
+    company_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    department_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    sub_department_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    role: Mapped[str] = mapped_column(String(30), default="admin", nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    company: Mapped[Unit | None] = relationship("Unit", back_populates="employees")

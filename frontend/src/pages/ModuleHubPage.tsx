@@ -55,6 +55,7 @@ export function ModuleHubPage() {
   const enabledModules = useMemo(() => modules.filter((moduleItem) => moduleItem.enabled), [modules])
   const companyName = session?.companyName || '云成数科'
   const roleLabel = session?.role === 'admin' ? '管理员' : '普通员工'
+  const displayName = session?.displayName || session?.username || '同事'
 
   if (!session) {
     return null
@@ -65,7 +66,7 @@ export function ModuleHubPage() {
       <section className="glass-card workspace-hero">
         <div className="workspace-hero-copy">
           <p className="workspace-hero-kicker">今日工作台</p>
-          <h2>欢迎回来，{session.username}</h2>
+          <h2>欢迎回来，{displayName}</h2>
           <div className="workspace-hero-pills" aria-label="工作台概览">
             <span className="soft-pill">公司归属 {companyName}</span>
             <span className={`soft-pill ${session.role === 'admin' ? 'is-admin' : ''}`}>当前角色 {roleLabel}</span>

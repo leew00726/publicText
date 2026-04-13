@@ -1,0 +1,380 @@
+[
+  {
+    "employeeNo": "80051081",
+    "name": "金刚善",
+    "companyName": "云成数科",
+    "departmentName": "公司领导",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "80052563",
+    "name": "汪进",
+    "companyName": "云成数科",
+    "departmentName": "公司领导",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "80052019",
+    "name": "何亘",
+    "companyName": "云成数科",
+    "departmentName": "公司领导",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "80308845",
+    "name": "段国强",
+    "companyName": "云成数科",
+    "departmentName": "公司领导",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82051864",
+    "name": "杨立寨",
+    "companyName": "云成数科",
+    "departmentName": "公司领导",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82051871",
+    "name": "杨琨",
+    "companyName": "云成数科",
+    "departmentName": "开发部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82051916",
+    "name": "李辰辉",
+    "companyName": "云成数科",
+    "departmentName": "开发部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82051926",
+    "name": "余纪良",
+    "companyName": "云成数科",
+    "departmentName": "开发部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82051914",
+    "name": "葛大伟",
+    "companyName": "云成数科",
+    "departmentName": "开发部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82065196",
+    "name": "陈士强",
+    "companyName": "云成数科",
+    "departmentName": "开发部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82054321",
+    "name": "李明",
+    "companyName": "云成数科",
+    "departmentName": "开发部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82051915",
+    "name": "何立军",
+    "companyName": "云成数科",
+    "departmentName": "开发部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82051872",
+    "name": "李新花",
+    "companyName": "云成数科",
+    "departmentName": "开发部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82051925",
+    "name": "倪岳华",
+    "companyName": "云成数科",
+    "departmentName": "开发部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82051874",
+    "name": "孙鹤",
+    "companyName": "云成数科",
+    "departmentName": "开发部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82074736",
+    "name": "刘珂",
+    "companyName": "云成数科",
+    "departmentName": "开发部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82075460",
+    "name": "孙昊",
+    "companyName": "云成数科",
+    "departmentName": "开发部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82080783",
+    "name": "徐国涛",
+    "companyName": "云成数科",
+    "departmentName": "开发二部（筹）",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82051873",
+    "name": "苏建新",
+    "companyName": "云成数科",
+    "departmentName": "开发二部（筹）",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82080922",
+    "name": "王群涛",
+    "companyName": "云成数科",
+    "departmentName": "开发二部（筹）",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82080957",
+    "name": "张东东",
+    "companyName": "云成数科",
+    "departmentName": "开发二部（筹）",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82076576",
+    "name": "田宇轩",
+    "companyName": "云成数科",
+    "departmentName": "开发二部（筹）",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82051921",
+    "name": "王凯飞",
+    "companyName": "云成数科",
+    "departmentName": "产品部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82051870",
+    "name": "刘奎阳",
+    "companyName": "云成数科",
+    "departmentName": "产品部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82051920",
+    "name": "于然",
+    "companyName": "云成数科",
+    "departmentName": "产品部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82053149",
+    "name": "赵阳",
+    "companyName": "云成数科",
+    "departmentName": "产品部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82067610",
+    "name": "邹瑜倩",
+    "companyName": "云成数科",
+    "departmentName": "产品部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82053227",
+    "name": "于松立",
+    "companyName": "云成数科",
+    "departmentName": "产品部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82053480",
+    "name": "侯小云",
+    "companyName": "云成数科",
+    "departmentName": "产品部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82080689",
+    "name": "温欣",
+    "companyName": "云成数科",
+    "departmentName": "产品部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82051853",
+    "name": "孙彬",
+    "companyName": "云成数科",
+    "departmentName": "业务部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82051863",
+    "name": "杨晨",
+    "companyName": "云成数科",
+    "departmentName": "业务部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82061091",
+    "name": "曾一",
+    "companyName": "云成数科",
+    "departmentName": "业务部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82076665",
+    "name": "李梓源",
+    "companyName": "云成数科",
+    "departmentName": "业务部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82017765",
+    "name": "彭博",
+    "companyName": "云成数科",
+    "departmentName": "风控部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82057342",
+    "name": "刘智心",
+    "companyName": "云成数科",
+    "departmentName": "风控部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82060180",
+    "name": "吕明珊",
+    "companyName": "云成数科",
+    "departmentName": "风控部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82060181",
+    "name": "祝思迪",
+    "companyName": "云成数科",
+    "departmentName": "风控部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "80074353",
+    "name": "王文远",
+    "companyName": "云成数科",
+    "departmentName": "综合部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82015296",
+    "name": "张燕",
+    "companyName": "云成数科",
+    "departmentName": "综合部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82051869",
+    "name": "庄佳星",
+    "companyName": "云成数科",
+    "departmentName": "综合部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82051923",
+    "name": "李健",
+    "companyName": "云成数科",
+    "departmentName": "综合部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82075441",
+    "name": "黄也峰",
+    "companyName": "云成数科",
+    "departmentName": "综合部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82061755",
+    "name": "靳冰洁",
+    "companyName": "云成数科",
+    "departmentName": "综合部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "80196319",
+    "name": "王振宇",
+    "companyName": "云成数科",
+    "departmentName": "财务部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82051846",
+    "name": "李春瑞",
+    "companyName": "云成数科",
+    "departmentName": "财务部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82057802",
+    "name": "吴焕玲",
+    "companyName": "云成数科",
+    "departmentName": "财务部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82051847",
+    "name": "刘婷",
+    "companyName": "云成数科",
+    "departmentName": "财务部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82065346",
+    "name": "方辰玥",
+    "companyName": "云成数科",
+    "departmentName": "财务部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82075542",
+    "name": "刘冬冬",
+    "companyName": "云成数科",
+    "departmentName": "运营部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82051849",
+    "name": "何美梅",
+    "companyName": "云成数科",
+    "departmentName": "运营部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82060179",
+    "name": "王骏",
+    "companyName": "云成数科",
+    "departmentName": "运营部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82051924",
+    "name": "刘霞",
+    "companyName": "云成数科",
+    "departmentName": "运营部",
+    "subDepartmentName": ""
+  },
+  {
+    "employeeNo": "82051850",
+    "name": "杨晓芳",
+    "companyName": "云成数科",
+    "departmentName": "运营部",
+    "subDepartmentName": ""
+  }
+]

@@ -11,6 +11,7 @@ const pagesCssPath = path.resolve(__dirname, '../styles/pages.css')
 vi.mock('../utils/employeeAuth', () => ({
   loadEmployeeSession: vi.fn(() => ({
     username: 'treter',
+    displayName: '张三',
     role: 'admin',
     loginAt: '2026-03-12T00:00:00.000Z',
     companyName: '云成数科',
@@ -58,7 +59,7 @@ describe('ModuleHubPage', () => {
     expect(html).toContain('workspace-hero')
     expect(html).toContain('今日工作台')
     expect(html).toContain('当前可用模块')
-    expect(html).toContain('欢迎回来，treter')
+    expect(html).toContain('欢迎回来，张三')
     expect(html).toContain('公司归属')
     expect(html).toContain('当前可用 4 个模块')
     expect(html).toContain('公文总结')

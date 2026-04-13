@@ -56,32 +56,7 @@ export function LoginPage() {
     <main className="auth-shell">
       <section className="auth-scene">
         <article className="auth-brand-panel">
-          <p className="auth-kicker">PublicText Office Suite</p>
-          <h1 className="auth-title">更轻、更清晰的公文工作台</h1>
-          <p className="auth-subtitle">
-            使用工号登录后，系统会自动识别所属公司，直接进入该公司的公文库与题材流程。
-          </p>
-
-          <div className="auth-metric-grid">
-            <div className="auth-metric">
-              <strong>自动识别公司</strong>
-              <span>登录后直接落到公司题材库，不再二次选择。</span>
-            </div>
-            <div className="auth-metric">
-              <strong>统一工作台</strong>
-              <span>公文总结、公文排版、公文管理在同一套蓝白工作界面中切换。</span>
-            </div>
-            <div className="auth-metric">
-              <strong>轻量毛玻璃</strong>
-              <span>只用于导航和面板层，不干扰正文纸面与表单可读性。</span>
-            </div>
-          </div>
-
-          <div className="auth-pill-row">
-            <span className="soft-pill">蓝白主题</span>
-            <span className="soft-pill">自动匹配公司</span>
-            <span className="soft-pill">统一权限入口</span>
-          </div>
+          <h1 className="auth-title">云矩公文管理平台</h1>
         </article>
 
         <section className="auth-login-panel" aria-labelledby="employee-login-title">

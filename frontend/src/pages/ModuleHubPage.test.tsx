@@ -84,4 +84,32 @@ describe('ModuleHubPage', () => {
 
     expect(styles).toMatch(/\.workspace-module-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);/)
   })
+
+  it('uses a compact single-screen workspace layout on desktop', () => {
+    const styles = fs.readFileSync(pagesCssPath, 'utf8')
+
+    expect(styles).toMatch(
+      /\.workspace-dashboard\s*\{[\s\S]*grid-template-rows:\s*auto minmax\(0,\s*1fr\);[\s\S]*overflow:\s*hidden;/,
+    )
+    expect(styles).toMatch(
+      /\.workspace-module-card\s*\{[\s\S]*grid-template-rows:\s*auto auto 1fr auto;[\s\S]*min-height:\s*0;/,
+    )
+  })
+
+  it('keeps the workspace hero banner visually compact', () => {
+    const styles = fs.readFileSync(pagesCssPath, 'utf8')
+
+    expect(styles).toMatch(
+      /\.workspace-hero\s*\{[\s\S]*gap:\s*10px;[\s\S]*padding:\s*18px 22px;[\s\S]*border-radius:\s*24px;/,
+    )
+    expect(styles).toMatch(
+      /\.workspace-hero-copy\s*\{[\s\S]*gap:\s*8px;/,
+    )
+    expect(styles).toMatch(
+      /\.workspace-hero h2\s*\{[\s\S]*font-size:\s*clamp\(26px,\s*3vw,\s*38px\);/,
+    )
+    expect(styles).toMatch(
+      /\.workspace-hero\s+\.soft-pill\s*\{[\s\S]*min-height:\s*28px;[\s\S]*padding:\s*0 10px;[\s\S]*font-size:\s*12px;/,
+    )
+  })
 })

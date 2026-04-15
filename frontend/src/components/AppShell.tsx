@@ -142,6 +142,7 @@ export function AppShell({ children }: AppShellProps) {
   const session = loadEmployeeSession()
   const currentMeta = useMemo(() => resolvePageMeta(location.pathname), [location.pathname])
   const isSummaryShell = useMemo(() => Boolean(matchPath('/layout/summary', location.pathname)), [location.pathname])
+  const isWorkspaceShell = useMemo(() => Boolean(matchPath('/workspace', location.pathname)), [location.pathname])
   const showWorkspaceTitleLogo = useMemo(() => Boolean(matchPath('/workspace', location.pathname)), [location.pathname])
   const companyName = session?.companyName || '云成数科'
   const displayName = session?.displayName || session?.username || ''
@@ -151,9 +152,17 @@ export function AppShell({ children }: AppShellProps) {
   }
 
   return (
-    <div className={`app-shell${isSummaryShell ? ' app-shell-summary' : ''}`}>
-      <div className={`app-shell-main${isSummaryShell ? ' app-shell-main-summary' : ''}`}>
-        <header className={`app-shell-topbar${isSummaryShell ? ' shell-topbar-summary' : ''}`}>
+    <div className={`app-shell${isSummaryShell ? ' app-shell-summary' : ''}${isWorkspaceShell ? ' app-shell-workspace' : ''}`}>
+      <div
+        className={`app-shell-main${isSummaryShell ? ' app-shell-main-summary' : ''}${
+          isWorkspaceShell ? ' app-shell-main-workspace' : ''
+        }`}
+      >
+        <header
+          className={`app-shell-topbar${isSummaryShell ? ' shell-topbar-summary' : ''}${
+            isWorkspaceShell ? ' shell-topbar-workspace' : ''
+          }`}
+        >
           <div className="shell-topbar-left">
             <GlobalBackButton variant="shell" />
             <div className="shell-topbar-copy">
@@ -184,7 +193,7 @@ export function AppShell({ children }: AppShellProps) {
           </div>
         </header>
 
-        <div className="app-shell-scroll">{children}</div>
+        <div className={`app-shell-scroll${isWorkspaceShell ? ' app-shell-scroll-workspace' : ''}`}>{children}</div>
       </div>
     </div>
   )

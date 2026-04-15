@@ -193,6 +193,22 @@ DEEPSEEK_TEMPERATURE=0.2
 - `-NoCache`
 - `-ShowLogs`
 
+### 7.4 内网服务器部署（本地存储版）
+
+如果要部署到公司内网服务器，并且希望：
+- 保持当前前端界面不变
+- 员工默认密码仍为 `000000`
+- PostgreSQL 和导入/导出文件都直接落在服务器本地磁盘
+
+请使用：
+
+```powershell
+Copy-Item .env.server.example .env.server
+.\deploy-server.ps1
+```
+
+详细步骤见：[docs/server-deployment.md](docs/server-deployment.md)
+
 ## 8. 本地开发（无 Docker）
 
 ### 8.1 后端

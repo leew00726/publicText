@@ -1,0 +1,54 @@
+name: publictext-server
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-public_text}
+      POSTGRES_USER: ${POSTGRES_USER:-public_text}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-publictext123}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-public_text} -d ${POSTGRES_DB:-public_text}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-public_text}:${POSTGRES_PASSWORD:-publictext123}@postgres:5432/${POSTGRES_DB:-public_text}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
+      CORS_ORIGIN_REGEX: ${CORS_ORIGIN_REGEX:-^https?://(localhost|127\.0\.0\.1)(?::\d+)?$}
+      STORAGE_MODE: local
+      EXPORT_DIR: /data/storage
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      DEEPSEEK_TIMEOUT_SEC: ${DEEPSEEK_TIMEOUT_SEC:-45}
+      DEEPSEEK_TEMPERATURE: ${DEEPSEEK_TEMPERATURE:-0.2}
+    volumes:
+      - ./data/storage:/data/storage
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_API_BASE: /api
+        VITE_ASSET_BASE: ""
+    depends_on:
+      backend:
+        condition: service_started
+    ports:
+      - "${APP_PORT:-80}:80"
+    restart: unless-stopped

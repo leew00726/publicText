@@ -37,6 +37,27 @@ describe('AppShell chrome', () => {
     expect(html).toContain('张三')
   })
 
+  it('uses a viewport-locked shell on the workspace route', () => {
+    const html = renderToStaticMarkup(
+      <MemoryRouter initialEntries={['/workspace']}>
+        <AppShell>
+          <div>content</div>
+        </AppShell>
+      </MemoryRouter>,
+    )
+    const styles = fs.readFileSync(appShellCssPath, 'utf8')
+
+    expect(html).toContain('app-shell app-shell-workspace')
+    expect(html).toContain('app-shell-main app-shell-main-workspace')
+    expect(html).toContain('app-shell-scroll app-shell-scroll-workspace')
+    expect(styles).toMatch(
+      /\.app-shell-workspace\s*\{[\s\S]*height:\s*100dvh;[\s\S]*overflow:\s*hidden;/,
+    )
+    expect(styles).toMatch(
+      /\.app-shell-scroll-workspace\s*\{[\s\S]*overflow:\s*hidden;[\s\S]*padding-bottom:\s*0;/,
+    )
+  })
+
   it('adds a summary-specific shell class on the summary route', () => {
     const html = renderToStaticMarkup(
       <MemoryRouter initialEntries={['/layout/summary']}>

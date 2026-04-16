@@ -97,8 +97,19 @@
   letter-spacing: -0.04em;
 }
 
-.shell-topbar-title-row h1 {
+.shell-topbar-title-row > h1 {
+  flex: 0 0 auto;
   min-width: 0;
+  white-space: nowrap;
+}
+
+.shell-topbar-banner-notice {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .shell-topbar-copy p:last-child {
@@ -211,12 +222,14 @@
 
 .app-shell-summary .shell-topbar-copy h1,
 .app-shell-summary .shell-topbar-copy p:last-child,
+.app-shell-summary .shell-topbar-banner-notice,
 .app-shell-summary .shell-session-card strong,
 .app-shell-summary .shell-session-label {
   color: #000000;
 }
 
 .app-shell-summary .shell-topbar-copy p:last-child,
+.app-shell-summary .shell-topbar-banner-notice,
 .app-shell-summary .shell-session-label {
   opacity: 0.7;
 }
@@ -326,6 +339,11 @@
 
   .shell-topbar-title-row {
     gap: 10px;
+  }
+
+  .shell-topbar-banner-notice {
+    flex-basis: 100%;
+    min-width: 0;
   }
 
   .shell-topbar-title-logo {

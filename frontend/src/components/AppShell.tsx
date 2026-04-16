@@ -13,6 +13,7 @@ type PageMeta = {
   kicker: string
   title: string
   subtitle: string
+  bannerNotice?: string
 }
 
 const PAGE_META_ROUTES: Array<{ path: string; meta: PageMeta }> = [
@@ -30,6 +31,7 @@ const PAGE_META_ROUTES: Array<{ path: string; meta: PageMeta }> = [
       kicker: '',
       title: '公文总结',
       subtitle: '',
+      bannerNotice: '出于公文保密要求，请勿上传涉密文件',
     },
   },
   {
@@ -170,6 +172,7 @@ export function AppShell({ children }: AppShellProps) {
               <div className={`shell-topbar-title-row${showWorkspaceTitleLogo ? ' is-brand' : ''}`}>
                 {showWorkspaceTitleLogo ? <img className="shell-topbar-title-logo" src="/huaneng-logo.jpg" alt="华能标志" /> : null}
                 <h1>{currentMeta.title}</h1>
+                {currentMeta.bannerNotice ? <p className="shell-topbar-banner-notice">{currentMeta.bannerNotice}</p> : null}
               </div>
               {currentMeta.subtitle ? <p>{currentMeta.subtitle}</p> : null}
             </div>

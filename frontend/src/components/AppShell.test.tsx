@@ -70,6 +70,7 @@ describe('AppShell chrome', () => {
     expect(html).toContain('app-shell app-shell-summary')
     expect(html).toContain('app-shell-topbar shell-topbar-summary')
     expect(html).toContain('公文总结')
+    expect(html).toContain('出于公文保密要求，请勿上传涉密文件')
     expect(html).not.toContain('>Summary<')
     expect(html).not.toContain('上传文档后调用 DeepSeek 生成结构化总结并导出。')
   })
@@ -85,6 +86,14 @@ describe('AppShell chrome', () => {
     )
     expect(styles).toMatch(
       /\.app-shell-summary\s+\.global-back-btn\.shell:hover\s*\{[\s\S]*transform:\s*translateY\(-2px\);[\s\S]*box-shadow:\s*0 14px 28px rgba\(37,\s*99,\s*235,\s*0\.18\);/,
+    )
+  })
+
+  it('keeps the summary title on a single line even when the notice is visible', () => {
+    const styles = fs.readFileSync(appShellCssPath, 'utf8')
+
+    expect(styles).toMatch(
+      /\.shell-topbar-title-row\s+>\s+h1\s*\{[\s\S]*flex:\s*0\s+0\s+auto;[\s\S]*white-space:\s*nowrap;/,
     )
   })
 })

@@ -5,12 +5,12 @@ services:
     image: postgres:16
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-public_text}
-      POSTGRES_USER: ${POSTGRES_USER:-public_text}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-publictext123}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-Postgres1234}
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-public_text} -d ${POSTGRES_DB:-public_text}"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -23,12 +23,12 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-public_text}:${POSTGRES_PASSWORD:-publictext123}@postgres:5432/${POSTGRES_DB:-public_text}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
-      CORS_ORIGIN_REGEX: ${CORS_ORIGIN_REGEX:-^https?://(localhost|127\.0\.0\.1)(?::\d+)?$}
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-Postgres1234}@postgres:5432/${POSTGRES_DB:-public_text}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://10.211.4.231}
+      CORS_ORIGIN_REGEX: ${CORS_ORIGIN_REGEX:-^https?://(10\.211\.4\.231|localhost|127\.0\.0\.1)(?::\d+)?$}
       STORAGE_MODE: local
       EXPORT_DIR: /data/storage
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-sk-ee0c45bc18044557b22ffc4ef2fc0bd}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
       DEEPSEEK_TIMEOUT_SEC: ${DEEPSEEK_TIMEOUT_SEC:-45}

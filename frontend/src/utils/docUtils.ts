@@ -4,7 +4,8 @@ const TAIL_PUNCT = ['。', '！', '？', '；', '：', '.', '!', '?', ';', ':']
 
 const RE_H1 = /^[一二三四五六七八九十百千万零〇两]+、/
 const RE_H2 = /^[（(][一二三四五六七八九十百千万零〇两]+[）)]/
-const RE_H3 = /^\d+[\.．、]/
+const RE_H2_DECIMAL_DUNHAO = /^\d+、/
+const RE_H3 = /^\d+[\.．]/
 const RE_H4 = /^[（(]\d+[）)]/
 const RE_SUFFIX_MARKER =
   /^(主\s*持(?:\s*人|\s*者)?|参\s*(?:加|会)(?:\s*人|\s*人员|\s*名单)?|列\s*席(?:\s*人|\s*人员)?|出\s*席(?:\s*人|\s*人员)?|记\s*录(?:\s*人|\s*员)?|发\s*(?:送|至|文)|主\s*送|抄\s*送|分\s*送)\s*[：:]/
@@ -12,6 +13,13 @@ const RE_ATTACHMENT_LABEL = /^附件\s*[:：]\s*(.*)$/
 const RE_ATTACHMENT_ITEM = /^(\d+)(?:[\.．、])?\s+(.+)$/
 const RE_REFERENCE_DOCNO_FIRST = /([A-Za-z0-9\u4e00-\u9fa5〔〕\-\u2014]+〔\d{2,4}〕[0-9一二三四五六七八九十百千]+号)\s*[《〈]([^》〉]+)[》〉]/g
 const REFERENCE_LEAD_PREFIXES = ['请参照', '参照', '按照', '根据', '依照', '依据', '遵照', '对照', '参见'] as const
+
+type HeadingNumberingStyle = 'chineseParen' | 'decimalDunhao'
+
+type HeadingDetection = {
+  level: 1 | 2 | 3 | 4
+  numberingStyle?: HeadingNumberingStyle
+}
 
 function toZh(num: number): string {
   const map = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九']
@@ -83,22 +91,34 @@ function normalizeHeadingPunctuation(level: number, text: string): string {
   return normalized
 }
 
-function replaceHeadingPrefix(level: number, text: string, value: number): string {
+function getHeadingNumberingStyle(level: number, text: string, fallback?: string): HeadingNumberingStyle {
+  if (level === 2 && (fallback === 'decimalDunhao' || RE_H2_DECIMAL_DUNHAO.test(text.trim()))) {
+    return 'decimalDunhao'
+  }
+  return 'chineseParen'
+}
+
+function replaceHeadingPrefix(level: number, text: string, value: number, numberingStyle?: string): string {
   const raw = text.trim()
+  const resolvedNumberingStyle = getHeadingNumberingStyle(level, raw, numberingStyle)
   const withoutPrefix =
     level === 1
       ? raw.replace(/^[一二三四五六七八九十百千万零〇两]+、\s*/, '')
       : level === 2
-        ? raw.replace(/^[（(][一二三四五六七八九十百千万零〇两]+[）)]\s*/, '')
+        ? resolvedNumberingStyle === 'decimalDunhao'
+          ? raw.replace(/^\d+、\s*/, '')
+          : raw.replace(/^[（(][一二三四五六七八九十百千万零〇两]+[）)]\s*/, '')
         : level === 3
-          ? raw.replace(/^\d+[\.．、]\s*/, '')
+          ? raw.replace(/^\d+[\.．]\s*/, '')
           : raw.replace(/^[（(]\d+[）)]\s*/, '')
 
   const prefix =
     level === 1
       ? `${toZh(value)}、`
       : level === 2
-        ? `（${toZh(value)}）`
+        ? resolvedNumberingStyle === 'decimalDunhao'
+          ? `${value}、`
+          : `（${toZh(value)}）`
         : level === 3
           ? `${value}.`
           : `（${value}）`
@@ -109,8 +129,13 @@ function replaceHeadingPrefix(level: number, text: string, value: number): strin
 function stripHeadingPrefix(level: 1 | 2 | 3 | 4, text: string): string {
   const raw = text.trim()
   if (level === 1) return raw.replace(/^[一二三四五六七八九十百千万零〇两]+、\s*/, '').trim()
-  if (level === 2) return raw.replace(/^[（(][一二三四五六七八九十百千万零〇两]+[）)]\s*/, '').trim()
-  if (level === 3) return raw.replace(/^\d+[\.．、]\s*/, '').trim()
+  if (level === 2) {
+    return raw
+      .replace(/^\d+、\s*/, '')
+      .replace(/^[（(][一二三四五六七八九十百千万零〇两]+[）)]\s*/, '')
+      .trim()
+  }
+  if (level === 3) return raw.replace(/^\d+[\.．]\s*/, '').trim()
   return raw.replace(/^[（(]\d+[）)]\s*/, '').trim()
 }
 
@@ -132,14 +157,19 @@ function shouldTreatAsHeading(level: 1 | 2 | 3 | 4, text: string): boolean {
   return true
 }
 
-function detectHeadingLevel(text: string): 1 | 2 | 3 | 4 | null {
+function detectHeading(text: string): HeadingDetection | null {
   const t = normalizeCommonText(text)
   if (!t) return null
-  if (RE_H1.test(t) && shouldTreatAsHeading(1, t)) return 1
-  if (RE_H2.test(t) && shouldTreatAsHeading(2, t)) return 2
-  if (RE_H3.test(t) && shouldTreatAsHeading(3, t)) return 3
-  if (RE_H4.test(t) && shouldTreatAsHeading(4, t)) return 4
+  if (RE_H1.test(t) && shouldTreatAsHeading(1, t)) return { level: 1 }
+  if (RE_H2_DECIMAL_DUNHAO.test(t)) return { level: 2, numberingStyle: 'decimalDunhao' }
+  if (RE_H2.test(t) && shouldTreatAsHeading(2, t)) return { level: 2, numberingStyle: 'chineseParen' }
+  if (RE_H3.test(t) && shouldTreatAsHeading(3, t)) return { level: 3 }
+  if (RE_H4.test(t) && shouldTreatAsHeading(4, t)) return { level: 4 }
   return null
+}
+
+function detectHeadingLevel(text: string): 1 | 2 | 3 | 4 | null {
+  return detectHeading(text)?.level ?? null
 }
 
 function normalizeAttachmentName(name: string): string {
@@ -427,10 +457,11 @@ function applyBodyLayoutOnly(body: any, options: BodyLayoutOptions = {}): any {
       continue
     }
 
-    const level = detectHeadingLevel(text)
-    if (level) {
+    const heading = detectHeading(text)
+    if (heading) {
+      const { level, numberingStyle } = heading
       node.type = 'heading'
-      node.attrs = { level }
+      node.attrs = numberingStyle ? { level, numberingStyle } : { level }
       setNodeText(node, normalizeReferenceText(normalizeHeadingPunctuation(level, text), referencesRules))
     } else {
       node.type = 'paragraph'
@@ -526,7 +557,11 @@ export function renumberHeadings(body: any): any {
     counters[level] += 1
 
     const current = getNodeText(node)
-    const next = normalizeHeadingPunctuation(level, replaceHeadingPrefix(level, current || '', counters[level]))
+    const numberingStyle = typeof node.attrs?.numberingStyle === 'string' ? node.attrs.numberingStyle : undefined
+    const next = normalizeHeadingPunctuation(
+      level,
+      replaceHeadingPrefix(level, current || '', counters[level], numberingStyle),
+    )
     setNodeText(node, next)
   }
 

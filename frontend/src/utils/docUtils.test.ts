@@ -161,4 +161,45 @@ describe('applyOneClickLayoutWithFields', () => {
     expect(textLines).toContain('新能源建设保理：针对集团新能源项目开展融资。')
     expect(textLines).toContain('累计投放规模：截至目前累计投放56亿元。')
   })
+
+  it('treats numeric dunhao lines as second-level headings and keeps numbering continuous', () => {
+    const body = {
+      type: 'doc',
+      content: [
+        paragraph('一、核心主管部门——雄安新区管委会改革发展局'),
+        paragraph('二、归口管理部门——雄安新区综合执法局'),
+        paragraph('三、协同监管单位'),
+        paragraph('四、标准制定流程'),
+        paragraph('1、改革发展局牵头（金融监管分局、人行雄安营管部配合）提出供应链金融标准需求与框架。'),
+        paragraph('2、联合行业主体（央企保理、数科平台、金融机构）起草标准文本。'),
+        paragraph('3、向省级主管部门报送，并由其组织技术审查与发布。'),
+        paragraph('五、对接建议'),
+      ],
+    }
+
+    const structuredFields: StructuredFields = {
+      title: '雄安新区供应链金融相关标准制定',
+      mainTo: '',
+      signOff: '',
+      docNo: '',
+      signatory: '',
+      copyNo: '',
+      date: '',
+      exportWithRedhead: false,
+      attachments: [],
+      topicTemplateRules: null,
+    }
+
+    const result = applyOneClickLayoutWithFields(body, structuredFields)
+    const standardFlowItems = result.body.content.slice(4, 7)
+    const itemTexts = standardFlowItems.map((node: any) => collectText({ content: [node] })[0])
+
+    expect(standardFlowItems.map((node: any) => node.type)).toEqual(['heading', 'heading', 'heading'])
+    expect(standardFlowItems.map((node: any) => node.attrs?.level)).toEqual([2, 2, 2])
+    expect(itemTexts).toEqual([
+      '1、改革发展局牵头（金融监管分局、人行雄安营管部配合）提出供应链金融标准需求与框架。',
+      '2、联合行业主体（央企保理、数科平台、金融机构）起草标准文本。',
+      '3、向省级主管部门报送，并由其组织技术审查与发布。',
+    ])
+  })
 })

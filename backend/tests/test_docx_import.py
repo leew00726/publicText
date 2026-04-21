@@ -56,7 +56,26 @@ def _build_sample_docx() -> bytes:
     return payload.getvalue()
 
 
+def _build_numeric_dunhao_heading_docx() -> bytes:
+    doc = Document()
+    doc.add_paragraph("一、标准制定流程")
+    doc.add_paragraph("1、改革发展局牵头提出供应链金融标准需求与框架。")
+
+    payload = io.BytesIO()
+    doc.save(payload)
+    return payload.getvalue()
+
+
 class DocxImportTests(unittest.TestCase):
+    def test_import_treats_numeric_dunhao_as_second_level_heading(self) -> None:
+        body, _, _ = import_docx(_build_numeric_dunhao_heading_docx(), preserve_formatting=True)
+
+        self.assertEqual(body["content"][0]["type"], "heading")
+        self.assertEqual(body["content"][0]["attrs"]["level"], 1)
+        self.assertEqual(body["content"][1]["type"], "heading")
+        self.assertEqual(body["content"][1]["attrs"]["level"], 2)
+        self.assertEqual(body["content"][1]["content"][0]["text"], "1、改革发展局牵头提出供应链金融标准需求与框架。")
+
     def test_import_extracts_centered_main_title_and_preserves_paragraph_style(self) -> None:
         body, structured, report = import_docx(_build_sample_docx(), preserve_formatting=True)
 

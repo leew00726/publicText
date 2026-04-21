@@ -125,6 +125,29 @@ def _build_docx_with_mixed_suffix_fonts() -> bytes:
     return bio.getvalue()
 
 
+def _build_docx_with_numeric_dunhao_second_level() -> bytes:
+    doc = Document()
+
+    level1 = doc.add_paragraph("一、标准制定流程")
+    level1_run = level1.runs[0]
+    level1_run.font.name = "黑体"
+    level1_run.font.size = Pt(16)
+
+    level2 = doc.add_paragraph("1、改革发展局牵头提出供应链金融标准需求与框架。")
+    level2_run = level2.runs[0]
+    level2_run.font.name = "方正楷体_GB2312"
+    level2_run.font.size = Pt(16)
+
+    body = doc.add_paragraph("这是正文第一段。")
+    body_run = body.runs[0]
+    body_run.font.name = "仿宋_GB2312"
+    body_run.font.size = Pt(16)
+
+    bio = io.BytesIO()
+    doc.save(bio)
+    return bio.getvalue()
+
+
 def _build_docx_with_title_sample(
     title_text: str,
     company_text: str = "华能云成数字产融科技（雄安）有限公司",
@@ -189,6 +212,12 @@ class TopicInferenceTests(unittest.TestCase):
         self.assertEqual(features["body"]["fontFamily"], "仿宋_GB2312")
         self.assertEqual(features["headings"]["level1"]["fontFamily"], "黑体")
         self.assertGreater(features["page"]["marginsCm"]["top"], 0)
+
+    def test_extract_docx_features_treats_numeric_dunhao_as_second_level_heading(self) -> None:
+        features = extract_docx_features(_build_docx_with_numeric_dunhao_second_level())
+
+        self.assertEqual(features["headings"]["level2"]["fontFamily"], "方正楷体_GB2312")
+        self.assertNotIn("level3", features["headings"])
 
     def test_infer_topic_rules_computes_mode_and_confidence(self) -> None:
         f1 = extract_docx_features(_build_docx_bytes("仿宋_GB2312", "黑体", 16, 16))

@@ -11,6 +11,7 @@ from app.services.checker import normalize_doc_no_brackets
 
 RE_H1 = re.compile(r"^[一二三四五六七八九十百千]+、")
 RE_H2 = re.compile(r"^（[一二三四五六七八九十百千]+）")
+RE_H2_DECIMAL_DUNHAO = re.compile(r"^\d+、")
 RE_H3 = re.compile(r"^\d+\.")
 RE_H4 = re.compile(r"^（\d+）")
 RE_SENTENCE_PUNCT = re.compile(r"[。！？；：:]$")
@@ -280,6 +281,8 @@ def _looks_like_main_title(text: str, paragraph) -> bool:
 def _detect_level(text: str, paragraph) -> int | None:
     if RE_H1.match(text):
         return 1
+    if RE_H2_DECIMAL_DUNHAO.match(text):
+        return 2
     if RE_H2.match(text):
         return 2
     if RE_H3.match(text):
@@ -359,6 +362,10 @@ def _parse_numbering_warning(headings: list[tuple[int, str]]) -> list[str]:
             m = RE_H2.match(text)
             if m:
                 actual = zh_to_num(m.group(0).replace("（", "").replace("）", ""))
+            else:
+                m = RE_H2_DECIMAL_DUNHAO.match(text)
+                if m:
+                    actual = int(m.group(0).replace("、", ""))
         elif level == 3:
             m = RE_H3.match(text)
             if m:

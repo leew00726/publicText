@@ -20,7 +20,7 @@ def _get_text(node: dict[str, Any]) -> str:
 def _strip_prefix(level: int, text: str) -> tuple[str | None, str]:
     patterns = {
         1: r"^([一二三四五六七八九十百千]+、)",
-        2: r"^(（[一二三四五六七八九十百千]+）)",
+        2: r"^((?:（[一二三四五六七八九十百千]+）)|(?:\d+、))",
         3: r"^(\d+\.)",
         4: r"^(（\d+）)",
     }
@@ -44,10 +44,12 @@ def _num_to_zh(num: int) -> str:
     return result
 
 
-def _expected_prefix(level: int, counters: dict[int, int]) -> str:
+def _expected_prefix(level: int, counters: dict[int, int], current_prefix: str | None = None) -> str:
     if level == 1:
         return f"{_num_to_zh(counters[1])}、"
     if level == 2:
+        if current_prefix and re.match(r"^\d+、$", current_prefix):
+            return f"{counters[2]}、"
         return f"（{_num_to_zh(counters[2])}）"
     if level == 3:
         return f"{counters[3]}."
@@ -99,7 +101,7 @@ def check_document(body: dict[str, Any]) -> list[CheckIssue]:
             counters[level] += 1
 
             prefix, remainder = _strip_prefix(level, text)
-            expected = _expected_prefix(level, counters)
+            expected = _expected_prefix(level, counters, prefix)
             if prefix and prefix != expected:
                 issues.append(
                     CheckIssue(

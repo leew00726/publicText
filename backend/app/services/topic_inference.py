@@ -18,7 +18,8 @@ except Exception:  # pragma: no cover - runtime dependency fallback
 
 RE_H1 = re.compile(r"^[一二三四五六七八九十百千]+、")
 RE_H2 = re.compile(r"^（[一二三四五六七八九十百千]+）")
-RE_H3 = re.compile(r"^\d+[\.．、]")
+RE_H2_DECIMAL_DUNHAO = re.compile(r"^\d+、")
+RE_H3 = re.compile(r"^\d+[\.．]")
 RE_H4 = re.compile(r"^（\d+）")
 RE_SUFFIX_MARKER = re.compile(
     r"^(主\s*持(?:\s*人|\s*者)?|参\s*(?:加|会)(?:\s*人|\s*人员|\s*名单)?|列\s*席(?:\s*人|\s*人员)?|出\s*席(?:\s*人|\s*人员)?|记\s*录(?:\s*人|\s*员)?|发\s*(?:送|至|文)|主\s*送|抄\s*送|分\s*送)\s*[：:]"
@@ -92,6 +93,8 @@ def _detect_heading_level(paragraph) -> int | None:
 def _detect_heading_level_from_text(text: str) -> int | None:
     if RE_H1.match(text):
         return 1
+    if RE_H2_DECIMAL_DUNHAO.match(text):
+        return 2
     if RE_H2.match(text):
         return 2
     if RE_H3.match(text):

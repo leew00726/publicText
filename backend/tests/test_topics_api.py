@@ -15,6 +15,7 @@ DB_PATH = ROOT / "test_topics_api.db"
 os.environ["DATABASE_URL"] = f"sqlite:///{DB_PATH.as_posix()}"
 os.environ["STORAGE_MODE"] = "local"
 os.environ["EXPORT_DIR"] = str((ROOT / "test-storage").as_posix())
+os.environ["TEMPLATE_INFERENCE_ENGINE"] = "rules"
 
 from app.database import SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
@@ -174,6 +175,42 @@ class TopicApiTests(unittest.TestCase):
         self.assertEqual(sf["topicId"], topic_id)
         self.assertEqual(sf["topicTemplateId"], first_template_id)
         self.assertEqual(sf["topicTemplateVersion"], first_template_version)
+
+    @patch("app.routers.topics.infer_topic_rules_with_optional_deepseek")
+    def test_topic_analyze_uses_isolated_template_inference_entrypoint(self, mock_infer) -> None:
+        mock_infer.return_value = (
+            {"body": {"fontFamily": "仿宋_GB2312"}},
+            {"templateInference": {"engine": "deepseek", "aiStatus": "applied"}},
+        )
+        company_resp = self.client.post("/api/units", json={"name": f"topic_ai_entry_{uuid.uuid4().hex[:8]}"})
+        self.assertEqual(company_resp.status_code, 200)
+        company_id = company_resp.json()["id"]
+
+        created = self.client.post(
+            "/api/topics",
+            json={"companyId": company_id, "name": "AI模板识别", "description": "测试 DeepSeek 隔离入口"},
+        )
+        self.assertEqual(created.status_code, 200)
+        topic_id = created.json()["id"]
+
+        analyze = self.client.post(
+            f"/api/topics/{topic_id}/analyze",
+            files=[
+                (
+                    "files",
+                    (
+                        "sample.docx",
+                        _docx_bytes("示例正文"),
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    ),
+                )
+            ],
+        )
+
+        self.assertEqual(analyze.status_code, 200)
+        self.assertTrue(mock_infer.called)
+        draft = analyze.json()["draft"]
+        self.assertEqual(draft["confidenceReport"]["templateInference"]["engine"], "deepseek")
 
     def test_topic_analyze_builds_dynamic_title_template_and_prefills_new_doc_title(self) -> None:
         company_resp = self.client.post("/api/units", json={"name": f"topic_title_tpl_{uuid.uuid4().hex[:8]}"})

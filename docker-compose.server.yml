@@ -28,11 +28,13 @@ services:
       CORS_ORIGIN_REGEX: ${CORS_ORIGIN_REGEX:-^https?://(10\.211\.4\.231|localhost|127\.0\.0\.1)(?::\d+)?$}
       STORAGE_MODE: local
       EXPORT_DIR: /data/storage
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-sk-ee0c45bc18044557b22ffc4ef2fc0bd}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
       DEEPSEEK_TIMEOUT_SEC: ${DEEPSEEK_TIMEOUT_SEC:-45}
       DEEPSEEK_TEMPERATURE: ${DEEPSEEK_TEMPERATURE:-0.2}
+      TEMPLATE_INFERENCE_ENGINE: ${TEMPLATE_INFERENCE_ENGINE:-hybrid}
+      TEMPLATE_INFERENCE_AI_MAX_PARAGRAPHS: ${TEMPLATE_INFERENCE_AI_MAX_PARAGRAPHS:-80}
     volumes:
       - ./data/storage:/data/storage
     ports:

@@ -176,10 +176,14 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
 DEEPSEEK_MODEL=deepseek-chat
 DEEPSEEK_TIMEOUT_SEC=45
 DEEPSEEK_TEMPERATURE=0.2
+TEMPLATE_INFERENCE_ENGINE=hybrid
+TEMPLATE_INFERENCE_AI_MAX_PARAGRAPHS=80
 ```
 
 说明：
 - 若不配置 `DEEPSEEK_API_KEY`，智能润色/智能修订会失败，其他功能可正常运行。
+- `TEMPLATE_INFERENCE_ENGINE` 控制文件训练模板的识别方式：`rules` 为现有规则版，`hybrid` 为 DeepSeek 辅助判断段落角色并失败回退，`deepseek` 为强制使用 DeepSeek。
+- 若 DeepSeek 辅助识别效果不理想，将 `TEMPLATE_INFERENCE_ENGINE` 改回 `rules` 并重启后端即可回滚。
 - 更新 `.env` 后请重建 `backend` 容器使配置生效。
 
 ### 7.3 Windows 一键发布脚本

@@ -66,6 +66,18 @@ def _build_numeric_dunhao_heading_docx() -> bytes:
     return payload.getvalue()
 
 
+def _build_meeting_topic_heading_docx() -> bytes:
+    doc = Document()
+    doc.add_paragraph("总经理办公会会议纪要")
+    doc.add_paragraph("2026年1月12日，公司召开总经理办公会。现将会议议定事项纪要如下：")
+    doc.add_paragraph("议题一：请示")
+    doc.add_paragraph("同意《》。")
+
+    payload = io.BytesIO()
+    doc.save(payload)
+    return payload.getvalue()
+
+
 class DocxImportTests(unittest.TestCase):
     def test_import_treats_numeric_dunhao_as_second_level_heading(self) -> None:
         body, _, _ = import_docx(_build_numeric_dunhao_heading_docx(), preserve_formatting=True)
@@ -75,6 +87,16 @@ class DocxImportTests(unittest.TestCase):
         self.assertEqual(body["content"][1]["type"], "heading")
         self.assertEqual(body["content"][1]["attrs"]["level"], 2)
         self.assertEqual(body["content"][1]["content"][0]["text"], "1、改革发展局牵头提出供应链金融标准需求与框架。")
+
+    def test_import_treats_meeting_topic_line_as_first_level_heading(self) -> None:
+        body, _, _ = import_docx(_build_meeting_topic_heading_docx(), preserve_formatting=True)
+
+        topic_node = next(
+            node for node in body["content"] if node["content"][0]["text"] == "议题一：请示"
+        )
+        self.assertEqual(topic_node["type"], "heading")
+        self.assertEqual(topic_node["attrs"]["level"], 1)
+        self.assertEqual(topic_node["content"][0]["text"], "议题一：请示")
 
     def test_import_extracts_centered_main_title_and_preserves_paragraph_style(self) -> None:
         body, structured, report = import_docx(_build_sample_docx(), preserve_formatting=True)

@@ -14,6 +14,7 @@ RE_H2 = re.compile(r"^（[一二三四五六七八九十百千]+）")
 RE_H2_DECIMAL_DUNHAO = re.compile(r"^\d+、")
 RE_H3 = re.compile(r"^\d+\.")
 RE_H4 = re.compile(r"^（\d+）")
+RE_TOPIC_H1 = re.compile(r"^议题\s*[0-9一二三四五六七八九十百千]+[：:]")
 RE_SENTENCE_PUNCT = re.compile(r"[。！？；：:]$")
 
 ALIGNMENT_MAP = {
@@ -280,6 +281,8 @@ def _looks_like_main_title(text: str, paragraph) -> bool:
 
 def _detect_level(text: str, paragraph) -> int | None:
     if RE_H1.match(text):
+        return 1
+    if RE_TOPIC_H1.match(text):
         return 1
     if RE_H2_DECIMAL_DUNHAO.match(text):
         return 2

@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     deepseek_timeout_sec: float = 45
     deepseek_temperature: float = 0.2
     deepseek_system_prompt: str = "You are an assistant for Chinese official-document rewriting. Return only rewritten text."
+    template_inference_engine: str = "rules"  # rules | hybrid | deepseek
+    template_inference_ai_max_paragraphs: int = 80
     employee_directory_path: str = str(BACKEND_ROOT / "assets" / "employee_directory.json")
 
     model_config = SettingsConfigDict(env_file=ENV_FILES, extra="ignore")

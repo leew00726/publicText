@@ -21,6 +21,7 @@ RE_H2 = re.compile(r"^（[一二三四五六七八九十百千]+）")
 RE_H2_DECIMAL_DUNHAO = re.compile(r"^\d+、")
 RE_H3 = re.compile(r"^\d+[\.．]")
 RE_H4 = re.compile(r"^（\d+）")
+RE_TOPIC_H1 = re.compile(r"^议题\s*[0-9一二三四五六七八九十百千]+[：:]")
 RE_SUFFIX_MARKER = re.compile(
     r"^(主\s*持(?:\s*人|\s*者)?|参\s*(?:加|会)(?:\s*人|\s*人员|\s*名单)?|列\s*席(?:\s*人|\s*人员)?|出\s*席(?:\s*人|\s*人员)?|记\s*录(?:\s*人|\s*员)?|发\s*(?:送|至|文)|主\s*送|抄\s*送|分\s*送)\s*[：:]"
 )
@@ -92,6 +93,8 @@ def _detect_heading_level(paragraph) -> int | None:
 
 def _detect_heading_level_from_text(text: str) -> int | None:
     if RE_H1.match(text):
+        return 1
+    if RE_TOPIC_H1.match(text):
         return 1
     if RE_H2_DECIMAL_DUNHAO.match(text):
         return 2
@@ -397,6 +400,8 @@ def _looks_like_header_meta_line(text: str) -> bool:
         return True
 
     if RE_ZH_DATE.search(value) and (value.endswith("：") or value.endswith(":")):
+        if re.search(r"[。！？；;]", value):
+            return False
         return True
 
     return False
@@ -636,6 +641,7 @@ def extract_docx_features(data: bytes) -> dict[str, Any]:
     heading_samples: dict[int, list[dict[str, Any]]] = {}
     template_nodes: list[dict[str, Any]] = []
     paragraph_entries: list[dict[str, Any]] = []
+    paragraph_snapshots: list[dict[str, Any]] = []
 
     for paragraph in doc.paragraphs:
         text = (paragraph.text or "").strip()
@@ -659,11 +665,22 @@ def extract_docx_features(data: bytes) -> dict[str, Any]:
             level = _detect_heading_level_from_text(text)
 
         if level is not None and 1 <= level <= 4:
-            template_nodes.append(_make_heading_node(level, text, node_attrs))
+            node = _make_heading_node(level, text, node_attrs)
+            template_nodes.append(node)
             paragraph_entries.append({"level": level, "sample": sample})
         else:
-            template_nodes.append(_make_paragraph_node(text, node_attrs))
+            node = _make_paragraph_node(text, node_attrs)
+            template_nodes.append(node)
             paragraph_entries.append({"level": None, "sample": sample})
+        paragraph_snapshots.append(
+            {
+                "index": len(paragraph_snapshots),
+                "text": text,
+                "node": copy.deepcopy(node),
+                "sample": copy.deepcopy(sample),
+                "detectedLevel": level,
+            }
+        )
 
     prefix_cut, suffix_start = _locate_content_template_bounds(template_nodes)
     excluded_body_indexes = set(range(0, prefix_cut))
@@ -698,6 +715,7 @@ def extract_docx_features(data: bytes) -> dict[str, Any]:
     body = _summarize_samples(body_samples) if body_samples else {}
     headings = {f"level{level}": _summarize_samples(samples) for level, samples in heading_samples.items()}
     result = {"body": body, "headings": headings, "page": {"marginsCm": margins}}
+    result["_paragraphs"] = paragraph_snapshots
     content_template = _extract_content_template_from_nodes(template_nodes)
     title_candidate = None
     if content_template:

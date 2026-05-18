@@ -24,7 +24,8 @@ from app.schemas import (
     UnitOut,
 )
 from app.services.ai_agent import AgentConfigError, AgentUpstreamError, revise_topic_rules_with_deepseek
-from app.services.topic_inference import extract_docx_features, extract_pdf_features, infer_topic_rules
+from app.services.template_ai_inference import infer_topic_rules_with_optional_deepseek
+from app.services.topic_inference import extract_docx_features, extract_pdf_features
 
 router = APIRouter(tags=["topics"])
 
@@ -1079,7 +1080,7 @@ async def analyze_topic(topic_id: str, files: list[UploadFile] = File(...), db: 
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-        rules, confidence = infer_topic_rules(features_list)
+        rules, confidence = infer_topic_rules_with_optional_deepseek(features_list)
         latest = (
             db.query(TopicTemplateDraft)
             .filter(TopicTemplateDraft.topic_id == topic_id)
@@ -1112,6 +1113,23 @@ async def analyze_topic(topic_id: str, files: list[UploadFile] = File(...), db: 
         db.commit()
         db.refresh(draft)
         return TopicAnalyzeResponse(topicId=topic.id, draft=_draft_out(draft))
+    except (AgentConfigError, AgentUpstreamError) as exc:
+        db.rollback()
+        db.add(
+            DeletionAuditEvent(
+                company_id=topic.company_id,
+                topic_id=topic.id,
+                file_count=file_count,
+                total_bytes=total_bytes,
+                status="failed",
+                error_code=exc.__class__.__name__,
+                started_at=started_at,
+                ended_at=datetime.utcnow(),
+            )
+        )
+        db.commit()
+        status_code = 503 if isinstance(exc, AgentConfigError) else 502
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
     except HTTPException as exc:
         db.rollback()
         db.add(

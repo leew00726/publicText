@@ -93,6 +93,64 @@ def _build_docx_with_styled_fixed_blocks() -> bytes:
     return bio.getvalue()
 
 
+def _build_meeting_minutes_docx_with_topic_heading() -> bytes:
+    doc = Document()
+
+    secret = doc.add_paragraph("普通商密★1年")
+    secret.runs[0].font.name = "黑体"
+    secret.runs[0].font.size = Pt(16)
+
+    company = doc.add_paragraph("华能云成数字产融科技（雄安）有限公司")
+    company.alignment = 1
+    company.runs[0].font.name = "方正小标宋简体"
+    company.runs[0].font.size = Pt(22)
+
+    title = doc.add_paragraph("总经理办公会会议纪要")
+    title.alignment = 1
+    title.runs[0].font.name = "方正小标宋简体"
+    title.runs[0].font.size = Pt(26)
+
+    issue = doc.add_paragraph("2026年第1期")
+    issue.alignment = 1
+    issue.runs[0].font.name = "黑体"
+    issue.runs[0].font.size = Pt(16)
+
+    signatory = doc.add_paragraph("综合管理部        2026年1月12日       签发人：")
+    signatory.runs[0].font.name = "仿宋_GB2312"
+    signatory.runs[0].font.size = Pt(16)
+
+    intro = doc.add_paragraph(
+        "2026年1月12日，公司总经理汪进同志主持召开2026年第一期总经理办公会。"
+        "会议审议了《》，现将会议议定事项纪要如下："
+    )
+    intro.runs[0].font.name = "仿宋_GB2312"
+    intro.runs[0].font.size = Pt(16)
+    intro.paragraph_format.first_line_indent = Pt(32)
+
+    topic = doc.add_paragraph("议题一：请示")
+    topic.runs[0].font.name = "黑体"
+    topic.runs[0].font.size = Pt(16)
+    topic.paragraph_format.first_line_indent = Pt(32)
+
+    body = doc.add_paragraph("同意《》。")
+    body.runs[0].font.name = "仿宋_GB2312"
+    body.runs[0].font.size = Pt(16)
+    body.paragraph_format.first_line_indent = Pt(32)
+
+    for text in ["主  持：汪  进", "参  加：何  亘、段国强、杨立寨", "记  录：李  健"]:
+        suffix = doc.add_paragraph(text)
+        suffix.runs[0].font.name = "黑体"
+        suffix.runs[0].font.size = Pt(16)
+
+    send = doc.add_paragraph("发送：董事长，总经理办公会成员。")
+    send.runs[0].font.name = "仿宋_GB2312"
+    send.runs[0].font.size = Pt(16)
+
+    bio = io.BytesIO()
+    doc.save(bio)
+    return bio.getvalue()
+
+
 def _build_docx_with_mixed_suffix_fonts() -> bytes:
     doc = Document()
 
@@ -283,6 +341,12 @@ class TopicInferenceTests(unittest.TestCase):
             if isinstance(node, dict)
         ]
         self.assertNotIn(title_text, leading_texts)
+
+    def test_extract_docx_features_handles_meeting_topic_heading_and_intro_body(self) -> None:
+        features = extract_docx_features(_build_meeting_minutes_docx_with_topic_heading())
+
+        self.assertEqual(features["body"]["fontFamily"], "仿宋_GB2312")
+        self.assertEqual(features["headings"]["level1"]["fontFamily"], "黑体")
 
     def test_infer_topic_rules_normalizes_suffix_line_font_to_body(self) -> None:
         features = extract_docx_features(_build_docx_with_mixed_suffix_fonts())

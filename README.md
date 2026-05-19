@@ -172,7 +172,7 @@ docker compose up -d --build backend frontend
 
 ```env
 DEEPSEEK_API_KEY=你的密钥
-DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
+DEEPSEEK_BASE_URL=http://10.211.49.42:8124/v1/models
 DEEPSEEK_MODEL=deepseek-chat
 DEEPSEEK_TIMEOUT_SEC=45
 DEEPSEEK_TEMPERATURE=0.2

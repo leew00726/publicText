@@ -6,7 +6,13 @@ from collections import Counter
 from typing import Any
 
 from app.config import Settings, get_settings
-from app.services.ai_agent import AgentConfigError, AgentUpstreamError, DeepSeekAgent, _extract_json_object
+from app.services.ai_agent import (
+    AgentConfigError,
+    AgentUpstreamError,
+    DeepSeekAgent,
+    _deepseek_chat_endpoint,
+    _extract_json_object,
+)
 from app.services.topic_inference import infer_topic_rules
 
 
@@ -257,8 +263,7 @@ def classify_template_layout_with_deepseek(
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     cfg = settings or get_settings()
-    base_url = cfg.deepseek_base_url.rstrip("/")
-    endpoint = f"{base_url}/chat/completions"
+    endpoint = _deepseek_chat_endpoint(cfg.deepseek_base_url)
     agent = DeepSeekAgent(
         api_key=cfg.deepseek_api_key,
         endpoint=endpoint,

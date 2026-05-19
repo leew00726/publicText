@@ -169,7 +169,7 @@ CORS_ORIGINS=http://服务器IP
 CORS_ORIGIN_REGEX=^https?://(服务器IP|localhost|127\.0\.0\.1)(?::\d+)?$
 
 DEEPSEEK_API_KEY=
-DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
+DEEPSEEK_BASE_URL=http://10.211.49.42:8124/v1/models
 DEEPSEEK_MODEL=deepseek-chat
 DEEPSEEK_TIMEOUT_SEC=45
 DEEPSEEK_TEMPERATURE=0.2

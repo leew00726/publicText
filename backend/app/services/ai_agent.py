@@ -57,6 +57,15 @@ SUMMARY_SYSTEM_PROMPT = (
 _REQUEST_EXECUTOR = ThreadPoolExecutor(max_workers=8)
 
 
+def _deepseek_chat_endpoint(base_url: str) -> str:
+    normalized = base_url.strip().rstrip("/")
+    if normalized.endswith("/chat/completions"):
+        return normalized
+    if normalized.endswith("/models"):
+        normalized = normalized[: -len("/models")]
+    return f"{normalized}/chat/completions"
+
+
 def _send_request(req: urllib.request.Request, timeout_sec: float) -> str:
     with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
         return resp.read().decode("utf-8")
@@ -166,8 +175,7 @@ class DeepSeekAgent:
 
 def rewrite_with_deepseek(text: str, mode: str, settings: Settings | None = None) -> dict[str, Any]:
     cfg = settings or get_settings()
-    base_url = cfg.deepseek_base_url.rstrip("/")
-    endpoint = f"{base_url}/chat/completions"
+    endpoint = _deepseek_chat_endpoint(cfg.deepseek_base_url)
     agent = DeepSeekAgent(
         api_key=cfg.deepseek_api_key,
         endpoint=endpoint,
@@ -189,8 +197,7 @@ def summarize_document_with_deepseek(
         raise AgentConfigError("文档正文为空，无法生成总结。")
 
     cfg = settings or get_settings()
-    base_url = cfg.deepseek_base_url.rstrip("/")
-    endpoint = f"{base_url}/chat/completions"
+    endpoint = _deepseek_chat_endpoint(cfg.deepseek_base_url)
     agent = DeepSeekAgent(
         api_key=cfg.deepseek_api_key,
         endpoint=endpoint,
@@ -270,8 +277,7 @@ def revise_topic_rules_with_deepseek(
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     cfg = settings or get_settings()
-    base_url = cfg.deepseek_base_url.rstrip("/")
-    endpoint = f"{base_url}/chat/completions"
+    endpoint = _deepseek_chat_endpoint(cfg.deepseek_base_url)
     agent = DeepSeekAgent(
         api_key=cfg.deepseek_api_key,
         endpoint=endpoint,

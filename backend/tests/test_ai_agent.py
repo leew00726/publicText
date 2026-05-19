@@ -16,7 +16,7 @@ from app.routers.ai import (
     rewrite_api,
     summarize_document_api,
 )
-from app.services.ai_agent import AgentConfigError, DeepSeekAgent, revise_topic_rules_with_deepseek
+from app.services.ai_agent import AgentConfigError, DeepSeekAgent, revise_topic_rules_with_deepseek, rewrite_with_deepseek
 
 
 class DeepSeekAgentTests(unittest.TestCase):
@@ -60,6 +60,37 @@ class DeepSeekAgentTests(unittest.TestCase):
         )
         with self.assertRaises(AgentConfigError):
             agent.rewrite("原始文本", "formal")
+
+    @patch("app.services.ai_agent.urllib.request.urlopen")
+    def test_rewrite_accepts_models_endpoint_as_upstream_base(self, mock_urlopen):
+        fake_payload = {
+            "model": "deepseek-chat",
+            "usage": {},
+            "choices": [{"message": {"content": "已改写"}}],
+        }
+
+        fake_resp = MagicMock()
+        fake_resp.read.return_value = json.dumps(fake_payload).encode("utf-8")
+        fake_resp.__enter__.return_value = fake_resp
+        mock_urlopen.return_value = fake_resp
+
+        settings = type(
+            "S",
+            (),
+            {
+                "deepseek_api_key": "test-key",
+                "deepseek_base_url": "http://10.211.49.42:8124/v1/models",
+                "deepseek_model": "deepseek-chat",
+                "deepseek_timeout_sec": 30,
+                "deepseek_temperature": 0.2,
+                "deepseek_system_prompt": "test",
+            },
+        )()
+
+        rewrite_with_deepseek("原始文本", "formal", settings=settings)
+
+        request = mock_urlopen.call_args.args[0]
+        self.assertEqual(request.full_url, "http://10.211.49.42:8124/v1/chat/completions")
 
 
 class AiRewriteEndpointTests(unittest.TestCase):

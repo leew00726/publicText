@@ -18,6 +18,32 @@ function collectText(body: any): string[] {
 }
 
 describe('applyOneClickLayoutWithFields', () => {
+  it('sets body paragraphs to justify alignment during one-click layout', () => {
+    const body = {
+      type: 'doc',
+      content: [paragraph('这是需要排版的正文段落。')],
+    }
+
+    const structuredFields: StructuredFields = {
+      title: '',
+      mainTo: '',
+      signOff: '',
+      docNo: '',
+      signatory: '',
+      copyNo: '',
+      date: '',
+      exportWithRedhead: false,
+      attachments: [],
+      topicTemplateRules: null,
+    }
+
+    const result = applyOneClickLayoutWithFields(body, structuredFields)
+
+    expect(result.body.content[0].type).toBe('paragraph')
+    expect(result.body.content[0].attrs.textAlign).toBe('justify')
+    expect(result.body.content[0].attrs.firstLineIndentChars).toBe(2)
+  })
+
   it('keeps user-authored body content when template fixed nodes exceed current content length', () => {
     const body = {
       type: 'doc',

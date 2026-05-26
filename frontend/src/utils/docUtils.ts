@@ -306,10 +306,7 @@ function normalizeParagraphAttrs(rawAttrs: any, defaultIndentChars: number = 2):
   if (textAlign === 'center' || textAlign === 'right') {
     return { textAlign, firstLineIndentChars: 0 }
   }
-  if (textAlign === 'left' || textAlign === 'justify') {
-    return { textAlign, firstLineIndentChars: defaultIndentChars }
-  }
-  return { firstLineIndentChars: defaultIndentChars }
+  return { textAlign: 'justify', firstLineIndentChars: defaultIndentChars }
 }
 
 function normalizeFixedSuffixNodeAttrs(node: any, bodyRules: Record<string, any>, force: boolean = false): any {

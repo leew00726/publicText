@@ -16,6 +16,21 @@ describe('login flow routing', () => {
     expect(source).not.toContain('ensureEmployeeCompany')
   })
 
+  it('routes company home from the backend-bound session company', () => {
+    const source = readFileSync(resolve(__dirname, '../src/App.tsx'), 'utf-8')
+
+    expect(source).not.toContain('ensureEmployeeCompany')
+    expect(source).not.toContain('saveEmployeeSession(nextSession)')
+    expect(source).toContain('resolveEmployeeCompanyHomePath(session)')
+  })
+
+  it('protects layout company topics with an own-company scope guard', () => {
+    const source = readFileSync(resolve(__dirname, '../src/App.tsx'), 'utf-8')
+
+    expect(source).toContain("companyScope: 'own'")
+    expect(source).toContain('canAccessCompany(session')
+  })
+
   it('keeps the minimal staged login presentation', () => {
     const pageSource = readFileSync(resolve(__dirname, '../src/pages/LoginPage.tsx'), 'utf-8')
     const styleSource = readFileSync(resolve(__dirname, '../src/styles/pages.css'), 'utf-8')
@@ -31,7 +46,7 @@ describe('login flow routing', () => {
     expect(styleSource).toContain('@keyframes authFormReveal')
     expect(styleSource).toContain('.auth-title-stage')
     expect(styleSource).toContain('.auth-login-panel')
-    expect(styleSource).toContain('letter-spacing: 0.14em')
+    expect(styleSource).toContain('letter-spacing: 0')
     expect(styleSource).toContain('authTitleSettle 970ms')
     expect(styleSource).toContain('scale(0.56)')
     expect(styleSource).toContain('height: 100dvh')

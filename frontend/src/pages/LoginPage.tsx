@@ -49,6 +49,7 @@ export function LoginPage() {
         id: resp.data.companyId,
         name: resp.data.companyName,
         employeeName: resp.data.name,
+        permissions: resp.data.permissions,
       })
       saveEmployeeSession(session)
       navigate('/workspace', { replace: true })

@@ -11,6 +11,8 @@ import { TiptapEditor } from '../components/TiptapEditor'
 import { ValidationPanel } from '../components/ValidationPanel'
 import { useFontCheck } from '../hooks/useFontCheck'
 import { applyOneClickLayoutWithFields } from '../utils/docUtils'
+import { loadEmployeeSession } from '../utils/employeeAuth'
+import { canAccessCompany } from '../utils/pagePermissions'
 import type { StructuredFields } from '../api/types'
 
 const DEFAULT_STRUCTURED_FIELDS = {
@@ -43,6 +45,17 @@ function isTemplateBackedDoc(structuredFields: Pick<StructuredFields, 'topicTemp
   return Boolean(
     structuredFields?.topicTemplateRules || structuredFields?.topicTemplateId || structuredFields?.topicId || structuredFields?.topicName,
   )
+}
+
+export function appendTopicTemplateContextToImportForm(
+  form: FormData,
+  structuredFields: Pick<StructuredFields, 'topicTemplateId'> | null | undefined,
+): FormData {
+  const topicTemplateId = String(structuredFields?.topicTemplateId || '').trim()
+  if (topicTemplateId) {
+    form.append('topicTemplateId', topicTemplateId)
+  }
+  return form
 }
 
 function getNodeText(node: any): string {
@@ -164,8 +177,15 @@ export function DocEditorPage() {
   const loadBase = useCallback(async () => {
     if (!id) return
     const docRes = await api.get<GovDoc>(`/api/layout/docs/${id}`)
-    setDoc(normalizeDoc(docRes.data))
-  }, [id])
+    const nextDoc = normalizeDoc(docRes.data)
+    const session = loadEmployeeSession()
+    if (!canAccessCompany(session, nextDoc.unitId)) {
+      alert('当前账号无权访问该公司文档，请返回所属公司公文库。')
+      navigate('/layout/company-home', { replace: true })
+      return
+    }
+    setDoc(nextDoc)
+  }, [id, navigate])
 
   useEffect(() => {
     void loadBase()
@@ -354,6 +374,7 @@ export function DocEditorPage() {
     form.append('docType', doc.docType)
     form.append('preserveFormatting', 'true')
     form.append('title', doc.title || '导入文档')
+    appendTopicTemplateContextToImportForm(form, doc.structuredFields)
 
     const res = await api.post<{ docId: string; importReport: any }>('/api/layout/docs/importDocx', form)
     const report = res.data.importReport || {}

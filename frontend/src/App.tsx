@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
 import { CompanySelectPage } from './pages/CompanySelectPage'
@@ -11,19 +10,31 @@ import { TopicComposePage } from './pages/TopicComposePage'
 import { TopicDetailPage } from './pages/TopicDetailPage'
 import { TopicLibraryPage } from './pages/TopicLibraryPage'
 import { TopicListPage } from './pages/TopicListPage'
-import { loadEmployeeSession, saveEmployeeSession } from './utils/employeeAuth'
-import { ensureEmployeeCompany } from './utils/employeeCompany'
+import { loadEmployeeSession } from './utils/employeeAuth'
+import { resolveEmployeeCompanyHomePath } from './utils/employeeCompany'
 import { LAYOUT_HOME_PATH } from './utils/layoutNavigation'
-import { canAccessPage, type PagePermissionKey } from './utils/pagePermissions'
+import { canAccessCompany, canAccessPage, type CompanyAccessScope, type PagePermissionKey } from './utils/pagePermissions'
 
-function RequirePageAccess({ permission, children }: { permission: PagePermissionKey; children: JSX.Element }) {
+function RequirePageAccess({
+  permission,
+  companyScope,
+  children,
+}: {
+  permission: PagePermissionKey
+  companyScope?: CompanyAccessScope
+  children: JSX.Element
+}) {
   const location = useLocation()
+  const { companyId = '' } = useParams()
   const session = loadEmployeeSession()
   if (!session) {
     return <Navigate to="/" replace state={{ from: location.pathname }} />
   }
-  if (!canAccessPage(session.role, permission)) {
+  if (!canAccessPage(session, permission)) {
     return <Navigate to="/workspace" replace state={{ deniedPath: location.pathname }} />
+  }
+  if (companyScope && !canAccessCompany(session, companyId, companyScope)) {
+    return <Navigate to="/layout/company-home" replace state={{ deniedCompanyId: companyId }} />
   }
   return children
 }
@@ -40,48 +51,16 @@ function AuthLandingRoute() {
 }
 
 function EmployeeCompanyHomeRoute() {
-  const [targetPath, setTargetPath] = useState<string | null>(null)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const session = loadEmployeeSession()
+  const targetPath = resolveEmployeeCompanyHomePath(session)
 
-  useEffect(() => {
-    let cancelled = false
-    const session = loadEmployeeSession()
-    if (!session) {
-      setTargetPath('/')
-      return () => {
-        cancelled = true
-      }
-    }
-
-    void ensureEmployeeCompany(session.username)
-      .then((company) => {
-        if (cancelled) return
-        const nextSession = {
-          ...session,
-          companyId: company.id,
-          companyName: company.name,
-        }
-        saveEmployeeSession(nextSession)
-        setTargetPath(`/layout/companies/${nextSession.companyId}/topics`)
-      })
-      .catch((error: any) => {
-        if (cancelled) return
-        const detail = error?.response?.data?.detail || '无法识别员工所属公司，请联系管理员。'
-        setErrorMessage(String(detail))
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  if (targetPath) {
-    return <Navigate to={targetPath} replace />
+  if (!session) {
+    return <Navigate to="/" replace />
   }
-  if (errorMessage) {
-    return <div className="page">{errorMessage}</div>
+  if (!targetPath) {
+    return <div className="page">员工未绑定所属公司，请联系管理员。</div>
   }
-  return <div className="page">正在进入所属公司公文库...</div>
+  return <Navigate to={targetPath} replace />
 }
 
 function LegacyCompanyTopicsRedirect() {
@@ -113,9 +92,9 @@ function FallbackRoute() {
   return <Navigate to={loadEmployeeSession() ? '/workspace' : '/'} replace />
 }
 
-function withShell(permission: PagePermissionKey, child: JSX.Element) {
+function withShell(permission: PagePermissionKey, child: JSX.Element, options: { companyScope?: CompanyAccessScope } = {}) {
   return (
-    <RequirePageAccess permission={permission}>
+    <RequirePageAccess permission={permission} companyScope={options.companyScope}>
       <WithShell>{child}</WithShell>
     </RequirePageAccess>
   )
@@ -131,7 +110,10 @@ export default function App() {
       <Route path="/layout/summary" element={withShell('layout.summary', <DocumentSummaryPage />)} />
       <Route path="/layout/company-home" element={withShell('layout.company', <EmployeeCompanyHomeRoute />)} />
       <Route path="/layout/companies" element={<Navigate to="/layout/company-home" replace />} />
-      <Route path="/layout/companies/:companyId/topics" element={withShell('layout.topicList', <TopicListPage mode="layout" />)} />
+      <Route
+        path="/layout/companies/:companyId/topics"
+        element={withShell('layout.topicList', <TopicListPage mode="layout" />, { companyScope: 'own' })}
+      />
       <Route path="/layout/topics/:topicId" element={withShell('layout.topicCompose', <TopicComposePage />)} />
       <Route path="/layout/topics/:topicId/library" element={withShell('layout.topicLibrary', <TopicLibraryPage />)} />
       <Route path="/layout/docs/:id" element={withShell('layout.docEditor', <DocEditorPage />)} />

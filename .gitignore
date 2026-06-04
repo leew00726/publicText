@@ -17,6 +17,10 @@ __pycache__/
 # local backups
 backups/
 data/
+dev-storage/
+test-storage/
+*.log
+.pytest_cache/
 
 # misc
 .DS_Store

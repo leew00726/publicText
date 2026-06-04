@@ -499,6 +499,17 @@ def _resolve_node_run_style(node_attrs: dict[str, Any], fallback_family: str, fa
     return family, size, bold, color_hex
 
 
+def _resolve_heading_node_run_attrs(node_attrs: dict[str, Any], level: int, heading_styles: dict[str, Any]) -> dict[str, Any]:
+    level_style = heading_styles.get(f"level{level}") if isinstance(heading_styles.get(f"level{level}"), dict) else None
+    if level_style is None:
+        return node_attrs
+
+    resolved = dict(node_attrs)
+    for key in ("fontFamily", "fontSizePt", "bold"):
+        resolved.pop(key, None)
+    return resolved
+
+
 def _append_red_divider_paragraph(doc: Document):
     paragraph = doc.add_paragraph()
     paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
@@ -650,7 +661,8 @@ def export_docx(
             level = int((node.get("attrs") or {}).get("level", 1))
             p = doc.add_paragraph()
             family, size, bold = _apply_heading_style(p, level, heading_styles)
-            family, size, bold, color_hex = _resolve_node_run_style(node_attrs, family, size, bold)
+            run_attrs = _resolve_heading_node_run_attrs(node_attrs, level, heading_styles)
+            family, size, bold, color_hex = _resolve_node_run_style(run_attrs, family, size, bold)
             _apply_node_paragraph_overrides(p, node_attrs, size)
             text = _normalize_reference_text(_node_text(node), references_rules)
             r = p.add_run(text)

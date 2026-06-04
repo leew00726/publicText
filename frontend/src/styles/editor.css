@@ -455,3 +455,62 @@
     padding: 12px;
   }
 }
+
+/* Apple-like editor chrome */
+.editor-command-bar {
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: var(--shadow-sm);
+}
+
+.editor-layout {
+  gap: 16px;
+}
+
+.attachments-box,
+.readonly-box {
+  border-color: var(--line);
+  border-radius: 14px;
+  background: rgba(245, 245, 247, 0.72);
+}
+
+.editor-shell {
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: var(--shadow-sm);
+}
+
+.editor-content {
+  background: #f5f5f7;
+}
+
+.editor-paper-shell {
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.08);
+}
+
+.font-status,
+.ai-preview-panel,
+.font-preview-warning {
+  border-radius: 18px;
+}
+
+.font-status {
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: var(--shadow-sm);
+}
+
+.font-actions a {
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.issue {
+  border-radius: 14px;
+  background: rgba(245, 245, 247, 0.8);
+}
+
+.modal {
+  border-radius: 20px;
+  box-shadow: var(--shadow-lg);
+}

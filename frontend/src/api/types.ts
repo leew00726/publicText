@@ -8,6 +8,7 @@ export type AuthLoginResponse = {
   role: 'staff' | 'admin'
   companyId: string
   companyName: string
+  permissions: string[]
 }
 
 export type RedheadElement = {

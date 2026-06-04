@@ -68,14 +68,14 @@
   color: var(--text);
   font-family: var(--font-ui);
   font-weight: 700;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
 }
 
 .auth-title {
   margin: 0;
   font-size: clamp(46px, 8vw, 92px);
   line-height: 0.94;
-  letter-spacing: 0.14em;
+  letter-spacing: 0;
   color: #152744;
   text-align: center;
 }
@@ -99,7 +99,7 @@
   color: #506174;
   font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
 }
 
 .auth-form input {
@@ -222,7 +222,7 @@
   color: var(--blue-deep);
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -349,7 +349,7 @@
   color: rgba(226, 237, 251, 0.78);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -358,7 +358,7 @@
   color: #fff;
   font-size: clamp(26px, 3vw, 38px);
   line-height: 1;
-  letter-spacing: -0.05em;
+  letter-spacing: 0;
 }
 
 .workspace-hero p {
@@ -415,7 +415,7 @@
   color: var(--blue-ink);
   font-size: 34px;
   line-height: 1;
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
 }
 
 .workspace-quick-grid {
@@ -442,14 +442,14 @@
   color: var(--blue-ink);
   font-size: 21px;
   line-height: 1.15;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
 }
 
 .workspace-quick-label {
   color: var(--text-muted);
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -624,7 +624,7 @@
   color: var(--blue-deep);
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -637,7 +637,7 @@
 .meeting-minutes-hero h2 {
   font-size: clamp(30px, 3.6vw, 42px);
   line-height: 1.08;
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
 }
 
 .meeting-minutes-hero p,
@@ -779,7 +779,7 @@
 .summary-page button {
   min-height: 48px;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
   cursor: pointer;
   transition:
     transform 180ms ease,
@@ -864,7 +864,7 @@
   color: var(--summary-accent);
   font-size: 24px;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
 }
 
 .summary-panel-copy {
@@ -877,7 +877,7 @@
   color: var(--summary-accent);
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -885,7 +885,7 @@
   color: var(--summary-ink);
   font-size: 30px;
   line-height: 1.1;
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
 }
 
 .summary-panel-copy p {
@@ -924,7 +924,7 @@
   color: var(--summary-ink);
   font-size: 18px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
 }
 
 .summary-page .summary-section-heading strong {
@@ -1489,5 +1489,363 @@
 
   .workspace-hero h2 {
     font-size: 30px;
+  }
+}
+
+/* Apple-like visual refresh */
+.auth-shell {
+  background: linear-gradient(180deg, #fbfbfd 0%, #f5f5f7 100%);
+}
+
+.auth-title {
+  color: var(--text);
+  letter-spacing: 0;
+  font-weight: 700;
+}
+
+.auth-login-panel {
+  border-radius: 20px;
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+.auth-title,
+.auth-form-title,
+.page-title,
+.module-card h2,
+.domain-card h2,
+.spotlight-card h2 {
+  letter-spacing: 0;
+}
+
+.auth-form label,
+.summary-editor label,
+.summary-control-card label,
+.panel label {
+  color: var(--text-soft);
+  letter-spacing: 0;
+}
+
+.auth-form input {
+  border-radius: 12px;
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.auth-form input:focus {
+  border-color: rgba(0, 113, 227, 0.42);
+  box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.1);
+}
+
+.auth-submit-btn,
+.module-enter-btn,
+.summary-page .summary-primary-action,
+.topic-revision-submit {
+  border-color: transparent;
+  background: var(--blue);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(0, 113, 227, 0.18);
+}
+
+.auth-submit-btn:hover,
+.module-enter-btn:hover,
+.summary-page .summary-primary-action:hover,
+.topic-revision-submit:hover {
+  background: #006edb;
+}
+
+.page-header {
+  border-radius: 20px;
+  padding: 20px 22px;
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: var(--shadow-sm);
+}
+
+.page-eyebrow,
+.spotlight-kicker,
+.module-tag {
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  letter-spacing: 0;
+}
+
+.page-title {
+  font-size: clamp(27px, 3.2vw, 36px);
+}
+
+.spotlight-card,
+.domain-card,
+.module-card,
+.workspace-table-card,
+.summary-control-card,
+.summary-result-card,
+.inline-status-card,
+.unit-editor-card,
+.panel {
+  border-radius: 20px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: var(--shadow-sm);
+}
+
+.spotlight-card.secondary,
+.topic-training-panel.secondary {
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.workspace-dashboard {
+  gap: 12px;
+}
+
+.workspace-hero {
+  padding: 8px 2px 6px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.workspace-hero::before {
+  display: none;
+}
+
+.workspace-hero h2 {
+  color: var(--text);
+  font-size: clamp(28px, 3vw, 38px);
+  letter-spacing: 0;
+}
+
+.workspace-hero p,
+.workspace-hero-kicker {
+  color: var(--text-muted);
+  letter-spacing: 0;
+}
+
+.workspace-hero .soft-pill,
+.workspace-hero .soft-pill.is-admin {
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.68);
+  color: var(--text-soft);
+}
+
+.workspace-module-grid {
+  gap: 1px;
+  padding: 1px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--line);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.workspace-module-card {
+  border: 0;
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.workspace-module-card::before {
+  display: none;
+}
+
+.workspace-module-card h2 {
+  font-size: 23px;
+}
+
+.module-card-copy strong,
+.workspace-module-card.is-layout .module-card-copy strong,
+.workspace-module-card.is-management .module-card-copy strong,
+.workspace-module-card.is-meeting .module-card-copy strong {
+  color: var(--text);
+}
+
+.module-card-steps li {
+  min-height: 36px;
+  border-radius: 10px;
+  background: rgba(245, 245, 247, 0.9);
+  color: var(--text-soft);
+}
+
+.module-card-steps li::before,
+.workspace-module-card.is-layout .module-card-steps li::before,
+.workspace-module-card.is-management .module-card-steps li::before,
+.workspace-module-card.is-meeting .module-card-steps li::before {
+  width: 6px;
+  height: 6px;
+  background: var(--text-muted);
+}
+
+.module-enter-btn {
+  border-radius: 999px;
+  font-weight: 650;
+}
+
+.workspace-quick-link {
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: var(--shadow-sm);
+}
+
+.workspace-quick-link.is-summary,
+.workspace-quick-link.is-layout,
+.workspace-quick-link.is-management {
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.workspace-quick-link strong {
+  color: var(--text);
+  letter-spacing: 0;
+}
+
+.meeting-minutes-hero,
+.meeting-minutes-stage,
+.meeting-minutes-roadmap {
+  border-radius: 20px;
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: var(--shadow-sm);
+}
+
+.meeting-minutes-hero h2,
+.meeting-minutes-roadmap h3 {
+  letter-spacing: 0;
+}
+
+.meeting-minutes-kicker {
+  color: var(--text-muted);
+  letter-spacing: 0;
+}
+
+.meeting-minutes-hero .soft-pill {
+  border-color: var(--line);
+  background: rgba(245, 245, 247, 0.9);
+  color: var(--text-soft);
+}
+
+.meeting-minutes-stage-index {
+  border-radius: 12px;
+  background: rgba(0, 113, 227, 0.1);
+  color: var(--blue);
+}
+
+.summary-page {
+  --summary-accent: var(--blue);
+  --summary-accent-strong: #006edb;
+  --summary-accent-soft: var(--blue-soft);
+  --summary-tint: #f5f5f7;
+  --summary-ink: var(--text);
+  --summary-muted: var(--text-soft);
+  --summary-line: var(--line);
+  --summary-line-strong: var(--line-strong);
+  --summary-panel-radius: 20px;
+  background: transparent;
+}
+
+.summary-page button,
+.summary-page select,
+.summary-page textarea,
+.summary-page input {
+  border-color: var(--line);
+  box-shadow: none;
+}
+
+.summary-page button:hover {
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+}
+
+.summary-page .summary-control-card,
+.summary-page .summary-result-card {
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: var(--shadow-sm);
+}
+
+.summary-panel-header {
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.summary-panel-index {
+  border-radius: 14px;
+  border-color: var(--line);
+  background: rgba(0, 113, 227, 0.1);
+  color: var(--blue);
+}
+
+.summary-panel-kicker,
+.summary-section-heading strong {
+  letter-spacing: 0;
+}
+
+.summary-section-heading {
+  border-bottom-color: var(--line);
+  border-left-color: var(--blue);
+}
+
+.summary-source-tab.active {
+  border-color: transparent;
+  background: var(--blue);
+  color: #fff;
+}
+
+.summary-page .secondary-button {
+  color: var(--blue);
+}
+
+.summary-page .summary-source-tab.active:hover {
+  background: #006edb;
+}
+
+.summary-drop-zone {
+  border-color: var(--line);
+  border-radius: 18px;
+  background: rgba(245, 245, 247, 0.72);
+}
+
+.summary-drop-zone.dragging {
+  border-color: var(--blue);
+  box-shadow: 0 8px 18px rgba(0, 113, 227, 0.14);
+}
+
+.summary-text-panel {
+  border-color: var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.summary-meta span,
+.summary-page .summary-file-pill,
+.summary-page .summary-meta span,
+.summary-page .summary-error {
+  border-color: var(--line);
+  background: rgba(245, 245, 247, 0.9);
+}
+
+.topic-history-card {
+  border-radius: 16px;
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+@media (max-width: 900px) {
+  .workspace-hero {
+    padding: 8px 0 10px;
+    background: transparent;
+  }
+
+  .workspace-module-grid {
+    border-radius: 18px;
+  }
+
+  .workspace-module-card {
+    padding: 18px;
   }
 }

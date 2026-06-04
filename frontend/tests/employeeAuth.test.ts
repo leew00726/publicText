@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { createEmployeeSession, listModulesByRole, parseEmployeeSession, validateEmployeeLogin } from '../src/utils/employeeAuth'
+import {
+  createEmployeeSession,
+  listModulesByRole,
+  listPermissionsByRole,
+  parseEmployeeSession,
+  validateEmployeeLogin,
+} from '../src/utils/employeeAuth'
 import { LAYOUT_HOME_PATH } from '../src/utils/layoutNavigation'
 
 describe('employee auth helpers', () => {
@@ -27,18 +33,48 @@ describe('employee auth helpers', () => {
     const session = createEmployeeSession(
       'alice',
       'staff',
-      { id: 'company-yc', name: '云成数科', employeeName: '张三' },
+      {
+        id: 'company-yc',
+        name: '云成数科',
+        employeeName: '张三',
+        permissions: ['workspace.home', 'layout.topicList'],
+      },
       new Date('2026-03-02T08:00:00.000Z'),
     )
     const parsed = parseEmployeeSession(JSON.stringify(session))
     expect(parsed?.companyId).toBe('company-yc')
     expect(parsed?.companyName).toBe('云成数科')
     expect(parsed?.displayName).toBe('张三')
+    expect(parsed?.permissions).toEqual(['workspace.home', 'layout.topicList'])
+  })
+
+  it('derives role permissions for old sessions without explicit permissions', () => {
+    const parsed = parseEmployeeSession(
+      JSON.stringify({
+        username: 'legacy-user',
+        role: 'staff',
+        loginAt: '2026-03-02T08:00:00.000Z',
+        companyId: 'company-yc',
+        companyName: '云成数科',
+      }),
+    )
+
+    expect(parsed?.permissions).toEqual(listPermissionsByRole('staff'))
   })
 
   it('returns null for malformed session payload', () => {
     expect(parseEmployeeSession('{')).toBeNull()
     expect(parseEmployeeSession(JSON.stringify({ username: 'alice', role: 'owner', loginAt: 'bad' }))).toBeNull()
+    expect(
+      parseEmployeeSession(
+        JSON.stringify({
+          username: 'alice',
+          role: 'staff',
+          loginAt: '2026-03-02T08:00:00.000Z',
+          permissions: ['workspace.home', 123],
+        }),
+      ),
+    ).toBeNull()
     expect(parseEmployeeSession(null)).toBeNull()
   })
 

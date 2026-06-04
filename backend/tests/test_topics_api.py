@@ -176,6 +176,66 @@ class TopicApiTests(unittest.TestCase):
         self.assertEqual(sf["topicTemplateId"], first_template_id)
         self.assertEqual(sf["topicTemplateVersion"], first_template_version)
 
+    def test_import_docx_with_topic_template_preserves_template_rules(self) -> None:
+        company_resp = self.client.post("/api/units", json={"name": f"topic_import_company_{uuid.uuid4().hex[:8]}"})
+        self.assertEqual(company_resp.status_code, 200)
+        company_id = company_resp.json()["id"]
+        topic_resp = self.client.post(
+            "/api/topics",
+            json={"companyId": company_id, "name": f"导入继承模板{uuid.uuid4().hex[:8]}"},
+        )
+        self.assertEqual(topic_resp.status_code, 200)
+        topic_id = topic_resp.json()["id"]
+        topic_name = topic_resp.json()["name"]
+
+        with SessionLocal() as session:
+            template = TopicTemplate(
+                topic_id=topic_id,
+                version=1,
+                rules={
+                    "body": {"fontFamily": "仿宋_GB2312", "fontSizePt": 16},
+                    "headings": {
+                        "level1": {"fontFamily": "黑体", "fontSizePt": 16},
+                        "level2": {"fontFamily": "楷体_GB2312", "fontSizePt": 16},
+                        "level3": {"fontFamily": "仿宋_GB2312", "fontSizePt": 16},
+                    },
+                },
+                source_draft_id=None,
+                effective=True,
+            )
+            session.add(template)
+            session.commit()
+            session.refresh(template)
+            template_id = template.id
+
+        import_resp = self.client.post(
+            "/api/docs/importDocx",
+            data={
+                "unitId": company_id,
+                "docType": "qingshi",
+                "title": "导入继承模板",
+                "topicTemplateId": template_id,
+            },
+            files={
+                "file": (
+                    "sample.docx",
+                    _docx_bytes("导入正文"),
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
+            },
+        )
+        self.assertEqual(import_resp.status_code, 200)
+        doc_id = import_resp.json()["docId"]
+
+        fetched = self.client.get(f"/api/docs/{doc_id}")
+        self.assertEqual(fetched.status_code, 200)
+        sf = fetched.json()["structuredFields"]
+        self.assertEqual(sf["topicId"], topic_id)
+        self.assertEqual(sf["topicName"], topic_name)
+        self.assertEqual(sf["topicTemplateId"], template_id)
+        self.assertEqual(sf["topicTemplateVersion"], 1)
+        self.assertEqual(sf["topicTemplateRules"]["headings"]["level2"]["fontFamily"], "楷体_GB2312")
+
     @patch("app.routers.topics.infer_topic_rules_with_optional_deepseek")
     def test_topic_analyze_uses_isolated_template_inference_entrypoint(self, mock_infer) -> None:
         mock_infer.return_value = (

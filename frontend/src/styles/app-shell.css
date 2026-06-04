@@ -1,6 +1,6 @@
 .app-shell {
   min-height: 100vh;
-  padding: 24px;
+  padding: 20px;
   box-sizing: border-box;
 }
 
@@ -25,27 +25,25 @@
 
 .app-shell-topbar {
   position: sticky;
-  top: 24px;
+  top: 20px;
   z-index: 30;
-  border-radius: 30px;
-  padding: 20px 24px;
+  border-radius: 20px;
+  padding: 14px 18px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 18px;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(245, 248, 252, 0.88)),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.3));
-  border: 1px solid rgba(76, 101, 131, 0.12);
-  box-shadow: 0 24px 60px rgba(19, 38, 58, 0.08);
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid var(--line);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
 }
 
 .shell-topbar-workspace {
   position: relative;
   top: 0;
-  padding: 16px 20px;
-  border-radius: 28px;
-  box-shadow: 0 18px 48px rgba(19, 38, 58, 0.08);
+  padding: 13px 18px;
+  border-radius: 20px;
+  box-shadow: var(--shadow-sm);
 }
 
 .shell-topbar-left,
@@ -82,19 +80,19 @@
 
 .shell-topbar-kicker {
   margin-bottom: 0;
-  color: var(--blue-deep);
+  color: var(--text-muted);
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
+  font-weight: 650;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
 .shell-topbar-copy h1 {
   margin: 0;
   color: var(--text);
-  font-size: clamp(22px, 2.6vw, 30px);
-  line-height: 1.1;
-  letter-spacing: -0.04em;
+  font-size: clamp(21px, 2.3vw, 28px);
+  line-height: 1.08;
+  letter-spacing: 0;
 }
 
 .shell-topbar-title-row > h1 {
@@ -121,9 +119,9 @@
 .shell-session-card {
   min-height: 54px;
   padding: 0 16px;
-  border-radius: 20px;
-  border: 1px solid rgba(76, 101, 131, 0.12);
-  background: linear-gradient(180deg, rgba(247, 250, 252, 0.95), rgba(239, 245, 251, 0.88));
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(245, 245, 247, 0.72);
   display: grid;
   align-content: center;
 }
@@ -141,7 +139,7 @@
 .shell-logout-btn,
 .global-back-btn.shell {
   min-height: 46px;
-  border-radius: 18px;
+  border-radius: 14px;
 }
 
 .global-back-btn {
@@ -150,14 +148,15 @@
 
 .global-back-btn.shell {
   box-shadow: none;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(243, 247, 251, 0.92));
-  border-color: rgba(76, 101, 131, 0.12);
+  background: rgba(255, 255, 255, 0.84);
+  border-color: var(--line);
 }
 
 .shell-logout-btn {
-  background: linear-gradient(180deg, rgba(30, 55, 87, 0.96), rgba(20, 39, 66, 0.94));
-  border-color: rgba(20, 39, 66, 0.18);
+  background: var(--blue);
+  border-color: transparent;
   color: #fff;
+  box-shadow: 0 8px 18px rgba(0, 113, 227, 0.18);
 }
 
 .global-back-btn.floating {
@@ -199,25 +198,23 @@
 }
 
 .app-shell-summary {
-  background:
-    radial-gradient(circle at top left, rgba(37, 99, 235, 0.1), transparent 28%),
-    linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  background: linear-gradient(180deg, #fbfbfd 0%, #f5f5f7 100%);
 }
 
 .app-shell-summary .app-shell-topbar {
-  border-radius: 24px;
-  border: 1px solid rgba(37, 99, 235, 0.14);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), #ffffff);
-  box-shadow: 0 18px 40px rgba(37, 99, 235, 0.1);
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: var(--shadow-sm);
 }
 
 .app-shell-summary .shell-topbar-kicker {
   display: inline-flex;
   width: fit-content;
-  padding: 6px 10px;
+  padding: 5px 9px;
   border-radius: 999px;
-  background: rgba(37, 99, 235, 0.12);
-  color: #2563eb;
+  background: rgba(0, 113, 227, 0.1);
+  color: var(--blue);
 }
 
 .app-shell-summary .shell-topbar-copy h1,
@@ -237,14 +234,14 @@
 .app-shell-summary .shell-session-card,
 .app-shell-summary .shell-logout-btn,
 .app-shell-summary .global-back-btn.shell {
-  border-radius: 18px;
-  border: 1px solid rgba(37, 99, 235, 0.14);
-  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.84);
   box-shadow: none;
 }
 
 .app-shell-summary .shell-session-card {
-  border-left: 4px solid #2563eb;
+  border-left: 1px solid var(--line);
 }
 
 .app-shell-summary .shell-logout-btn,
@@ -259,14 +256,14 @@
 }
 
 .app-shell-summary .shell-logout-btn {
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  background: var(--blue);
   border-color: transparent;
   color: #ffffff;
-  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.18);
+  box-shadow: 0 8px 18px rgba(0, 113, 227, 0.18);
 }
 
 .app-shell-summary .global-back-btn.shell {
-  color: #2563eb;
+  color: var(--blue);
   background: rgba(255, 255, 255, 0.92);
 }
 
@@ -276,20 +273,20 @@
 }
 
 .app-shell-summary .shell-logout-btn:hover {
-  box-shadow: 0 18px 32px rgba(37, 99, 235, 0.24);
+  box-shadow: 0 10px 24px rgba(0, 113, 227, 0.2);
 }
 
 .app-shell-summary .global-back-btn.shell:hover {
-  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.18);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
 }
 
 .app-shell-summary .shell-logout-btn:hover {
-  background: linear-gradient(135deg, #1d4ed8, #1e40af);
+  background: #006edb;
 }
 
 .app-shell-summary .shell-logout-btn:focus-visible,
 .app-shell-summary .global-back-btn.shell:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--blue);
   outline-offset: 2px;
 }
 

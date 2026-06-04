@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest'
 
-import { resolvePreviewTitleText, sanitizeTemplateBodyContent } from './DocEditorPage'
+import { appendTopicTemplateContextToImportForm, resolvePreviewTitleText, sanitizeTemplateBodyContent } from './DocEditorPage'
 
 describe('resolvePreviewTitleText', () => {
+  it('appends topic template id when importing into a template-backed document', () => {
+    const form = new FormData()
+
+    appendTopicTemplateContextToImportForm(form, {
+      topicTemplateId: 'tpl-1',
+    })
+
+    expect(form.get('topicTemplateId')).toBe('tpl-1')
+  })
+
   it('does not fall back to doc.title for template-backed docs when structured title is empty', () => {
     expect(
       resolvePreviewTitleText('云成数科2025年资源协同报告', {

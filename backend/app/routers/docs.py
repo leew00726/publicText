@@ -8,7 +8,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Document, DocumentFile, Unit
+from app.models import Document, DocumentFile, Topic, TopicTemplate, Unit
 from app.schemas import (
     ApiMessage,
     CheckResponse,
@@ -143,6 +143,7 @@ async def import_docx_api(
     docType: str = Form("qingshi"),
     title: str = Form("导入文档"),
     redheadTemplateId: str | None = Form(default=None),
+    topicTemplateId: str | None = Form(default=None),
     preserveFormatting: bool = Form(default=True),
     db: Session = Depends(get_db),
 ):
@@ -151,6 +152,21 @@ async def import_docx_api(
 
     data = await file.read()
     body, structured_fields, report = import_docx(data, preserve_formatting=preserveFormatting)
+    if topicTemplateId:
+        template = db.query(TopicTemplate).filter(TopicTemplate.id == topicTemplateId).first()
+        if not template:
+            raise HTTPException(status_code=400, detail="指定题材模板无效")
+        topic = db.query(Topic).filter(Topic.id == template.topic_id).first()
+        if not topic:
+            raise HTTPException(status_code=400, detail="题材不存在")
+        if topic.company_id != unitId:
+            raise HTTPException(status_code=400, detail="题材模板不属于当前单位")
+
+        structured_fields["topicId"] = topic.id
+        structured_fields["topicName"] = topic.name
+        structured_fields["topicTemplateId"] = template.id
+        structured_fields["topicTemplateVersion"] = template.version
+        structured_fields["topicTemplateRules"] = template.rules if isinstance(template.rules, dict) else None
     resolved_title = (structured_fields.get("title") or "").strip() or title
 
     row = Document(

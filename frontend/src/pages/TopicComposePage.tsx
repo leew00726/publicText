@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import type { Topic, TopicTemplate } from '../api/types'
 import { loadEmployeeSession } from '../utils/employeeAuth'
-import { canAccessPage, canPerformAction } from '../utils/pagePermissions'
+import { canAccessCompany, canAccessPage, canPerformAction } from '../utils/pagePermissions'
 import { pickDefaultTopicTemplateId } from '../utils/topicCompose'
 import { summarizeRulesAsNarrative } from '../utils/topicNarrative'
 
@@ -24,9 +24,10 @@ export function TopicComposePage() {
   const [creating, setCreating] = useState(false)
   const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null)
   const [message, setMessage] = useState('')
-  const role = loadEmployeeSession()?.role || 'staff'
-  const canEnterManagementTrain = canAccessPage(role, 'management.topicTrain')
-  const canDeleteTemplate = canPerformAction(role, 'management.template.delete')
+  const session = loadEmployeeSession()
+  const permissionSubject = session || 'staff'
+  const canEnterManagementTrain = canAccessPage(permissionSubject, 'management.topicTrain')
+  const canDeleteTemplate = canPerformAction(permissionSubject, 'management.template.delete')
 
   const load = async () => {
     if (!topicId) return
@@ -36,6 +37,11 @@ export function TopicComposePage() {
         api.get<Topic>(`/api/management/topics/${topicId}`),
         api.get<TopicTemplate[]>(`/api/management/topics/${topicId}/templates`),
       ])
+      if (!canAccessCompany(session, topicRes.data.companyId)) {
+        alert('当前账号无权访问该公司题材，请返回所属公司公文库。')
+        navigate('/layout/company-home', { replace: true })
+        return
+      }
       setTopic(topicRes.data)
       setTemplates(templateRes.data)
       setSelectedTemplateId(pickDefaultTopicTemplateId(templateRes.data))

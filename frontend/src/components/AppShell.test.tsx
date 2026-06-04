@@ -75,17 +75,17 @@ describe('AppShell chrome', () => {
     expect(html).not.toContain('上传文档后调用 DeepSeek 生成结构化总结并导出。')
   })
 
-  it('styles the summary shell as a blue and white minimal chrome', () => {
+  it('styles the summary shell as an Apple-like translucent chrome', () => {
     const styles = fs.readFileSync(appShellCssPath, 'utf8')
 
     expect(styles).toMatch(
-      /\.app-shell-summary\s+\.app-shell-topbar\s*\{[\s\S]*border-radius:\s*24px;[\s\S]*background:\s*linear-gradient\(180deg,\s*rgba\(255,\s*255,\s*255,\s*0\.96\),\s*#ffffff\);/,
+      /\.app-shell-summary\s+\.app-shell-topbar\s*\{[\s\S]*border-radius:\s*20px;[\s\S]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.78\);/,
     )
     expect(styles).toMatch(
-      /\.app-shell-summary\s+\.shell-logout-btn\s*\{[\s\S]*background:\s*linear-gradient\(135deg,\s*#2563eb,\s*#1d4ed8\);[\s\S]*color:\s*#ffffff;/,
+      /\.app-shell-summary\s+\.shell-logout-btn\s*\{[\s\S]*background:\s*var\(--blue\);[\s\S]*color:\s*#ffffff;/,
     )
     expect(styles).toMatch(
-      /\.app-shell-summary\s+\.global-back-btn\.shell:hover\s*\{[\s\S]*transform:\s*translateY\(-2px\);[\s\S]*box-shadow:\s*0 14px 28px rgba\(37,\s*99,\s*235,\s*0\.18\);/,
+      /\.app-shell-summary\s+\.global-back-btn\.shell:hover\s*\{[\s\S]*box-shadow:\s*0 8px 18px rgba\(0,\s*0,\s*0,\s*0\.08\);/,
     )
   })
 

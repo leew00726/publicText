@@ -28,6 +28,13 @@ ENGINE_RULES = "rules"
 ENGINE_HYBRID = "hybrid"
 ENGINE_DEEPSEEK = "deepseek"
 
+SEMANTIC_ROLE_INDEX_FIELDS: dict[str, str] = {
+    "recipientsIndexes": "recipients",
+    "attachmentIndexes": "attachments",
+    "signatureIndexes": "signature",
+    "referenceIndexes": "references",
+}
+
 
 def _normalize_engine(value: str | None) -> str:
     engine = str(value or "").strip().lower()
@@ -102,6 +109,69 @@ def _node_for_paragraph(paragraph: dict[str, Any] | None) -> dict[str, Any] | No
         return None
     node = paragraph.get("node")
     return copy.deepcopy(node) if isinstance(node, dict) else None
+
+
+def _text_for_paragraph(paragraph: dict[str, Any] | None) -> str:
+    if not isinstance(paragraph, dict):
+        return ""
+    return str(paragraph.get("text") or "").strip()
+
+
+def _semantic_role_entries(feature: dict[str, Any], role_file: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    by_index = _paragraph_by_index(feature)
+    if not by_index:
+        return {}
+
+    content_roles: dict[str, list[dict[str, Any]]] = {}
+    file_index = role_file.get("fileIndex")
+    if isinstance(file_index, str) and file_index.strip().isdigit():
+        file_index = int(file_index.strip())
+
+    for source_key, target_key in SEMANTIC_ROLE_INDEX_FIELDS.items():
+        entries: list[dict[str, Any]] = []
+        for index in _coerce_index_list(role_file.get(source_key)):
+            paragraph = by_index.get(index)
+            node = _node_for_paragraph(paragraph)
+            if node is None:
+                continue
+            entry: dict[str, Any] = {
+                "index": index,
+                "text": _text_for_paragraph(paragraph),
+                "node": node,
+            }
+            if isinstance(file_index, int) and not isinstance(file_index, bool):
+                entry["fileIndex"] = file_index
+            entries.append(entry)
+        if entries:
+            content_roles[target_key] = entries
+    return content_roles
+
+
+def _merge_content_roles(target: dict[str, list[dict[str, Any]]], source: dict[str, list[dict[str, Any]]]) -> None:
+    for role_name, entries in source.items():
+        if not entries:
+            continue
+        target.setdefault(role_name, []).extend(copy.deepcopy(entries))
+
+
+def _collect_content_roles(features_list: list[dict[str, Any]], layout_result: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    role_files = layout_result.get("files")
+    if not isinstance(role_files, list):
+        return {}
+
+    roles: dict[str, list[dict[str, Any]]] = {}
+    for role_file in role_files:
+        if not isinstance(role_file, dict):
+            continue
+        file_index = role_file.get("fileIndex")
+        if isinstance(file_index, str) and file_index.strip().isdigit():
+            file_index = int(file_index.strip())
+        if not isinstance(file_index, int) or isinstance(file_index, bool):
+            continue
+        if file_index < 0 or file_index >= len(features_list):
+            continue
+        _merge_content_roles(roles, _semantic_role_entries(features_list[file_index], role_file))
+    return roles
 
 
 def _build_content_template_from_roles(
@@ -290,7 +360,13 @@ def classify_template_layout_with_deepseek(
                     '      "bodyIndexes": [3, 5],\n'
                     '      "headings": [{"index": 4, "level": 1}],\n'
                     '      "leadingIndexes": [0, 2],\n'
-                    '      "trailingIndexes": [6]\n'
+                    '      "trailingIndexes": [6],\n'
+                    '      "recipientsIndexes": [3],\n'
+                    '      "attachmentIndexes": [8],\n'
+                    '      "signatureIndexes": [9, 10],\n'
+                    '      "referenceIndexes": [11],\n'
+                    '      "confidence": 0.86,\n'
+                    '      "notes": "识别依据"\n'
                     "    }\n"
                     "  ]\n"
                     "}\n"
@@ -300,7 +376,12 @@ def classify_template_layout_with_deepseek(
                     "3) headings 用 level 1-4 标明正文内层级标题；会议纪要的“议题一：”“专题A：”通常是 level 1。\n"
                     "4) leadingIndexes 是正文前需要固定保留的模板段落，不含动态主标题。\n"
                     "5) trailingIndexes 是正文后需要固定保留的模板段落。\n"
-                    "6) 只能返回段落索引，不要返回或猜测字体字号。\n\n"
+                    "6) recipientsIndexes 是主送/抄送/分送等收发文对象段落。\n"
+                    "7) attachmentIndexes 是附件说明或附件清单段落。\n"
+                    "8) signatureIndexes 是落款、日期、盖章区域段落。\n"
+                    "9) referenceIndexes 是引用发文号、制度文件、依据条款等段落。\n"
+                    "10) confidence 是 0-1 的整体判断置信度；notes 用一句话说明依据。\n"
+                    "11) 只能返回段落索引和说明，不要返回或猜测字体字号。\n\n"
                     f"本地解析出的段落和样式：\n{json.dumps(payload, ensure_ascii=False)}"
                 ),
             },
@@ -345,12 +426,16 @@ def infer_topic_rules_with_optional_deepseek(
         assisted_features = apply_deepseek_layout_roles(features_list, layout_result)
         ai_rules, ai_confidence = infer_topic_rules(assisted_features)
         _copy_base_title_template(ai_rules, base_rules)
+        content_roles = _collect_content_roles(features_list, layout_result)
+        if content_roles:
+            ai_rules["contentRoles"] = content_roles
         ai_confidence["templateInference"] = {
             "engine": ENGINE_DEEPSEEK,
             "aiStatus": "applied",
             "summary": str(layout_result.get("summary") or "").strip(),
             "model": layout_result.get("_model"),
             "usage": layout_result.get("_usage") or {},
+            "roleSummary": {role_name: len(entries) for role_name, entries in content_roles.items()},
         }
         return ai_rules, ai_confidence
     except (AgentConfigError, AgentUpstreamError, ValueError, TypeError, KeyError) as exc:

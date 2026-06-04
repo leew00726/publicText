@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Employee
 from app.schemas import AuthLoginRequest, AuthLoginResponse
+from app.services.auth_permissions import list_permissions_for_role, normalize_employee_role
 from app.services.passwords import verify_password
 
 
@@ -16,13 +17,20 @@ def login(payload: AuthLoginRequest, db: Session = Depends(get_db)):
     employee = db.query(Employee).filter(Employee.employee_no == employee_no, Employee.is_active.is_(True)).first()
     if not employee or not verify_password(payload.password, employee.password_hash):
         raise HTTPException(status_code=401, detail="工号或密码错误")
-    if not employee.company_id or not employee.company_name:
+
+    role = normalize_employee_role(employee.role, None)
+    if not role:
+        raise HTTPException(status_code=503, detail="员工角色配置异常，请联系管理员")
+
+    company = employee.company
+    if not employee.company_id or not company:
         raise HTTPException(status_code=503, detail="员工未绑定所属公司，请联系管理员")
 
     return AuthLoginResponse(
         employeeNo=employee.employee_no,
         name=employee.name,
-        role=employee.role,
-        companyId=employee.company_id,
-        companyName=employee.company_name,
+        role=role,
+        companyId=company.id,
+        companyName=company.name,
+        permissions=list_permissions_for_role(role),
     )

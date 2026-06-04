@@ -146,7 +146,7 @@ function shouldTreatAsHeading(level: 1 | 2 | 3 | 4, text: string): boolean {
   const hasSentencePunct = /[。！？；]/.test(body)
   const commaCount = (body.match(/[，,]/g) || []).length
 
-  if ((level === 2 || level === 4) && (hasSentencePunct || commaCount > 0 || body.length > 20)) {
+  if ((level === 2 || level === 4) && (hasSentencePunct || commaCount > 1 || body.length > 24)) {
     return false
   }
 

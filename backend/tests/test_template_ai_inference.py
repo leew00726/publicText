@@ -61,6 +61,40 @@ def _build_simple_docx() -> bytes:
     return payload.getvalue()
 
 
+def _build_semantic_role_docx() -> bytes:
+    doc = Document()
+
+    title = doc.add_paragraph("关于供应链金融业务方案的请示")
+    title.alignment = 1
+    title.runs[0].font.name = "方正小标宋简体"
+    title.runs[0].font.size = Pt(22)
+
+    recipient = doc.add_paragraph("主送：董事会")
+    recipient.runs[0].font.name = "仿宋_GB2312"
+    recipient.runs[0].font.size = Pt(16)
+
+    body = doc.add_paragraph("现将有关事项请示如下。")
+    body.runs[0].font.name = "仿宋_GB2312"
+    body.runs[0].font.size = Pt(16)
+
+    attachment = doc.add_paragraph("附件：供应链金融业务实施方案")
+    attachment.runs[0].font.name = "仿宋_GB2312"
+    attachment.runs[0].font.size = Pt(16)
+
+    signature = doc.add_paragraph("贵诚信托")
+    signature.alignment = 2
+    signature.runs[0].font.name = "仿宋_GB2312"
+    signature.runs[0].font.size = Pt(16)
+
+    reference = doc.add_paragraph("引用：《业务管理办法》（贵诚发〔2026〕1号）")
+    reference.runs[0].font.name = "仿宋_GB2312"
+    reference.runs[0].font.size = Pt(16)
+
+    payload = io.BytesIO()
+    doc.save(payload)
+    return payload.getvalue()
+
+
 class TemplateAiInferenceTests(unittest.TestCase):
     def test_rules_mode_does_not_call_deepseek(self) -> None:
         features = extract_docx_features(_build_simple_docx())
@@ -103,6 +137,42 @@ class TemplateAiInferenceTests(unittest.TestCase):
         self.assertEqual(rules["body"]["fontFamily"], "仿宋_GB2312")
         self.assertEqual(rules["headings"]["level1"]["fontFamily"], "黑体")
         self.assertNotEqual(rules["headings"]["level1"].get("fontFamily"), "模型编造字体")
+
+    def test_deepseek_roles_preserve_semantic_sections_with_local_nodes(self) -> None:
+        features = extract_docx_features(_build_semantic_role_docx())
+        settings = Settings(template_inference_engine="hybrid", deepseek_api_key="test-key")
+        ai_roles = {
+            "summary": "识别请示模板的主送、附件、落款和引用规则。",
+            "files": [
+                {
+                    "fileIndex": 0,
+                    "titleIndex": 0,
+                    "bodyIndexes": [2],
+                    "recipientsIndexes": [1],
+                    "attachmentIndexes": [3],
+                    "signatureIndexes": [4],
+                    "referenceIndexes": [5],
+                }
+            ],
+        }
+
+        with patch(
+            "app.services.template_ai_inference.classify_template_layout_with_deepseek",
+            return_value=ai_roles,
+        ):
+            rules, confidence = infer_topic_rules_with_optional_deepseek([features], settings=settings)
+
+        self.assertEqual(rules["body"]["fontFamily"], "仿宋_GB2312")
+        self.assertEqual(rules["title"]["fontFamily"], "方正小标宋简体")
+        self.assertEqual(confidence["templateInference"]["roleSummary"]["recipients"], 1)
+
+        content_roles = rules["contentRoles"]
+        self.assertEqual(content_roles["recipients"][0]["text"], "主送：董事会")
+        self.assertEqual(content_roles["attachments"][0]["text"], "附件：供应链金融业务实施方案")
+        self.assertEqual(content_roles["signature"][0]["text"], "贵诚信托")
+        self.assertIn("贵诚发〔2026〕1号", content_roles["references"][0]["text"])
+        self.assertEqual(content_roles["signature"][0]["node"]["attrs"]["textAlign"], "right")
+        self.assertNotIn("模型编造字体", str(content_roles))
 
     def test_hybrid_mode_falls_back_to_rules_when_deepseek_fails(self) -> None:
         features = extract_docx_features(_build_simple_docx())

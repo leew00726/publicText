@@ -149,7 +149,7 @@ class DeepSeekAgent:
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="ignore")
             raise AgentUpstreamError(f"DeepSeek HTTP {exc.code}: {detail or exc.reason}") from exc
-        except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
+        except (urllib.error.URLError, TimeoutError, socket.timeout, ConnectionError, OSError) as exc:
             raise AgentUpstreamError(f"DeepSeek request failed: {exc}") from exc
 
         try:

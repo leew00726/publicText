@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import type { GovDoc, Topic } from '../api/types'
 import { loadEmployeeSession } from '../utils/employeeAuth'
-import { canPerformAction } from '../utils/pagePermissions'
+import { canAccessCompany, canPerformAction } from '../utils/pagePermissions'
 import { formatServerDateTime } from '../utils/time'
 
 export function TopicLibraryPage() {
@@ -15,8 +15,8 @@ export function TopicLibraryPage() {
   const [docs, setDocs] = useState<GovDoc[]>([])
   const [loading, setLoading] = useState(false)
   const [deletingDocId, setDeletingDocId] = useState<string | null>(null)
-  const role = loadEmployeeSession()?.role || 'staff'
-  const canDeleteDoc = canPerformAction(role, 'management.doc.delete')
+  const session = loadEmployeeSession()
+  const canDeleteDoc = canPerformAction(session || 'staff', 'management.doc.delete')
 
   const load = async () => {
     if (!topicId) return
@@ -26,6 +26,11 @@ export function TopicLibraryPage() {
         api.get<Topic>(`/api/management/topics/${topicId}`),
         api.get<GovDoc[]>('/api/layout/docs', { params: { topicId } }),
       ])
+      if (!canAccessCompany(session, topicRes.data.companyId)) {
+        alert('当前账号无权访问该公司题材，请返回所属公司公文库。')
+        navigate('/layout/company-home', { replace: true })
+        return
+      }
       setTopic(topicRes.data)
       setDocs(docsRes.data)
     } catch (error: any) {

@@ -17,9 +17,10 @@ export function CompanySelectPage({ mode }: CompanySelectPageProps) {
   const [name, setName] = useState('')
   const [creating, setCreating] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const role = loadEmployeeSession()?.role || 'staff'
-  const canCreateCompany = mode === 'management' && canPerformAction(role, 'management.company.create')
-  const canDeleteCompany = mode === 'management' && canPerformAction(role, 'management.company.delete')
+  const session = loadEmployeeSession()
+  const permissionSubject = session || 'staff'
+  const canCreateCompany = mode === 'management' && canPerformAction(permissionSubject, 'management.company.create')
+  const canDeleteCompany = mode === 'management' && canPerformAction(permissionSubject, 'management.company.delete')
   const canManageCompany = mode === 'management'
   const nextTopicsPrefix = useMemo(
     () => (mode === 'management' ? '/management/companies' : '/layout/companies'),

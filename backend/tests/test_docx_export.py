@@ -13,6 +13,55 @@ def _paragraph_texts(raw: bytes) -> list[str]:
 
 
 class DocxExportTests(unittest.TestCase):
+    def test_export_topic_template_heading_styles_override_imported_node_fonts(self) -> None:
+        payload = {
+            "title": "测试",
+            "structuredFields": {
+                "title": "",
+                "mainTo": "",
+                "topicTemplateRules": {
+                    "body": {"fontFamily": "仿宋_GB2312", "fontSizePt": 16},
+                    "headings": {
+                        "level1": {"fontFamily": "黑体", "fontSizePt": 16},
+                        "level2": {"fontFamily": "楷体_GB2312", "fontSizePt": 16},
+                        "level3": {"fontFamily": "仿宋_GB2312", "fontSizePt": 16},
+                    },
+                },
+            },
+            "body": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "heading",
+                        "attrs": {"level": 1, "fontFamily": "黑体", "fontSizePt": 16, "bold": True},
+                        "content": [{"type": "text", "text": "一、一级标题"}],
+                    },
+                    {
+                        "type": "heading",
+                        "attrs": {"level": 2, "fontFamily": "黑体", "fontSizePt": 16, "bold": True},
+                        "content": [{"type": "text", "text": "（一）二级标题"}],
+                    },
+                    {
+                        "type": "heading",
+                        "attrs": {"level": 3, "fontFamily": "黑体", "fontSizePt": 16, "bold": True},
+                        "content": [{"type": "text", "text": "1.三级标题。"}],
+                    },
+                ],
+            },
+        }
+
+        raw = export_docx(payload, unit_name="测试单位", redhead_template={"elements": [], "page": {}}, include_redhead=False)
+        doc = Document(io.BytesIO(raw))
+        level1 = next(p for p in doc.paragraphs if p.text == "一、一级标题")
+        level2 = next(p for p in doc.paragraphs if p.text == "（一）二级标题")
+        level3 = next(p for p in doc.paragraphs if p.text == "1.三级标题。")
+
+        self.assertEqual(level1.runs[0]._element.rPr.rFonts.get(qn("w:eastAsia")), "黑体")
+        self.assertEqual(level2.runs[0]._element.rPr.rFonts.get(qn("w:eastAsia")), "楷体_GB2312")
+        self.assertEqual(level3.runs[0]._element.rPr.rFonts.get(qn("w:eastAsia")), "仿宋_GB2312")
+        self.assertFalse(bool(level2.runs[0].bold))
+        self.assertFalse(bool(level3.runs[0].bold))
+
     def test_export_keeps_auto_title_when_topic_only_has_non_title_leading_nodes(self) -> None:
         payload = {
             "title": "自动标题-应出现",

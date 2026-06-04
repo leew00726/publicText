@@ -16,7 +16,13 @@ from app.routers.ai import (
     rewrite_api,
     summarize_document_api,
 )
-from app.services.ai_agent import AgentConfigError, DeepSeekAgent, revise_topic_rules_with_deepseek, rewrite_with_deepseek
+from app.services.ai_agent import (
+    AgentConfigError,
+    AgentUpstreamError,
+    DeepSeekAgent,
+    revise_topic_rules_with_deepseek,
+    rewrite_with_deepseek,
+)
 
 
 class DeepSeekAgentTests(unittest.TestCase):
@@ -60,6 +66,21 @@ class DeepSeekAgentTests(unittest.TestCase):
         )
         with self.assertRaises(AgentConfigError):
             agent.rewrite("原始文本", "formal")
+
+    @patch("app.services.ai_agent.urllib.request.urlopen")
+    def test_connection_reset_is_reported_as_upstream_error(self, mock_urlopen):
+        mock_urlopen.side_effect = ConnectionResetError("connection reset by peer")
+        agent = DeepSeekAgent(
+            api_key="test-key",
+            endpoint="https://api.deepseek.com/v1/chat/completions",
+            model="deepseek-chat",
+            timeout_sec=20,
+        )
+
+        with self.assertRaises(AgentUpstreamError) as ctx:
+            agent.rewrite("原始文本", "formal")
+
+        self.assertIn("DeepSeek request failed", str(ctx.exception))
 
     @patch("app.services.ai_agent.urllib.request.urlopen")
     def test_rewrite_accepts_models_endpoint_as_upstream_base(self, mock_urlopen):

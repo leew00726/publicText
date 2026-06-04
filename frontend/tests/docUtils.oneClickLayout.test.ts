@@ -37,6 +37,28 @@ describe('one-click layout normalization', () => {
     expect(result.body.content[0].attrs.firstLineIndentChars).toBe(2)
   })
 
+  it('should treat short （一） lines with a comma as second-level headings', () => {
+    const body = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          attrs: {},
+          content: [
+            {
+              type: 'text',
+              text: '（一）明确融资支持规则，优化审批机制',
+            },
+          ],
+        },
+      ],
+    }
+
+    const result = applyOneClickLayoutWithFields(body, BASE_FIELDS as any)
+    expect(result.body.content[0].type).toBe('heading')
+    expect(result.body.content[0].attrs.level).toBe(2)
+  })
+
   it('should restore leading nodes and normalize fixed suffix lines to body style', () => {
     const body = {
       type: 'doc',

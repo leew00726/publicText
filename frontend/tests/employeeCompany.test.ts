@@ -1,11 +1,31 @@
 import { describe, expect, it } from 'vitest'
 
-import { DEFAULT_COMPANY_NAME, resolveCompanyNameByEmployeeNo } from '../src/utils/employeeCompany'
+import { resolveEmployeeCompanyHomePath } from '../src/utils/employeeCompany'
 
 describe('employee company mapping', () => {
-  it('maps employee number to default company', () => {
-    expect(resolveCompanyNameByEmployeeNo('10001')).toBe(DEFAULT_COMPANY_NAME)
-    expect(resolveCompanyNameByEmployeeNo('yc-zhangsan')).toBe(DEFAULT_COMPANY_NAME)
+  it('routes to the company bound in the employee session', () => {
+    expect(
+      resolveEmployeeCompanyHomePath({
+        username: '82000001',
+        role: 'staff',
+        loginAt: '2026-03-02T08:00:00.000Z',
+        companyId: ' company-yc ',
+        companyName: '云成数科',
+        permissions: ['layout.topicList'],
+      }),
+    ).toBe('/layout/companies/company-yc/topics')
+  })
+
+  it('does not fall back to a default company when the session is unbound', () => {
+    expect(resolveEmployeeCompanyHomePath(null)).toBeNull()
+    expect(
+      resolveEmployeeCompanyHomePath({
+        username: '82000001',
+        role: 'staff',
+        loginAt: '2026-03-02T08:00:00.000Z',
+        companyName: '云成数科',
+        permissions: ['layout.topicList'],
+      }),
+    ).toBeNull()
   })
 })
-

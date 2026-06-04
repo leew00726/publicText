@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.models import Employee, Unit
+from app.services.auth_permissions import DEFAULT_EMPLOYEE_ROLE, normalize_employee_role
 from app.services.passwords import hash_password
 
 
@@ -48,6 +49,7 @@ def _load_directory_rows(path: Path) -> list[dict[str, str]]:
                 "companyName": company_name,
                 "departmentName": _normalize_text(item.get("departmentName")),
                 "subDepartmentName": _normalize_text(item.get("subDepartmentName")),
+                "role": normalize_employee_role(item.get("role"), DEFAULT_EMPLOYEE_ROLE) or DEFAULT_EMPLOYEE_ROLE,
             }
         )
     return rows
@@ -89,7 +91,7 @@ def sync_employee_directory(db: Session, directory_path: str | None = None) -> i
                 company_name=unit.name,
                 department_name=row["departmentName"] or None,
                 sub_department_name=row["subDepartmentName"] or None,
-                role="admin",
+                role=row["role"],
                 password_hash=hash_password(DEFAULT_EMPLOYEE_PASSWORD),
                 is_active=True,
             )
@@ -103,7 +105,7 @@ def sync_employee_directory(db: Session, directory_path: str | None = None) -> i
         employee.company_name = unit.name
         employee.department_name = row["departmentName"] or None
         employee.sub_department_name = row["subDepartmentName"] or None
-        employee.role = "admin"
+        employee.role = row["role"]
         employee.is_active = True
         if not employee.password_hash:
             employee.password_hash = hash_password(DEFAULT_EMPLOYEE_PASSWORD)

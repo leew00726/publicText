@@ -51,7 +51,10 @@ export function ModuleHubPage() {
   const navigate = useNavigate()
   const session = loadEmployeeSession()
 
-  const modules = useMemo(() => listModulesByRole(session?.role ?? 'staff'), [session?.role])
+  const modules = useMemo(
+    () => listModulesByRole(session?.role ?? 'staff', session?.permissions),
+    [session?.permissions, session?.role],
+  )
   const enabledModules = useMemo(() => modules.filter((moduleItem) => moduleItem.enabled), [modules])
   const companyName = session?.companyName || '云成数科'
   const roleLabel = session?.role === 'admin' ? '管理员' : '普通员工'

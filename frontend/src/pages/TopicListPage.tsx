@@ -26,9 +26,10 @@ export function TopicListPage({ mode }: TopicListPageProps) {
   const [name, setName] = useState('')
   const [creating, setCreating] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const role = loadEmployeeSession()?.role || 'staff'
-  const canCreateTopic = mode === 'management' && canPerformAction(role, 'management.topic.create')
-  const canDeleteTopic = mode === 'management' && canPerformAction(role, 'management.topic.delete')
+  const session = loadEmployeeSession()
+  const permissionSubject = session || 'staff'
+  const canCreateTopic = mode === 'management' && canPerformAction(permissionSubject, 'management.topic.create')
+  const canDeleteTopic = mode === 'management' && canPerformAction(permissionSubject, 'management.topic.delete')
   const canManageTopic = mode === 'management'
 
   const load = async () => {

@@ -195,6 +195,7 @@ class AuthLoginResponse(BaseModel):
     role: Literal["staff", "admin"]
     companyId: str
     companyName: str
+    permissions: list[str]
 
 
 class TopicCreate(BaseModel):

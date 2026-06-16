@@ -203,7 +203,7 @@ export function TopicDetailPage() {
   }
 
   return (
-    <main className="page workspace-page">
+    <main className="page workspace-page module-workbench-page module-workbench-page-management">
       {message ? <div className="inline-status-card">{message}</div> : null}
 
       <section className="workspace-grid workspace-grid-two">

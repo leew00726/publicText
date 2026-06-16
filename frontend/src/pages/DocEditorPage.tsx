@@ -379,11 +379,11 @@ export function DocEditorPage() {
   const previewMainToText = hasFixedTemplateTitleContent ? '' : doc?.structuredFields?.mainTo || ''
 
   if (!doc) {
-    return <div className="page">加载中...</div>
+    return <div className="page doc-editor-page module-workbench-page">加载中...</div>
   }
 
   return (
-    <main className="page doc-editor-page">
+    <main className="page doc-editor-page module-workbench-page">
       <section className="glass-card editor-command-bar">
         <div className="editor-command-row">
           <input

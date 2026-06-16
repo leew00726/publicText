@@ -37,7 +37,7 @@ describe('AppShell chrome', () => {
     expect(html).toContain('张三')
   })
 
-  it('uses a viewport-locked shell on the workspace route', () => {
+  it('allows page-level scrolling on the workspace route', () => {
     const html = renderToStaticMarkup(
       <MemoryRouter initialEntries={['/workspace']}>
         <AppShell>
@@ -51,10 +51,13 @@ describe('AppShell chrome', () => {
     expect(html).toContain('app-shell-main app-shell-main-workspace')
     expect(html).toContain('app-shell-scroll app-shell-scroll-workspace')
     expect(styles).toMatch(
-      /\.app-shell-workspace\s*\{[\s\S]*height:\s*100dvh;[\s\S]*overflow:\s*hidden;/,
+      /\.app-shell-workspace\s*\{[\s\S]*min-height:\s*100dvh;[\s\S]*height:\s*auto;[\s\S]*overflow:\s*visible;/,
     )
     expect(styles).toMatch(
-      /\.app-shell-scroll-workspace\s*\{[\s\S]*overflow:\s*hidden;[\s\S]*padding-bottom:\s*0;/,
+      /\.app-shell-main-workspace\s*\{[\s\S]*height:\s*auto;[\s\S]*min-height:\s*0;[\s\S]*grid-template-rows:\s*auto minmax\(0,\s*1fr\);/,
+    )
+    expect(styles).toMatch(
+      /\.app-shell-scroll-workspace\s*\{[\s\S]*overflow:\s*visible;[\s\S]*padding-bottom:\s*0;/,
     )
   })
 
@@ -75,17 +78,20 @@ describe('AppShell chrome', () => {
     expect(html).not.toContain('上传文档后调用 DeepSeek 生成结构化总结并导出。')
   })
 
-  it('styles the summary shell as a blue and white minimal chrome', () => {
+  it('styles the summary shell as a premium blue-white document workspace chrome', () => {
     const styles = fs.readFileSync(appShellCssPath, 'utf8')
 
     expect(styles).toMatch(
-      /\.app-shell-summary\s+\.app-shell-topbar\s*\{[\s\S]*border-radius:\s*24px;[\s\S]*background:\s*linear-gradient\(180deg,\s*rgba\(255,\s*255,\s*255,\s*0\.96\),\s*#ffffff\);/,
+      /\.app-shell-summary\s*\{[\s\S]*background:\s*[\s\S]*linear-gradient/,
     )
     expect(styles).toMatch(
-      /\.app-shell-summary\s+\.shell-logout-btn\s*\{[\s\S]*background:\s*linear-gradient\(135deg,\s*#2563eb,\s*#1d4ed8\);[\s\S]*color:\s*#ffffff;/,
+      /\.app-shell-summary\s+\.app-shell-topbar\s*\{[\s\S]*border-radius:\s*8px;[\s\S]*border:\s*1px solid rgba\(40,\s*74,\s*118,\s*0\.12\);[\s\S]*box-shadow:\s*0 12px 28px/,
     )
     expect(styles).toMatch(
-      /\.app-shell-summary\s+\.global-back-btn\.shell:hover\s*\{[\s\S]*transform:\s*translateY\(-2px\);[\s\S]*box-shadow:\s*0 14px 28px rgba\(37,\s*99,\s*235,\s*0\.18\);/,
+      /\.app-shell-summary\s+\.shell-topbar-title-row\s*\{[\s\S]*border-left:\s*3px solid #2457d6;[\s\S]*padding-left:\s*14px;/,
+    )
+    expect(styles).toMatch(
+      /\.app-shell-summary\s+\.shell-logout-btn\s*\{[\s\S]*background:\s*#ffffff;[\s\S]*color:\s*#153a73;/,
     )
   })
 

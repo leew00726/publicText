@@ -13,10 +13,12 @@ from app.models import TopicTemplate
 from app.services.ai_agent import (
     AgentConfigError,
     AgentUpstreamError,
+    draft_document_with_knowledge,
     rewrite_with_deepseek,
     summarize_document_with_deepseek,
 )
 from app.services.document_summary import build_summary_docx, extract_text_from_uploaded_file, prepare_summary_source_text
+from app.services.knowledge_base import build_knowledge_context, search_knowledge_documents
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
@@ -31,6 +33,12 @@ class SummaryDocxExportRequest(BaseModel):
     summary: str = Field(min_length=1, max_length=20000)
     sourceFileName: str | None = Field(default=None, max_length=255)
     topicTemplateId: str | None = Field(default=None, max_length=36)
+
+
+class KnowledgeDraftRequest(BaseModel):
+    instruction: str = Field(min_length=1, max_length=4000)
+    summaryLength: Literal["short", "medium", "long"] = "medium"
+    limit: int = Field(default=5, ge=1, le=10)
 
 
 def _safe_filename_stem(value: str) -> str:
@@ -116,6 +124,42 @@ async def summarize_document_api(
             "usedChars": extracted["usedChars"],
             "truncated": extracted["truncated"],
         },
+        "summary": result["text"],
+    }
+
+
+@router.post("/draft-with-knowledge")
+def draft_with_knowledge_api(payload: KnowledgeDraftRequest, db: Session = Depends(get_db)):
+    references = search_knowledge_documents(db, payload.instruction, limit=payload.limit)
+    if not references:
+        raise HTTPException(status_code=400, detail="知识库暂无可用文档，请先上传材料")
+
+    try:
+        result = draft_document_with_knowledge(
+            instruction=payload.instruction,
+            knowledge_references=references,
+            summary_length=payload.summaryLength,
+        )
+    except AgentConfigError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except AgentUpstreamError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    context = build_knowledge_context(references)
+    return {
+        "message": "ok",
+        "provider": "deepseek",
+        "model": result["model"],
+        "usage": result["usage"],
+        "summaryLength": payload.summaryLength,
+        "source": {
+            "fileName": "云矩知识库",
+            "fileType": "knowledge",
+            "originalChars": sum(int(item.get("sourceChars") or 0) for item in references),
+            "usedChars": len(context),
+            "truncated": False,
+        },
+        "knowledgeReferences": references,
         "summary": result["text"],
     }
 

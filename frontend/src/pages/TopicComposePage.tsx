@@ -113,7 +113,7 @@ export function TopicComposePage() {
   }
 
   return (
-    <main className="page workspace-page layout-page-scale">
+    <main className="page workspace-page module-workbench-page module-workbench-page-layout layout-page-scale">
       {message ? <div className="inline-status-card">{message}</div> : null}
 
       {loading ? (

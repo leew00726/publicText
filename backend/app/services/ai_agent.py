@@ -54,6 +54,12 @@ SUMMARY_SYSTEM_PROMPT = (
     " Output concise Chinese summary with clear structure and factual consistency."
 )
 
+KNOWLEDGE_DRAFT_SYSTEM_PROMPT = (
+    "You are an assistant for Chinese official-document drafting."
+    " Draft formal Chinese official-document material from the user's requirement and the provided knowledge-base excerpts."
+    " Use the excerpts as grounding material, keep wording factual, and do not invent source facts."
+)
+
 _REQUEST_EXECUTOR = ThreadPoolExecutor(max_workers=8)
 
 
@@ -230,6 +236,70 @@ def summarize_document_with_deepseek(
             },
         ],
         temperature=min(cfg.deepseek_temperature, 0.3),
+    )
+
+    return {
+        "text": response["content"],
+        "model": response["model"],
+        "usage": response["usage"],
+    }
+
+
+def draft_document_with_knowledge(
+    instruction: str,
+    knowledge_references: list[dict[str, Any]],
+    summary_length: Literal["short", "medium", "long"] = "medium",
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    cleaned_instruction = (instruction or "").strip()
+    if not cleaned_instruction:
+        raise AgentConfigError("写作要求不能为空。")
+    if not knowledge_references:
+        raise AgentConfigError("知识库暂无可用参考材料。")
+
+    cfg = settings or get_settings()
+    endpoint = _deepseek_chat_endpoint(cfg.deepseek_base_url)
+    agent = DeepSeekAgent(
+        api_key=cfg.deepseek_api_key,
+        endpoint=endpoint,
+        model=cfg.deepseek_model,
+        timeout_sec=cfg.deepseek_timeout_sec,
+        temperature=min(cfg.deepseek_temperature, 0.35),
+        system_prompt=KNOWLEDGE_DRAFT_SYSTEM_PROMPT,
+    )
+
+    length_guide = SUMMARY_LENGTH_GUIDANCE.get(summary_length, SUMMARY_LENGTH_GUIDANCE["medium"])
+    context_chunks = []
+    for index, item in enumerate(knowledge_references, start=1):
+        context_chunks.append(
+            (
+                f"[{index}] 标题：{item.get('title') or '未命名材料'}\n"
+                f"来源文件：{item.get('fileName') or ''}\n"
+                f"片段：{item.get('excerpt') or ''}"
+            ).strip()
+        )
+    context = "\n\n".join(context_chunks)
+
+    response = agent.chat(
+        messages=[
+            {"role": "system", "content": KNOWLEDGE_DRAFT_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": (
+                    "请根据云矩知识库参考材料和用户要求，起草一份中文公文材料。\n"
+                    f"篇幅参考：{length_guide}\n"
+                    "写作要求：\n"
+                    f"{cleaned_instruction}\n\n"
+                    "知识库参考材料：\n"
+                    f"{context}\n\n"
+                    "输出要求：\n"
+                    "1) 直接输出可编辑正文，不要解释过程。\n"
+                    "2) 可以综合多份材料，但不得编造知识库中没有的事实、数据、单位或时间。\n"
+                    "3) 结构清晰，符合正式公文语气，可包含标题、背景、主要内容、工作要求或下一步安排。"
+                ),
+            },
+        ],
+        temperature=min(cfg.deepseek_temperature, 0.35),
     )
 
     return {

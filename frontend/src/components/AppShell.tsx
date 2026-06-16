@@ -20,7 +20,7 @@ const PAGE_META_ROUTES: Array<{ path: string; meta: PageMeta }> = [
   {
     path: '/workspace',
     meta: {
-      kicker: 'Workspace',
+      kicker: '',
       title: '云矩公文管理平台',
       subtitle: '',
     },
@@ -35,17 +35,17 @@ const PAGE_META_ROUTES: Array<{ path: string; meta: PageMeta }> = [
     },
   },
   {
-    path: '/meeting-minutes',
+    path: '/knowledge',
     meta: {
-      kicker: 'Meeting',
-      title: '会议纪要',
-      subtitle: '前端占位模块，预留会议纪要整理、生成与归档入口。',
+      kicker: '',
+      title: '知识库',
+      subtitle: '管理入库公文材料，供公文总结调用写作参考。',
     },
   },
   {
     path: LAYOUT_HOME_PATH,
     meta: {
-      kicker: 'Layout',
+      kicker: '',
       title: '公文排版',
       subtitle: '直接进入所属公司题材库，继续文档排版与输出流程。',
     },
@@ -53,7 +53,7 @@ const PAGE_META_ROUTES: Array<{ path: string; meta: PageMeta }> = [
   {
     path: '/layout',
     meta: {
-      kicker: 'Layout',
+      kicker: '',
       title: '公文排版',
       subtitle: '聚焦文档导入、正文排版、校验和导出。',
     },
@@ -61,7 +61,7 @@ const PAGE_META_ROUTES: Array<{ path: string; meta: PageMeta }> = [
   {
     path: '/layout/companies/:companyId/topics',
     meta: {
-      kicker: 'Topics',
+      kicker: '',
       title: '题材库',
       subtitle: '按公司浏览题材，进入文档库或正文编辑入口。',
     },
@@ -69,7 +69,7 @@ const PAGE_META_ROUTES: Array<{ path: string; meta: PageMeta }> = [
   {
     path: '/layout/topics/:topicId',
     meta: {
-      kicker: 'Compose',
+      kicker: '',
       title: '正文编辑入口',
       subtitle: '选择模板版本并创建新的正文编辑文档。',
     },
@@ -77,7 +77,7 @@ const PAGE_META_ROUTES: Array<{ path: string; meta: PageMeta }> = [
   {
     path: '/layout/topics/:topicId/library',
     meta: {
-      kicker: 'Library',
+      kicker: '',
       title: '文档库',
       subtitle: '按题材查看既有文档，继续编辑或删除。',
     },
@@ -85,7 +85,7 @@ const PAGE_META_ROUTES: Array<{ path: string; meta: PageMeta }> = [
   {
     path: '/layout/docs/:id',
     meta: {
-      kicker: 'Editor',
+      kicker: '',
       title: '正文排版工作区',
       subtitle: '结构化字段、智能润色、规范校验与 DOCX 导出。',
     },
@@ -93,7 +93,7 @@ const PAGE_META_ROUTES: Array<{ path: string; meta: PageMeta }> = [
   {
     path: '/management',
     meta: {
-      kicker: 'Management',
+      kicker: '',
       title: '公文管理',
       subtitle: '维护公司、题材、模板版本与治理流程。',
     },
@@ -101,7 +101,7 @@ const PAGE_META_ROUTES: Array<{ path: string; meta: PageMeta }> = [
   {
     path: '/management/companies',
     meta: {
-      kicker: 'Companies',
+      kicker: '',
       title: '公司管理',
       subtitle: '维护公司主数据并进入题材治理流程。',
     },
@@ -109,7 +109,7 @@ const PAGE_META_ROUTES: Array<{ path: string; meta: PageMeta }> = [
   {
     path: '/management/companies/:companyId/topics',
     meta: {
-      kicker: 'Governance',
+      kicker: '',
       title: '题材治理',
       subtitle: '管理题材、模板版本和文档库。',
     },
@@ -117,7 +117,7 @@ const PAGE_META_ROUTES: Array<{ path: string; meta: PageMeta }> = [
   {
     path: '/management/topics/:topicId/train',
     meta: {
-      kicker: 'Training',
+      kicker: '',
       title: '模板训练',
       subtitle: '上传材料、修订草稿并确认模板版本。',
     },
@@ -144,6 +144,17 @@ export function AppShell({ children }: AppShellProps) {
   const session = loadEmployeeSession()
   const currentMeta = useMemo(() => resolvePageMeta(location.pathname), [location.pathname])
   const isSummaryShell = useMemo(() => Boolean(matchPath('/layout/summary', location.pathname)), [location.pathname])
+  const isDocumentShell = useMemo(
+    () =>
+      Boolean(
+          matchPath('/layout', location.pathname) ||
+          matchPath('/layout/*', location.pathname) ||
+          matchPath('/knowledge', location.pathname) ||
+          matchPath('/management', location.pathname) ||
+          matchPath('/management/*', location.pathname),
+      ),
+    [location.pathname],
+  )
   const isWorkspaceShell = useMemo(() => Boolean(matchPath('/workspace', location.pathname)), [location.pathname])
   const showWorkspaceTitleLogo = useMemo(() => Boolean(matchPath('/workspace', location.pathname)), [location.pathname])
   const companyName = session?.companyName || '云成数科'
@@ -154,14 +165,22 @@ export function AppShell({ children }: AppShellProps) {
   }
 
   return (
-    <div className={`app-shell${isSummaryShell ? ' app-shell-summary' : ''}${isWorkspaceShell ? ' app-shell-workspace' : ''}`}>
+    <div
+      className={`app-shell${isSummaryShell ? ' app-shell-summary' : ''}${isDocumentShell ? ' app-shell-document' : ''}${
+        isWorkspaceShell ? ' app-shell-workspace' : ''
+      }`}
+    >
       <div
         className={`app-shell-main${isSummaryShell ? ' app-shell-main-summary' : ''}${
+          isDocumentShell ? ' app-shell-main-document' : ''
+        }${
           isWorkspaceShell ? ' app-shell-main-workspace' : ''
         }`}
       >
         <header
           className={`app-shell-topbar${isSummaryShell ? ' shell-topbar-summary' : ''}${
+            isDocumentShell ? ' shell-topbar-document' : ''
+          }${
             isWorkspaceShell ? ' shell-topbar-workspace' : ''
           }`}
         >
@@ -196,7 +215,13 @@ export function AppShell({ children }: AppShellProps) {
           </div>
         </header>
 
-        <div className={`app-shell-scroll${isWorkspaceShell ? ' app-shell-scroll-workspace' : ''}`}>{children}</div>
+        <div
+          className={`app-shell-scroll${isDocumentShell ? ' app-shell-scroll-document' : ''}${
+            isWorkspaceShell ? ' app-shell-scroll-workspace' : ''
+          }`}
+        >
+          {children}
+        </div>
       </div>
     </div>
   )

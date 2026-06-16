@@ -1,7 +1,7 @@
 import { LAYOUT_HOME_PATH } from './layoutNavigation'
 
 export type EmployeeRole = 'staff' | 'admin'
-export type ModuleKey = 'summary' | 'layout' | 'management' | 'meetingMinutes'
+export type ModuleKey = 'summary' | 'layout' | 'management' | 'knowledge'
 
 export type EmployeeSession = {
   username: string
@@ -50,6 +50,13 @@ const MODULE_DEFINITIONS: ModuleDefinition[] = [
     allowedRoles: ['staff', 'admin'],
   },
   {
+    key: 'knowledge',
+    title: '知识库',
+    description: '沉淀本地公文材料，供智能写作调阅参考。',
+    entryPath: '/knowledge',
+    allowedRoles: ['staff', 'admin'],
+  },
+  {
     key: 'layout',
     title: '公文排版',
     description: '统一正文结构、格式规范和输出标准，提升发文一致性。',
@@ -62,13 +69,6 @@ const MODULE_DEFINITIONS: ModuleDefinition[] = [
     description: '管理公司、题材和历史文档，支持后续权限精细化治理。',
     entryPath: '/management/companies',
     allowedRoles: ['admin'],
-  },
-  {
-    key: 'meetingMinutes',
-    title: '会议纪要',
-    description: '会后整理会议议程、结论和待办事项，后续将接入完整纪要生成流程。',
-    entryPath: '/meeting-minutes',
-    allowedRoles: ['staff', 'admin'],
   },
 ]
 

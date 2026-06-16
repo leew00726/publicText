@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.database import Base, SessionLocal, engine
-from app.routers import ai, auth, docs, topics, units
+from app.routers import ai, auth, docs, knowledge, topics, units
 from app.seed import seed_data
 from app.services.employee_directory import sync_employee_directory
 
@@ -100,6 +100,7 @@ async def api_domain_alias_middleware(request, call_next):
 app.include_router(units.router)
 app.include_router(docs.router)
 app.include_router(ai.router)
+app.include_router(knowledge.router)
 app.include_router(topics.router)
 app.include_router(auth.router)
 

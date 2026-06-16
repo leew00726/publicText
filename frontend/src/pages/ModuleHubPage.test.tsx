@@ -4,7 +4,9 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 
-import { ModuleHubPage } from './ModuleHubPage'
+import * as ModuleHubPageModule from './ModuleHubPage'
+
+const { ModuleHubPage } = ModuleHubPageModule
 
 const pagesCssPath = path.resolve(__dirname, '../styles/pages.css')
 
@@ -39,10 +41,10 @@ vi.mock('../utils/employeeAuth', () => ({
       enabled: true,
     },
     {
-      key: 'meetingMinutes',
-      title: '会议纪要',
-      description: '会后整理会议议程、结论和待办事项，后续将接入完整纪要生成流程。',
-      entryPath: '/meeting-minutes',
+      key: 'knowledge',
+      title: '知识库',
+      description: '沉淀本地公文材料，供智能写作调阅参考。',
+      entryPath: '/knowledge',
       enabled: true,
     },
   ]),
@@ -62,54 +64,158 @@ describe('ModuleHubPage', () => {
     expect(html).toContain('欢迎回来，张三')
     expect(html).toContain('公司归属')
     expect(html).toContain('当前可用 4 个模块')
+    expect(html).toContain('workspace-primary-module')
+    expect(html).toContain('workspace-secondary-modules')
+    expect(html).toContain('workspace-module-tier')
+    expect(html).toContain('协同模块')
     expect(html).toContain('公文总结')
     expect(html).toContain('公文排版')
     expect(html).toContain('公文管理')
-    expect(html).toContain('会议纪要')
+    expect(html).toContain('知识库')
     expect(html).toContain('进入公文总结')
     expect(html).toContain('进入公文排版')
-    expect(html).toContain('进入会议纪要')
+    expect(html).toContain('进入公文管理')
+    expect(html).toContain('进入知识库')
+    expect(html).not.toContain('按题材进入正文编排流程')
+    expect(html).not.toContain('从题材库、模板版本到正文编辑与导出')
+    expect(html).toContain('最近文档')
+    expect(html).toContain('workspace-recent-count')
+    expect(html).toContain('0 条')
+    expect(html).not.toContain('会议纪要')
+    expect(html.indexOf('公文排版')).toBeLessThan(html.indexOf('公文总结'))
     expect(html).not.toContain('模块总数')
     expect(html).not.toContain('统一进入公文总结、公文排版和公文管理模块。')
     expect(html).not.toContain('这里不再放装饰横幅')
     expect(html).not.toContain('workspace-quick-grid')
+    expect(html).not.toContain('SUMMARY')
+    expect(html).not.toContain('LAYOUT')
+    expect(html).not.toContain('MANAGEMENT')
+    expect(html).not.toContain('主流程')
+    expect(html).not.toContain('<span>01</span>')
+    expect(html).not.toContain('<span>02</span>')
+    expect(html).not.toContain('<span>03</span>')
 
     expect(html).not.toContain('中国华能')
     expect(html).not.toContain('module-h-hero')
     expect(html).not.toContain('data-particle-shape=')
   })
 
-  it('uses a four-column workspace module grid on desktop when four modules are available', () => {
-    const styles = fs.readFileSync(pagesCssPath, 'utf8')
+  it('maps recent documents from real document records instead of static placeholders', () => {
+    const buildRecentDocRows = (ModuleHubPageModule as any).buildRecentDocRows
+    expect(typeof buildRecentDocRows).toBe('function')
 
-    expect(styles).toMatch(/\.workspace-module-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);/)
+    const rows = buildRecentDocRows([
+      {
+        id: 'doc-old',
+        title: '较早文档',
+        status: 'draft',
+        updatedAt: '2026-03-01T08:00:00.000Z',
+        structuredFields: { topicName: '通知' },
+      },
+      {
+        id: 'doc-new',
+        title: '最新文档',
+        status: 'published',
+        updatedAt: '2026-03-03T08:00:00.000Z',
+        structuredFields: { topicName: '请示' },
+      },
+      {
+        id: 'doc-mid',
+        title: '中间文档',
+        status: 'archived',
+        updatedAt: '2026-03-02T08:00:00.000Z',
+        structuredFields: {},
+      },
+    ])
+
+    expect(rows.map((row: any) => row.id)).toEqual(['doc-new', 'doc-mid', 'doc-old'])
+    expect(rows[0].title).toBe('最新文档')
+    expect(rows[0].meta).toContain('请示')
+    expect(rows[0].status).toBe('已完成')
+    expect(rows[1].meta).toContain('公文排版')
+    expect(rows[1].status).toBe('已归档')
   })
 
-  it('uses a compact single-screen workspace layout on desktop', () => {
+  it('loads and opens recent documents from the document API', () => {
+    const source = fs.readFileSync(path.resolve(__dirname, 'ModuleHubPage.tsx'), 'utf8')
+
+    expect(source).toContain("api.get<GovDoc[]>('/api/layout/docs')")
+    expect(source).toContain('navigate(`/layout/docs/${doc.id}`)')
+    expect(source).not.toContain('const RECENT_DOCS')
+  })
+
+  it('puts layout in the largest workspace module area on desktop', () => {
     const styles = fs.readFileSync(pagesCssPath, 'utf8')
 
     expect(styles).toMatch(
-      /\.workspace-dashboard\s*\{[\s\S]*grid-template-rows:\s*auto minmax\(0,\s*1fr\);[\s\S]*overflow:\s*hidden;/,
+      /\.workspace-primary-module\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) minmax\(320px,\s*0\.84fr\) auto;/,
+    )
+    expect(styles).toMatch(/\.workspace-secondary-modules\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/)
+    expect(styles).toMatch(/border-bottom:\s*1px solid rgba\(40,\s*74,\s*118,\s*0\.14\);/)
+    expect(styles).toMatch(/border-left:\s*1px solid rgba\(40,\s*74,\s*118,\s*0\.12\);/)
+  })
+
+  it('keeps recent documents reachable on shorter desktop viewports', () => {
+    const styles = fs.readFileSync(pagesCssPath, 'utf8')
+
+    expect(styles).toMatch(
+      /\.workspace-dashboard\s*\{[\s\S]*min-height:\s*100%;[\s\S]*height:\s*auto;[\s\S]*overflow:\s*visible;/,
     )
     expect(styles).toMatch(
-      /\.workspace-module-card\s*\{[\s\S]*grid-template-rows:\s*auto auto 1fr auto;[\s\S]*min-height:\s*0;/,
+      /\.workspace-panel\s*\{[\s\S]*height:\s*auto;[\s\S]*grid-template-rows:\s*auto auto auto auto;[\s\S]*overflow:\s*visible;/,
+    )
+    expect(styles).toMatch(
+      /\.workspace-recent-docs\s*\{[\s\S]*min-height:\s*242px;[\s\S]*grid-template-rows:\s*auto auto;[\s\S]*gap:\s*12px;/,
+    )
+    expect(styles).toMatch(
+      /\.workspace-recent-list\s*\{[\s\S]*overflow:\s*hidden;[\s\S]*border:\s*1px solid rgba\(40,\s*74,\s*118,\s*0\.1\);/,
     )
   })
 
-  it('keeps the workspace hero banner visually compact', () => {
+  it('keeps the workspace overview banner visually compact with a premium blue-white surface', () => {
     const styles = fs.readFileSync(pagesCssPath, 'utf8')
 
     expect(styles).toMatch(
-      /\.workspace-hero\s*\{[\s\S]*gap:\s*10px;[\s\S]*padding:\s*18px 22px;[\s\S]*border-radius:\s*24px;/,
+      /\.workspace-hero\s*\{[\s\S]*gap:\s*28px;[\s\S]*padding:\s*22px 28px;[\s\S]*border-radius:\s*8px;/,
     )
     expect(styles).toMatch(
-      /\.workspace-hero-copy\s*\{[\s\S]*gap:\s*8px;/,
+      /\.workspace-hero-copy\s*\{[\s\S]*gap:\s*6px;/,
     )
     expect(styles).toMatch(
-      /\.workspace-hero h2\s*\{[\s\S]*font-size:\s*clamp\(26px,\s*3vw,\s*38px\);/,
+      /\.workspace-hero h2\s*\{[\s\S]*font-size:\s*22px;/,
     )
     expect(styles).toMatch(
-      /\.workspace-hero\s+\.soft-pill\s*\{[\s\S]*min-height:\s*28px;[\s\S]*padding:\s*0 10px;[\s\S]*font-size:\s*12px;/,
+      /\.workspace-overview-stat\s*\{[\s\S]*padding:\s*0 18px;[\s\S]*min-height:\s*40px;/,
     )
+    expect(styles).toMatch(
+      /\.workspace-panel::before\s*\{[\s\S]*background:\s*linear-gradient\(90deg,\s*#153a73,\s*#2457d6 52%,\s*#6d8edc\);/,
+    )
+  })
+
+  it('optimizes home page controls and recent-document rows for scanning and touch', () => {
+    const styles = fs.readFileSync(pagesCssPath, 'utf8')
+
+    expect(styles).toMatch(
+      /\.workspace-link-button,\s*\.workspace-text-button\s*\{[\s\S]*min-height:\s*44px;/,
+    )
+    expect(styles).toMatch(
+      /\.workspace-link-button:focus-visible,\s*\.workspace-text-button:focus-visible,\s*\.workspace-recent-title:focus-visible\s*\{[\s\S]*outline:\s*2px solid #2457d6;/,
+    )
+    expect(styles).toMatch(
+      /\.workspace-recent-list li\s*\{[\s\S]*min-height:\s*54px;[\s\S]*grid-template-columns:\s*42px minmax\(0,\s*1\.2fr\) minmax\(140px,\s*0\.8fr\) 76px;/,
+    )
+    expect(styles).toMatch(
+      /\.workspace-recent-count\s*\{[\s\S]*min-height:\s*28px;[\s\S]*background:\s*#f4f7ff;/,
+    )
+  })
+
+  it('shows complete supporting copy in the secondary workspace modules', () => {
+    const styles = fs.readFileSync(pagesCssPath, 'utf8')
+
+    expect(styles).toMatch(
+      /\.workspace-secondary-module\s*\{[\s\S]*height:\s*auto;/,
+    )
+    expect(styles).not.toContain('.workspace-secondary-module .module-card-copy p {\n  -webkit-line-clamp')
+    expect(styles).not.toContain('.workspace-secondary-module .workspace-secondary-flow {\n  min-width: 0;\n  overflow: hidden;')
   })
 })

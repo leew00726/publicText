@@ -86,6 +86,17 @@ export type GovDoc = {
   updatedAt: string
 }
 
+export type KnowledgeDocument = {
+  id: string
+  title: string
+  fileName: string
+  fileType: string
+  excerpt: string
+  sourceChars: number
+  createdAt: string
+  updatedAt: string
+}
+
 export type CheckIssue = {
   code: string
   type: 'A' | 'B'

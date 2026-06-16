@@ -1,31 +1,36 @@
 :root {
-  --bg-base: #edf2f8;
-  --bg-elevated: #f8fafc;
-  --bg-accent: #dbe6f3;
-  --surface: rgba(255, 255, 255, 0.76);
-  --surface-strong: rgba(255, 255, 255, 0.9);
+  --bg-base: #edf3fb;
+  --bg-elevated: #f8fbff;
+  --bg-accent: #e0e9f6;
+  --surface: rgba(255, 255, 255, 0.86);
+  --surface-strong: rgba(255, 255, 255, 0.96);
   --surface-solid: #ffffff;
-  --surface-muted: #f3f6fa;
-  --line: rgba(76, 101, 131, 0.14);
-  --line-strong: rgba(48, 78, 112, 0.24);
-  --text: #172638;
-  --text-soft: #4e6075;
-  --text-muted: #7e8da1;
-  --blue: #2563eb;
-  --blue-deep: #183a66;
-  --blue-soft: #dce8fb;
-  --blue-ink: #0f2745;
+  --surface-muted: #f4f7fb;
+  --line: rgba(40, 74, 118, 0.14);
+  --line-strong: rgba(36, 87, 168, 0.26);
+  --text: #111d2e;
+  --text-soft: #43546a;
+  --text-muted: #7c8a9c;
+  --blue: #2457d6;
+  --blue-deep: #153a73;
+  --blue-soft: #e8eefb;
+  --blue-ink: #102b57;
+  --tech-cyan: #2457d6;
+  --tech-mint: #2457d6;
+  --tech-amber: #b7791f;
   --sand: #f4efe5;
-  --teal-soft: #d9ece8;
-  --ok: #1f8a55;
-  --warn: #b17811;
+  --teal-soft: #d7f4ee;
+  --ok: #14885f;
+  --warn: #b7791f;
   --err: #d04a4a;
-  --shadow-sm: 0 10px 24px rgba(19, 38, 58, 0.06);
-  --shadow-md: 0 22px 60px rgba(19, 38, 58, 0.1);
-  --shadow-lg: 0 40px 96px rgba(15, 32, 49, 0.14);
-  --radius-sm: 14px;
-  --radius-md: 20px;
-  --radius-lg: 28px;
+  --tech-grid: rgba(36, 87, 214, 0.03);
+  --tech-glow: rgba(36, 87, 214, 0.12);
+  --shadow-sm: 0 6px 16px rgba(18, 41, 76, 0.06);
+  --shadow-md: 0 16px 42px rgba(18, 41, 76, 0.09);
+  --shadow-lg: 0 28px 70px rgba(18, 41, 76, 0.12);
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 8px;
   --blur: 20px;
   --font-ui: 'Avenir Next', 'PingFang SC', 'Microsoft YaHei UI', 'Segoe UI', sans-serif;
   --font-body: 'Avenir Next', 'PingFang SC', 'Microsoft YaHei UI', 'Segoe UI', sans-serif;
@@ -42,14 +47,26 @@ body,
 }
 
 body {
+  position: relative;
   margin: 0;
   font-family: var(--font-body);
   color: var(--text);
   background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.92), transparent 24%),
-    radial-gradient(circle at top right, rgba(199, 218, 244, 0.55), transparent 28%),
-    radial-gradient(circle at bottom right, rgba(234, 225, 206, 0.38), transparent 24%),
-    linear-gradient(180deg, #f7f9fc 0%, #edf2f8 48%, #e8eef6 100%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 34%),
+    linear-gradient(135deg, rgba(36, 87, 214, 0.08), transparent 38%),
+    linear-gradient(180deg, #f8fbff 0%, #edf3fb 58%, #e6edf7 100%);
+}
+
+body::before {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  content: '';
+  background:
+    linear-gradient(120deg, rgba(36, 87, 214, 0.05), transparent 44%),
+    linear-gradient(270deg, rgba(83, 125, 194, 0.04), transparent 32%);
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.08));
 }
 
 a {
@@ -73,17 +90,17 @@ input,
 select,
 textarea {
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--radius-sm);
 }
 
 input,
 select,
 textarea {
   width: 100%;
-  background: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.9);
   color: var(--text);
   padding: 12px 14px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 0 0 1px rgba(36, 87, 214, 0.02);
 }
 
 input::placeholder,
@@ -95,15 +112,16 @@ button {
   min-height: 44px;
   padding: 0 16px;
   cursor: pointer;
-  color: var(--text);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(242, 247, 255, 0.92));
+  color: var(--blue-deep);
+  background: linear-gradient(180deg, #ffffff, #f5f8fd);
   box-shadow: var(--shadow-sm);
   transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease, border-color 180ms ease;
 }
 
 button:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 14px 28px rgba(21, 49, 86, 0.12);
+  border-color: rgba(36, 87, 214, 0.34);
+  box-shadow: 0 12px 26px rgba(18, 41, 76, 0.1);
 }
 
 button:disabled {
@@ -154,8 +172,8 @@ p {
   min-height: 32px;
   padding: 0 12px;
   border-radius: 999px;
-  border: 1px solid rgba(110, 147, 199, 0.18);
-  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(36, 87, 214, 0.14);
+  background: rgba(255, 255, 255, 0.78);
   color: var(--text-soft);
   font-size: 13px;
   white-space: nowrap;
@@ -251,7 +269,7 @@ p {
 }
 
 .data-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.46);
+  background: #f7faff;
 }
 
 .narrative-list {

@@ -427,6 +427,76 @@
   gap: 8px;
 }
 
+.doc-editor-page.module-workbench-page {
+  gap: 18px;
+  padding: 0;
+  background: transparent;
+}
+
+.doc-editor-page.module-workbench-page .editor-command-bar {
+  border-radius: 8px;
+  padding: 14px 18px;
+  border: 1px solid rgba(40, 74, 118, 0.14);
+  background: linear-gradient(180deg, #ffffff, #f7faff);
+  box-shadow: 0 14px 34px rgba(18, 41, 76, 0.08);
+}
+
+.doc-editor-page.module-workbench-page .editor-shell {
+  border-radius: 8px;
+  border: 1px solid rgba(40, 74, 118, 0.14);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 20px 48px rgba(18, 41, 76, 0.1);
+}
+
+.doc-editor-page.module-workbench-page .structured-panel,
+.doc-editor-page.module-workbench-page .validation-panel,
+.doc-editor-page.module-workbench-page .ai-preview-panel,
+.doc-editor-page.module-workbench-page .font-status,
+.doc-editor-page.module-workbench-page .font-preview-warning {
+  border-radius: 8px;
+  border: 1px solid rgba(40, 74, 118, 0.12);
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(18, 41, 76, 0.05);
+}
+
+.doc-editor-page.module-workbench-page .font-status.ok {
+  border-color: rgba(31, 138, 85, 0.22);
+  background: #f3fbf6;
+}
+
+.doc-editor-page.module-workbench-page .font-status.error,
+.doc-editor-page.module-workbench-page .font-preview-warning {
+  border-color: rgba(208, 74, 74, 0.22);
+  background: #fff7f7;
+}
+
+.doc-editor-page.module-workbench-page .editor-layout {
+  gap: 18px;
+}
+
+.doc-editor-page.module-workbench-page .editor-content {
+  background: linear-gradient(180deg, #eef3fa, #f6f9fd);
+}
+
+.doc-editor-page.module-workbench-page .editor-paper-shell {
+  box-shadow: 0 18px 40px rgba(18, 41, 76, 0.12);
+}
+
+.doc-editor-page.module-workbench-page .attachments-box,
+.doc-editor-page.module-workbench-page .readonly-box,
+.doc-editor-page.module-workbench-page .issue {
+  border-radius: 8px;
+  background: rgba(248, 252, 255, 0.82);
+}
+
+.doc-editor-page.module-workbench-page .font-actions a {
+  min-height: 38px;
+  border-radius: 6px;
+  border: 1px solid rgba(40, 74, 118, 0.12);
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgba(18, 41, 76, 0.05);
+}
+
 @media (max-width: 1440px) {
   .editor-layout {
     grid-template-columns: 240px minmax(0, 1fr) 240px;

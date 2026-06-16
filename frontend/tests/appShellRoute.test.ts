@@ -8,6 +8,12 @@ describe('app shell routing', () => {
 
     expect(source).toContain("import { AppShell } from './components/AppShell'")
     expect(source).toContain('<AppShell>')
+    expect(source).toContain('KnowledgeBasePage')
+    expect(source).toContain('path="/knowledge"')
+    expect(source).toContain("withShell('knowledge.home', <KnowledgeBasePage />)")
     expect(source).not.toContain('<GlobalBackButton />')
+    expect(source).not.toContain('MeetingMinutesPage')
+    expect(source).not.toContain('/meeting-minutes')
+    expect(source).not.toContain('workspace.meetingMinutes')
   })
 })

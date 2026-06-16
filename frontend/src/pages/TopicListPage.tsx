@@ -100,7 +100,11 @@ export function TopicListPage({ mode }: TopicListPageProps) {
   }
 
   return (
-    <main className={`page workspace-page${mode === 'layout' ? ' layout-page-scale' : ''}`}>
+    <main
+      className={`page workspace-page module-workbench-page module-workbench-page-${mode}${
+        mode === 'layout' ? ' layout-page-scale' : ''
+      }`}
+    >
       {canCreateTopic ? (
         <section className="unit-editor-card">
           <strong>新建题材</strong>

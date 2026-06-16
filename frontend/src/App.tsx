@@ -4,8 +4,8 @@ import { AppShell } from './components/AppShell'
 import { CompanySelectPage } from './pages/CompanySelectPage'
 import { DocumentSummaryPage } from './pages/DocumentSummaryPage'
 import { DocEditorPage } from './pages/DocEditorPage'
+import { KnowledgeBasePage } from './pages/KnowledgeBasePage'
 import { LoginPage } from './pages/LoginPage'
-import { MeetingMinutesPage } from './pages/MeetingMinutesPage'
 import { ModuleHubPage } from './pages/ModuleHubPage'
 import { TopicComposePage } from './pages/TopicComposePage'
 import { TopicDetailPage } from './pages/TopicDetailPage'
@@ -126,7 +126,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<AuthLandingRoute />} />
       <Route path="/workspace" element={withShell('workspace.home', <ModuleHubPage />)} />
-      <Route path="/meeting-minutes" element={withShell('workspace.meetingMinutes', <MeetingMinutesPage />)} />
+      <Route path="/knowledge" element={withShell('knowledge.home', <KnowledgeBasePage />)} />
       <Route path="/layout" element={<Navigate to={LAYOUT_HOME_PATH} replace />} />
       <Route path="/layout/summary" element={withShell('layout.summary', <DocumentSummaryPage />)} />
       <Route path="/layout/company-home" element={withShell('layout.company', <EmployeeCompanyHomeRoute />)} />

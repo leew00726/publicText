@@ -8,7 +8,7 @@ export type PagePermissionKey =
   | 'layout.topicCompose'
   | 'layout.topicLibrary'
   | 'layout.docEditor'
-  | 'workspace.meetingMinutes'
+  | 'knowledge.home'
   | 'management.home'
   | 'management.company'
   | 'management.topicList'
@@ -26,7 +26,6 @@ export type ActionPermissionKey =
 const ROLE_PAGE_PERMISSIONS: Record<EmployeeRole, PagePermissionKey[]> = {
   staff: [
     'workspace.home',
-    'workspace.meetingMinutes',
     'layout.home',
     'layout.summary',
     'layout.company',
@@ -34,10 +33,10 @@ const ROLE_PAGE_PERMISSIONS: Record<EmployeeRole, PagePermissionKey[]> = {
     'layout.topicCompose',
     'layout.topicLibrary',
     'layout.docEditor',
+    'knowledge.home',
   ],
   admin: [
     'workspace.home',
-    'workspace.meetingMinutes',
     'layout.home',
     'layout.summary',
     'layout.company',
@@ -45,6 +44,7 @@ const ROLE_PAGE_PERMISSIONS: Record<EmployeeRole, PagePermissionKey[]> = {
     'layout.topicCompose',
     'layout.topicLibrary',
     'layout.docEditor',
+    'knowledge.home',
     'management.home',
     'management.company',
     'management.topicList',

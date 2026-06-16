@@ -85,7 +85,7 @@ export function CompanySelectPage({ mode }: CompanySelectPageProps) {
   }
 
   return (
-    <main className="page workspace-page">
+    <main className={`page workspace-page module-workbench-page module-workbench-page-${mode}`}>
       {canCreateCompany ? (
         <section className="unit-editor-card company-create-card">
           <div className="company-create-copy">

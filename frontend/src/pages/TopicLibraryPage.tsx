@@ -61,7 +61,7 @@ export function TopicLibraryPage() {
   }
 
   return (
-    <main className="page workspace-page layout-page-scale">
+    <main className="page workspace-page module-workbench-page module-workbench-page-layout layout-page-scale">
       <section className="workspace-table-card">
         {loading ? (
           <p>加载中...</p>

@@ -1,4 +1,5 @@
 import { DragEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { useInRouterContext, useNavigate } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type { Topic, TopicTemplate } from '../api/types'
@@ -35,6 +36,29 @@ type SummaryApiResponse = {
     truncated: boolean
   }
   summary: string
+  knowledgeReferences?: Array<Record<string, any>>
+}
+
+function KnowledgeBaseEntryButton() {
+  const inRouter = useInRouterContext()
+  if (inRouter) {
+    return <KnowledgeBaseRouterEntryButton />
+  }
+
+  return (
+    <button type="button" className="secondary-button" onClick={() => window.location.assign('/knowledge')}>
+      进入知识库
+    </button>
+  )
+}
+
+function KnowledgeBaseRouterEntryButton() {
+  const navigate = useNavigate()
+  return (
+    <button type="button" className="secondary-button" onClick={() => navigate('/knowledge')}>
+      进入知识库
+    </button>
+  )
 }
 
 export function DocumentSummaryPage() {
@@ -44,6 +68,7 @@ export function DocumentSummaryPage() {
   const [sourceMode, setSourceMode] = useState<SummarySourceMode>('file')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [sourceText, setSourceText] = useState('')
+  const [useKnowledgeBase, setUseKnowledgeBase] = useState(false)
   const [summaryLength, setSummaryLength] = useState<SummaryLength>('medium')
   const [agentMessages, setAgentMessages] = useState<AgentMessage[]>([])
   const [agentDraft, setAgentDraft] = useState('')
@@ -57,9 +82,18 @@ export function DocumentSummaryPage() {
   const [templatesLoading, setTemplatesLoading] = useState(false)
 
   const normalizedSourceText = sourceText.trim()
-  const canSummarize = Boolean(sourceMode === 'file' ? selectedFile : normalizedSourceText) && !summarizing
+  const activeInstruction = useMemo(() => {
+    const staged = agentDraft.trim()
+    const messages = staged ? [...agentMessages, { role: 'user' as const, content: staged }] : agentMessages
+    return messages
+      .filter((item) => item.role === 'user')
+      .map((item) => item.content.trim())
+      .filter(Boolean)
+      .join('\n')
+  }, [agentDraft, agentMessages])
+  const canSummarize = (useKnowledgeBase ? Boolean(activeInstruction) : Boolean(sourceMode === 'file' ? selectedFile : normalizedSourceText)) && !summarizing
   const canExport = summary.trim().length > 0 && !exporting && (templateOptions.length === 0 || Boolean(selectedTemplateId))
-  const showTemplateSelector = templateOptions.length > 0
+  const showGeneratedSummary = Boolean(summary.trim() || resultMeta)
 
   const usageSummary = useMemo(() => {
     if (!resultMeta) return ''
@@ -157,6 +191,48 @@ export function DocumentSummaryPage() {
       .map((item) => item.content.trim())
       .filter(Boolean)
       .join('\n')
+
+    if (useKnowledgeBase) {
+      if (!extraInstruction) {
+        setErrorMessage('请先填写写作要求，再调用知识库写作。')
+        return
+      }
+
+      setSummarizing(true)
+      setErrorMessage('')
+      setAgentMessages(nextAgentMessages)
+      setAgentDraft('')
+      try {
+        const res = await api.post<SummaryApiResponse>('/api/layout/ai/draft-with-knowledge', {
+          instruction: extraInstruction,
+          summaryLength,
+        }, {
+          timeout: 180000,
+        })
+        setResultMeta(res.data)
+        setSummary((res.data.summary || '').trim())
+        setAgentMessages((current) => [
+          ...current,
+          {
+            role: 'assistant',
+            content: '已调阅云矩知识库生成材料。你可以继续补充要求后重新生成。',
+          },
+        ])
+        if (!res.data.summary?.trim()) {
+          setErrorMessage('生成结果为空，请重试。')
+        }
+      } catch (error: any) {
+        const detail = error?.response?.data?.detail
+        if (typeof detail === 'string') {
+          setErrorMessage(detail)
+        } else {
+          setErrorMessage('知识库写作失败，请检查 DeepSeek 配置或稍后重试。')
+        }
+      } finally {
+        setSummarizing(false)
+      }
+      return
+    }
 
     if (sourceMode === 'file' && !selectedFile) return
     if (sourceMode === 'text' && !normalizedSourceText) return
@@ -267,10 +343,6 @@ export function DocumentSummaryPage() {
             </div>
 
             <div className="summary-panel-body">
-              <div className="summary-section-heading">
-                <strong>输入源</strong>
-              </div>
-
               <div className="summary-source-switch" role="tablist" aria-label="总结输入方式">
                 <button
                   type="button"
@@ -305,6 +377,7 @@ export function DocumentSummaryPage() {
                   onDrop={handleDrop}
                 >
                   <p>{selectedFile ? `已选择：${selectedFile.name}` : '拖拽或点击选择文件'}</p>
+                  <small>支持 DOCX / PDF / TXT，单文件 ≤ 20MB</small>
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -334,6 +407,24 @@ export function DocumentSummaryPage() {
                   />
                 </section>
               )}
+
+              <section className="summary-knowledge-bridge">
+                <div className="summary-section-heading">
+                  <strong>知识库调用</strong>
+                </div>
+
+                <label className="checkbox-inline summary-knowledge-toggle">
+                  <input
+                    type="checkbox"
+                    checked={useKnowledgeBase}
+                    onChange={(event) => setUseKnowledgeBase(event.target.checked)}
+                  />
+                  调用知识库写作
+                </label>
+
+                <p className="summary-side-note">启用后将根据补充要求调阅云矩知识库生成材料。</p>
+                <KnowledgeBaseEntryButton />
+              </section>
 
               <label>
                 总结长度
@@ -387,7 +478,7 @@ export function DocumentSummaryPage() {
 
               <div className="row-gap">
                 <button type="button" className="summary-primary-action" onClick={() => void summarize()} disabled={!canSummarize}>
-                  {summarizing ? '总结中...' : '开始总结'}
+                  {summarizing ? (useKnowledgeBase ? '写作中...' : '总结中...') : useKnowledgeBase ? '开始知识库写作' : '开始总结'}
                 </button>
               </div>
 
@@ -419,22 +510,29 @@ export function DocumentSummaryPage() {
                   {resultMeta.source.truncated ? <span className="summary-warn">原文过长，已截断处理。</span> : null}
                 </section>
               ) : (
-                <div className="empty-state">
-                  <strong>暂无结果</strong>
-                </div>
+                <section className="summary-meta summary-meta-empty" aria-hidden="true" />
               )}
 
-              <section className="summary-editor">
-                <textarea
-                  id="summary-textarea"
-                  aria-label="总结内容"
-                  rows={16}
-                  value={summary}
-                  onChange={(event) => setSummary(event.target.value)}
-                />
+              <section className="summary-output-surface">
+                {showGeneratedSummary ? (
+                  <section className="summary-editor">
+                    <textarea
+                      id="summary-textarea"
+                      aria-label="总结内容"
+                      rows={16}
+                      value={summary}
+                      onChange={(event) => setSummary(event.target.value)}
+                    />
+                  </section>
+                ) : (
+                  <div className="empty-state">
+                    <span className="summary-empty-mark">-</span>
+                    <p>暂无结果，完成左侧设置后点击「开始总结」</p>
+                  </div>
+                )}
               </section>
 
-              {showTemplateSelector ? (
+              <section className="summary-export-row">
                 <section className="summary-template-panel">
                   <label htmlFor="summary-template-select">导出模板</label>
                   <select
@@ -442,28 +540,30 @@ export function DocumentSummaryPage() {
                     className="summary-template-select"
                     value={selectedTemplateId}
                     onChange={(event) => setSelectedTemplateId(event.target.value)}
-                    disabled={templatesLoading}
+                    disabled={templatesLoading || templateOptions.length === 0}
                   >
-                    {templateOptions.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.topicName} · v{option.version}
-                        {option.effective ? '（当前生效）' : ''}
-                      </option>
-                    ))}
+                    {templateOptions.length === 0 ? (
+                      <option value="">通用模板 · v1（当前生效）</option>
+                    ) : (
+                      templateOptions.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.topicName} · v{option.version}
+                          {option.effective ? '（当前生效）' : ''}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </section>
-              ) : null}
 
-              <div className="row-gap">
                 <button
                   type="button"
-                  className="summary-primary-action"
+                  className="summary-primary-action summary-export-action"
                   onClick={() => void exportDocx()}
                   disabled={!canExport}
                 >
                   {exporting ? '导出中...' : '导出总结 DOCX'}
                 </button>
-              </div>
+              </section>
             </div>
           </article>
         </section>

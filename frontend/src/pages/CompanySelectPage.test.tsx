@@ -35,4 +35,18 @@ describe('CompanySelectPage', () => {
     expect(html).toContain('新增公司后即可进入对应题材、模板与文档治理流程。')
     expect(html).toContain('公司名称（必填）')
   })
+
+  it('routes management users through the company department overview', () => {
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <CompanySelectPage
+          mode="management"
+          initialCompanies={[{ id: 'company-1', name: '云成数科' }]}
+        />
+      </MemoryRouter>,
+    )
+
+    expect(html).toContain('进入公司')
+    expect(html).toContain('/management/companies/company-1/departments')
+  })
 })

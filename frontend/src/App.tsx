@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
 import { CompanySelectPage } from './pages/CompanySelectPage'
+import { DepartmentManagementPage } from './pages/DepartmentManagementPage'
 import { DocumentSummaryPage } from './pages/DocumentSummaryPage'
 import { DocEditorPage } from './pages/DocEditorPage'
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage'
@@ -137,6 +138,10 @@ export default function App() {
       <Route path="/layout/docs/:id" element={withShell('layout.docEditor', <DocEditorPage />)} />
       <Route path="/management" element={<Navigate to="/management/companies" replace />} />
       <Route path="/management/companies" element={withShell('management.company', <CompanySelectPage mode="management" />)} />
+      <Route
+        path="/management/companies/:companyId/departments"
+        element={withShell('management.company', <DepartmentManagementPage />)}
+      />
       <Route
         path="/management/companies/:companyId/topics"
         element={withShell('management.topicList', <TopicListPage mode="management" />)}

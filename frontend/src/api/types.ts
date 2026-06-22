@@ -2,6 +2,24 @@
   id: string
   name: string
 }
+export type Personnel = {
+  id: string
+  employeeNo?: string | null
+  name: string
+  subDepartmentName?: string | null
+  hasLogin: boolean
+}
+
+export type Department = {
+  id: string
+  companyId: string
+  name: string
+  code: string
+  sortOrder: number
+  memberCount: number
+  members: Personnel[]
+}
+
 export type AuthLoginResponse = {
   employeeNo: string
   name: string

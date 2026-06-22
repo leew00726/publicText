@@ -103,7 +103,15 @@ const PAGE_META_ROUTES: Array<{ path: string; meta: PageMeta }> = [
     meta: {
       kicker: '',
       title: '公司管理',
-      subtitle: '维护公司主数据并进入题材治理流程。',
+      subtitle: '维护公司主数据并进入组织与题材治理流程。',
+    },
+  },
+  {
+    path: '/management/companies/:companyId/departments',
+    meta: {
+      kicker: '',
+      title: '部门管理',
+      subtitle: '查看公司组织架构与人员归属。',
     },
   },
   {

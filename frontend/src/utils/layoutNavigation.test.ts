@@ -24,4 +24,11 @@ describe('layoutNavigation', () => {
   it('returns to the document library from the editor when the topic is known', () => {
     expect(resolveLayoutBackPath('/layout/docs/doc-1', { docTopicId: 'topic-1' })).toBe('/layout/topics/topic-1/library')
   })
+
+  it('keeps management navigation inside the company department flow', () => {
+    expect(resolveLayoutBackPath('/management/companies/company-1/departments')).toBe('/management/companies')
+    expect(resolveLayoutBackPath('/management/companies/company-1/topics')).toBe(
+      '/management/companies/company-1/departments',
+    )
+  })
 })

@@ -11,6 +11,16 @@ export function resolveLayoutBackPath(
   pathname: string,
   { docTopicId = null, topicCompanyId = null }: ResolveLayoutBackPathOptions = {},
 ): string | null {
+  const managementDepartmentMatch = matchPath('/management/companies/:companyId/departments', pathname)
+  if (managementDepartmentMatch) {
+    return '/management/companies'
+  }
+
+  const managementTopicListMatch = matchPath('/management/companies/:companyId/topics', pathname)
+  if (managementTopicListMatch?.params?.companyId) {
+    return `/management/companies/${managementTopicListMatch.params.companyId}/departments`
+  }
+
   if (matchPath('/layout/docs/:id', pathname) && docTopicId) {
     return `/layout/topics/${docTopicId}/library`
   }

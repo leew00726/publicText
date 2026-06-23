@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import KnowledgeDocument
+from app.schemas import ApiMessage
 from app.services.document_summary import extract_text_from_uploaded_file
 from app.services.knowledge_base import knowledge_document_to_out
 from app.services.storage import storage_service
@@ -31,6 +32,29 @@ def _safe_object_filename(value: str) -> str:
 def list_knowledge_documents_api(db: Session = Depends(get_db)):
     rows = db.query(KnowledgeDocument).order_by(KnowledgeDocument.updated_at.desc()).all()
     return [knowledge_document_to_out(row) for row in rows]
+
+
+@router.get("/docs/{doc_id}")
+def get_knowledge_document_api(doc_id: str, db: Session = Depends(get_db)):
+    row = db.query(KnowledgeDocument).filter(KnowledgeDocument.id == doc_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="知识库文档不存在")
+
+    payload = knowledge_document_to_out(row)
+    payload["contentText"] = row.content_text
+    return payload
+
+
+@router.delete("/docs/{doc_id}", response_model=ApiMessage)
+def delete_knowledge_document_api(doc_id: str, db: Session = Depends(get_db)):
+    row = db.query(KnowledgeDocument).filter(KnowledgeDocument.id == doc_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="知识库文档不存在")
+
+    storage_service.delete_object(row.object_name)
+    db.delete(row)
+    db.commit()
+    return ApiMessage(message="ok")
 
 
 @router.post("/docs")

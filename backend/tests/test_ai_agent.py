@@ -51,12 +51,38 @@ class DeepSeekAgentTests(unittest.TestCase):
         self.assertEqual(result["model"], "deepseek-chat")
         self.assertEqual(result["usage"]["total_tokens"], 31)
 
-    def test_rewrite_without_api_key_raises_config_error(self):
+    @patch("app.services.ai_agent.urllib.request.urlopen")
+    def test_rewrite_without_api_key_omits_authorization_header_when_not_required(self, mock_urlopen):
+        fake_payload = {
+            "model": "deepseek-chat",
+            "usage": {},
+            "choices": [{"message": {"content": "已改写"}}],
+        }
+
+        fake_resp = MagicMock()
+        fake_resp.read.return_value = json.dumps(fake_payload).encode("utf-8")
+        fake_resp.__enter__.return_value = fake_resp
+        mock_urlopen.return_value = fake_resp
+
+        agent = DeepSeekAgent(
+            api_key="",
+            endpoint="http://10.211.49.42:8124/v1/chat/completions",
+            model="deepseek-chat",
+            timeout_sec=20,
+        )
+        result = agent.rewrite("原始文本", "formal")
+
+        self.assertEqual(result["text"], "已改写")
+        request = mock_urlopen.call_args.args[0]
+        self.assertNotIn("Authorization", request.headers)
+
+    def test_rewrite_requires_api_key_when_configured(self):
         agent = DeepSeekAgent(
             api_key="",
             endpoint="https://api.deepseek.com/v1/chat/completions",
             model="deepseek-chat",
             timeout_sec=20,
+            require_api_key=True,
         )
         with self.assertRaises(AgentConfigError):
             agent.rewrite("原始文本", "formal")

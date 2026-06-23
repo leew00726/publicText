@@ -115,6 +115,10 @@ export type KnowledgeDocument = {
   updatedAt: string
 }
 
+export type KnowledgeDocumentDetail = KnowledgeDocument & {
+  contentText: string
+}
+
 export type CheckIssue = {
   code: string
   type: 'A' | 'B'

@@ -26,6 +26,10 @@ describe('KnowledgeBasePage', () => {
     expect(html).toContain('上传左侧公文材料后，会在这里形成可调阅的写作参考。')
     expect(source).toContain("api.get<KnowledgeDocument[]>('/api/knowledge/docs')")
     expect(source).toContain("api.post<KnowledgeDocument>('/api/knowledge/docs'")
+    expect(source).toContain("api.get<KnowledgeDocumentDetail>(`/api/knowledge/docs/${doc.id}`)")
+    expect(source).toContain("api.delete(`/api/knowledge/docs/${doc.id}`)")
+    expect(source).toContain('查看文件')
+    expect(source).toContain('删除')
     expect(source).not.toContain('/api/layout/ai/knowledge-docs')
   })
 

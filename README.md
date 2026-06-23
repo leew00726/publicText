@@ -176,7 +176,8 @@ docker compose up -d --build backend frontend
 在项目根目录创建 `.env`（供 `docker compose` 读取）：
 
 ```env
-DEEPSEEK_API_KEY=你的密钥
+DEEPSEEK_API_KEY=
+DEEPSEEK_REQUIRE_API_KEY=false
 DEEPSEEK_BASE_URL=http://10.211.49.42:8124/v1/models
 DEEPSEEK_MODEL=deepseek-chat
 DEEPSEEK_TIMEOUT_SEC=45
@@ -186,7 +187,8 @@ TEMPLATE_INFERENCE_AI_MAX_PARAGRAPHS=80
 ```
 
 说明：
-- 若不配置 `DEEPSEEK_API_KEY`，智能润色/智能修订会失败，其他功能可正常运行。
+- 内网 DeepSeek 若不需要鉴权，可保持 `DEEPSEEK_API_KEY` 为空且 `DEEPSEEK_REQUIRE_API_KEY=false`。
+- 若接入公网 DeepSeek 或需要鉴权的内网网关，请填写 `DEEPSEEK_API_KEY`，并可设置 `DEEPSEEK_REQUIRE_API_KEY=true` 让后端在缺少 key 时快速报配置错误。
 - `TEMPLATE_INFERENCE_ENGINE` 控制文件训练模板的识别方式：`rules` 为现有规则版，`hybrid` 为 DeepSeek 辅助判断段落角色并失败回退，`deepseek` 为强制使用 DeepSeek。
 - 若 DeepSeek 辅助识别效果不理想，将 `TEMPLATE_INFERENCE_ENGINE` 改回 `rules` 并重启后端即可回滚。
 - 更新 `.env` 后请重建 `backend` 容器使配置生效。

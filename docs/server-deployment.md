@@ -28,7 +28,7 @@
 - 平台以前后端分离方式运行
 - PostgreSQL 数据库存放在服务器本机磁盘
 - 导入、导出文件也存放在服务器本机磁盘
-- 如需 AI 功能，服务器需要能访问外部 DeepSeek 接口
+- 如需 AI 功能，服务器需要能访问 DeepSeek 兼容接口（内网或外部均可）
 
 ## 2. 依赖环境
 
@@ -169,6 +169,7 @@ CORS_ORIGINS=http://服务器IP
 CORS_ORIGIN_REGEX=^https?://(服务器IP|localhost|127\.0\.0\.1)(?::\d+)?$
 
 DEEPSEEK_API_KEY=
+DEEPSEEK_REQUIRE_API_KEY=false
 DEEPSEEK_BASE_URL=http://10.211.49.42:8124/v1/models
 DEEPSEEK_MODEL=deepseek-chat
 DEEPSEEK_TIMEOUT_SEC=45
@@ -183,7 +184,8 @@ TEMPLATE_INFERENCE_AI_MAX_PARAGRAPHS=80
 - `APP_PORT`
 - `CORS_ORIGINS`
 - `CORS_ORIGIN_REGEX`
-- `DEEPSEEK_API_KEY`，如果需要 AI 功能
+- `DEEPSEEK_API_KEY`，如果 DeepSeek 接口需要鉴权；内网无鉴权服务可留空
+- `DEEPSEEK_REQUIRE_API_KEY`，无鉴权内网服务保持 `false`；需要强制检查 key 时改为 `true`
 - `TEMPLATE_INFERENCE_ENGINE`，文件训练模板识别方式；回滚 DeepSeek 辅助识别时改为 `rules`
 
 ### 7.2 员工账号文件

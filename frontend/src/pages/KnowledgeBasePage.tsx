@@ -2,7 +2,7 @@ import { DragEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { api } from '../api/client'
-import type { KnowledgeDocument } from '../api/types'
+import type { KnowledgeDocument, KnowledgeDocumentDetail } from '../api/types'
 import { isSupportedSummaryFileName } from '../utils/documentSummary'
 
 export function KnowledgeBasePage() {
@@ -12,6 +12,9 @@ export function KnowledgeBasePage() {
   const [dragging, setDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [viewingDocId, setViewingDocId] = useState<string | null>(null)
+  const [deletingDocId, setDeletingDocId] = useState<string | null>(null)
+  const [selectedDoc, setSelectedDoc] = useState<KnowledgeDocumentDetail | null>(null)
   const [errorMessage, setErrorMessage] = useState('')
   const [statusMessage, setStatusMessage] = useState('')
 
@@ -65,6 +68,40 @@ export function KnowledgeBasePage() {
     setDragging(false)
     const file = event.dataTransfer.files?.[0] || null
     void uploadFile(file)
+  }
+
+  const viewDocument = async (doc: KnowledgeDocument) => {
+    setViewingDocId(doc.id)
+    setErrorMessage('')
+    try {
+      const res = await api.get<KnowledgeDocumentDetail>(`/api/knowledge/docs/${doc.id}`)
+      setSelectedDoc(res.data)
+    } catch (error: any) {
+      const detail = error?.response?.data?.detail
+      setErrorMessage(typeof detail === 'string' ? detail : '知识库文档查看失败，请稍后重试。')
+    } finally {
+      setViewingDocId(null)
+    }
+  }
+
+  const deleteDocument = async (doc: KnowledgeDocument) => {
+    const confirmed = window.confirm(`确认删除知识库文档“${doc.title}”？`)
+    if (!confirmed) return
+
+    setDeletingDocId(doc.id)
+    setErrorMessage('')
+    setStatusMessage('')
+    try {
+      await api.delete(`/api/knowledge/docs/${doc.id}`)
+      setDocs((current) => current.filter((item) => item.id !== doc.id))
+      setSelectedDoc((current) => (current?.id === doc.id ? null : current))
+      setStatusMessage(`已删除：${doc.title}`)
+    } catch (error: any) {
+      const detail = error?.response?.data?.detail
+      setErrorMessage(typeof detail === 'string' ? detail : '知识库文档删除失败，请稍后重试。')
+    } finally {
+      setDeletingDocId(null)
+    }
   }
 
   return (
@@ -134,18 +171,50 @@ export function KnowledgeBasePage() {
           ) : (
             docs.map((doc) => (
               <li key={doc.id}>
-                <div className="knowledge-doc-main">
-                  <strong>{doc.title}</strong>
-                  <span>{doc.excerpt || '暂无摘要'}</span>
-                </div>
-                <div className="knowledge-doc-meta">
-                  <span>{doc.fileName}</span>
-                  <span>{doc.sourceChars} 字</span>
+                <button type="button" className="knowledge-doc-open" onClick={() => void viewDocument(doc)}>
+                  <span className="knowledge-doc-main">
+                    <strong>{doc.title}</strong>
+                    <span>{doc.excerpt || '暂无摘要'}</span>
+                  </span>
+                </button>
+                <div className="knowledge-doc-actions">
+                  <div className="knowledge-doc-meta">
+                    <span>{doc.fileName}</span>
+                    <span>{doc.sourceChars} 字</span>
+                  </div>
+                  <div className="row-gap">
+                    <button type="button" className="secondary-button" onClick={() => void viewDocument(doc)}>
+                      {viewingDocId === doc.id ? '打开中...' : '查看文件'}
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => void deleteDocument(doc)}
+                      disabled={deletingDocId === doc.id}
+                    >
+                      {deletingDocId === doc.id ? '删除中...' : '删除'}
+                    </button>
+                  </div>
                 </div>
               </li>
             ))
           )}
         </ul>
+
+        {selectedDoc ? (
+          <section className="knowledge-preview-panel" aria-label="知识库文档预览">
+            <div className="row-between knowledge-preview-header">
+              <div>
+                <h4>{selectedDoc.title}</h4>
+                <p>{selectedDoc.fileName} · {selectedDoc.sourceChars} 字</p>
+              </div>
+              <button type="button" className="secondary-button" onClick={() => setSelectedDoc(null)}>
+                关闭
+              </button>
+            </div>
+            <pre>{selectedDoc.contentText || '暂无可预览正文'}</pre>
+          </section>
+        ) : null}
       </section>
     </main>
   )

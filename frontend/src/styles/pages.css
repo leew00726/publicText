@@ -1766,6 +1766,30 @@
   box-shadow: 0 8px 20px rgba(18, 41, 76, 0.05);
 }
 
+.knowledge-doc-open {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  text-align: left;
+}
+
+.knowledge-doc-open:hover:not(:disabled) {
+  transform: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.knowledge-doc-open:hover .knowledge-doc-main strong {
+  color: var(--module-accent);
+  text-decoration: underline;
+}
+
 .knowledge-doc-main {
   min-width: 0;
   display: grid;
@@ -1801,6 +1825,69 @@
   white-space: nowrap;
 }
 
+.knowledge-doc-actions {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
+.knowledge-doc-actions .row-gap {
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.knowledge-doc-actions .secondary-button {
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.knowledge-preview-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px 18px;
+  border-top: 1px solid var(--module-line);
+  background: #ffffff;
+}
+
+.knowledge-preview-header {
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.knowledge-preview-header h4,
+.knowledge-preview-header p {
+  margin: 0;
+}
+
+.knowledge-preview-header h4 {
+  color: #071225;
+  font-size: 16px;
+}
+
+.knowledge-preview-header p {
+  margin-top: 4px;
+  color: #68758a;
+  font-size: 13px;
+}
+
+.knowledge-preview-panel pre {
+  max-height: 420px;
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  border: 1px solid rgba(40, 74, 118, 0.12);
+  border-radius: 6px;
+  background: #f8fbff;
+  color: #25324a;
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .knowledge-doc-list .knowledge-empty-row {
   grid-template-columns: 1fr;
   min-height: 112px;
@@ -1827,6 +1914,14 @@
 
 .module-workbench-page .narrative-list {
   color: #344056;
+}
+
+.topic-library-header {
+  align-items: center;
+  gap: 18px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--module-line);
+  background: linear-gradient(180deg, #ffffff, #f7faff);
 }
 
 .module-workbench-page .table-primary-link,

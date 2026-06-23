@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     storage_mode: str = "minio"  # minio | local
     export_dir: str = "/tmp/public-text-exports"
     deepseek_api_key: str = ""
+    deepseek_require_api_key: bool = False
     deepseek_base_url: str = "http://10.211.49.42:8124/v1/models"
     deepseek_model: str = "deepseek-chat"
     deepseek_timeout_sec: float = 45

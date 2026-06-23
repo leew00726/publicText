@@ -11,6 +11,7 @@ from app.services.ai_agent import (
     AgentUpstreamError,
     DeepSeekAgent,
     _deepseek_chat_endpoint,
+    _deepseek_require_api_key,
     _extract_json_object,
 )
 from app.services.topic_inference import infer_topic_rules
@@ -271,6 +272,7 @@ def classify_template_layout_with_deepseek(
         timeout_sec=cfg.deepseek_timeout_sec,
         temperature=min(cfg.deepseek_temperature, 0.2),
         system_prompt=TEMPLATE_LAYOUT_SYSTEM_PROMPT,
+        require_api_key=_deepseek_require_api_key(cfg),
     )
 
     payload = _layout_prompt_payload(features_list, cfg.template_inference_ai_max_paragraphs)

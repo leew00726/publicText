@@ -785,6 +785,48 @@ class TopicApiTests(unittest.TestCase):
         self.assertTrue(divider_attrs.get("dividerRed"))
         self.assertEqual(last_text, "发送：全体员工。")
 
+    def test_import_docx_into_topic_document_library(self) -> None:
+        company_resp = self.client.post("/api/units", json={"name": f"topic_doc_upload_{uuid.uuid4().hex[:8]}"})
+        self.assertEqual(company_resp.status_code, 200)
+        company_id = company_resp.json()["id"]
+
+        created = self.client.post(
+            "/api/topics",
+            json={"companyId": company_id, "name": "安全生产报告", "description": "测试题材文档库上传"},
+        )
+        self.assertEqual(created.status_code, 200)
+        topic = created.json()
+        topic_id = topic["id"]
+
+        imported = self.client.post(
+            f"/api/topics/{topic_id}/docs/importDocx",
+            data={"title": "安全生产整改报告", "preserveFormatting": "true"},
+            files={
+                "file": (
+                    "safe-report.docx",
+                    _docx_bytes("安全生产整改措施和年度重点工作。"),
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
+            },
+        )
+        self.assertEqual(imported.status_code, 200)
+        doc_id = imported.json()["docId"]
+
+        fetched = self.client.get(f"/api/docs/{doc_id}")
+        self.assertEqual(fetched.status_code, 200)
+        doc = fetched.json()
+        self.assertEqual(doc["unitId"], company_id)
+        self.assertEqual(doc["structuredFields"]["topicId"], topic_id)
+        self.assertEqual(doc["structuredFields"]["topicName"], topic["name"])
+        self.assertEqual(doc["title"], "安全生产整改报告")
+
+        listed = self.client.get("/api/docs", params={"topicId": topic_id})
+        self.assertEqual(listed.status_code, 200)
+        self.assertTrue(any(item["id"] == doc_id for item in listed.json()))
+
+        with SessionLocal() as session:
+            self.assertEqual(session.query(DocumentFile).filter(DocumentFile.document_id == doc_id).count(), 1)
+
     def test_create_doc_from_topic_strips_title_like_leading_nodes_for_non_fixed_templates(self) -> None:
         company_resp = self.client.post("/api/units", json={"name": f"topic_strip_title_{uuid.uuid4().hex[:8]}"})
         self.assertEqual(company_resp.status_code, 200)

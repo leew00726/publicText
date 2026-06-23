@@ -6,8 +6,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import DeletionAuditEvent, Document, DocumentFile, RedheadTemplate, Topic, TopicTemplate, TopicTemplateDraft, Unit
-from app.schemas import ApiMessage, UnitCreate, UnitOut, UnitUpdate
+from app.models import Department, DeletionAuditEvent, Document, DocumentFile, Personnel, RedheadTemplate, Topic, TopicTemplate, TopicTemplateDraft, Unit
+from app.schemas import ApiMessage, DepartmentOut, PersonnelOut, UnitCreate, UnitOut, UnitUpdate
 from app.services.constants import default_redhead_template_a, default_redhead_template_b
 from app.services.storage import storage_service
 
@@ -29,6 +29,51 @@ def _normalize_unit_code(code: str | None) -> str:
 def list_units(db: Session = Depends(get_db)):
     rows = db.query(Unit).order_by(Unit.created_at.asc()).all()
     return [UnitOut(id=r.id, name=r.name, code=r.code) for r in rows]
+
+
+@router.get("/{unit_id}/departments", response_model=list[DepartmentOut])
+def list_unit_departments(unit_id: str, db: Session = Depends(get_db)):
+    company = db.query(Unit).filter(Unit.id == unit_id).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="公司不存在")
+
+    departments = (
+        db.query(Department)
+        .filter(Department.company_id == unit_id)
+        .order_by(Department.sort_order.asc(), Department.created_at.asc())
+        .all()
+    )
+    personnel = (
+        db.query(Personnel)
+        .filter(Personnel.company_id == unit_id)
+        .order_by(Personnel.sort_order.asc(), Personnel.created_at.asc())
+        .all()
+    )
+    members_by_department: dict[str, list[Personnel]] = {}
+    for person in personnel:
+        members_by_department.setdefault(person.department_id, []).append(person)
+
+    return [
+        DepartmentOut(
+            id=department.id,
+            companyId=department.company_id,
+            name=department.name,
+            code=department.code,
+            sortOrder=department.sort_order,
+            memberCount=len(members_by_department.get(department.id, [])),
+            members=[
+                PersonnelOut(
+                    id=person.id,
+                    employeeNo=person.employee_no,
+                    name=person.name,
+                    subDepartmentName=person.sub_department_name,
+                    hasLogin=person.has_login,
+                )
+                for person in members_by_department.get(department.id, [])
+            ],
+        )
+        for department in departments
+    ]
 
 
 @router.post("", response_model=UnitOut)

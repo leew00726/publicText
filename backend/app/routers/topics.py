@@ -4,15 +4,16 @@ import copy
 import re
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Document, DeletionAuditEvent, Topic, TopicTemplate, TopicTemplateDraft, Unit
+from app.models import Document, DocumentFile, DeletionAuditEvent, Topic, TopicTemplate, TopicTemplateDraft, Unit
 from app.schemas import (
     ApiMessage,
     DeletionAuditEventOut,
     IdResponse,
+    ImportResponse,
     TopicAnalyzeResponse,
     TopicConfirmResponse,
     TopicCreate,
@@ -24,6 +25,8 @@ from app.schemas import (
     UnitOut,
 )
 from app.services.ai_agent import AgentConfigError, AgentUpstreamError, revise_topic_rules_with_deepseek
+from app.services.docx_import import import_docx
+from app.services.storage import storage_service
 from app.services.template_ai_inference import infer_topic_rules_with_optional_deepseek
 from app.services.topic_inference import extract_docx_features, extract_pdf_features
 
@@ -972,6 +975,11 @@ def _infer_doc_type(topic_name: str, preferred_doc_type: str | None) -> str:
     return "tongzhi"
 
 
+def _safe_import_filename(value: str) -> str:
+    text = re.sub(r"[\\/:*?\"<>|]+", "_", (value or "").strip())
+    return text[:160] or "document.docx"
+
+
 def _resolve_initial_structured_title(template: TopicTemplate | None) -> str:
     if template is None or not isinstance(template.rules, dict):
         return ""
@@ -1341,6 +1349,63 @@ def create_doc_from_topic(topic_id: str, payload: TopicCreateDocRequest, db: Ses
     db.add(row)
     db.commit()
     return IdResponse(id=row.id)
+
+
+@router.post("/api/topics/{topic_id}/docs/importDocx", response_model=ImportResponse)
+async def import_docx_from_topic(
+    topic_id: str,
+    file: UploadFile = File(...),
+    title: str | None = Form(default=None),
+    docType: str | None = Form(default=None),
+    preserveFormatting: bool = Form(default=True),
+    db: Session = Depends(get_db),
+):
+    topic = db.query(Topic).filter(Topic.id == topic_id).first()
+    if not topic:
+        raise HTTPException(status_code=404, detail="题材不存在")
+
+    file_name = (file.filename or "").strip()
+    if not file_name:
+        raise HTTPException(status_code=400, detail="文件名不能为空")
+    if not file_name.lower().endswith(".docx"):
+        raise HTTPException(status_code=400, detail="仅支持 DOCX")
+
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="上传文件为空")
+    if len(data) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="文件大小不能超过 20MB")
+
+    body, structured_fields, report = import_docx(data, preserve_formatting=preserveFormatting)
+    resolved_title = (title or "").strip() or (structured_fields.get("title") or "").strip() or file_name.rsplit(".", 1)[0]
+    structured_fields = dict(structured_fields or {})
+    structured_fields["title"] = structured_fields.get("title") or resolved_title
+    structured_fields["topicId"] = topic.id
+    structured_fields["topicName"] = topic.name
+
+    row = Document(
+        title=resolved_title,
+        doc_type=_infer_doc_type(f"{topic.name} {file_name}", docType),
+        unit_id=topic.company_id,
+        redhead_template_id=None,
+        status="draft",
+        structured_fields=structured_fields,
+        body=body,
+        import_report=report,
+    )
+    db.add(row)
+    db.commit()
+
+    object_name = f"imports/{row.id}/{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{_safe_import_filename(file_name)}"
+    storage_service.save_bytes(
+        object_name,
+        data,
+        content_type=file.content_type or "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+    db.add(DocumentFile(document_id=row.id, file_kind="import_source", object_name=object_name))
+    db.commit()
+
+    return ImportResponse(docId=row.id, importReport=report)
 
 
 @router.get("/api/topics/{topic_id}/audit-events", response_model=list[DeletionAuditEventOut])

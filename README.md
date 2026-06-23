@@ -15,24 +15,27 @@
 - 预览与导出一致：前端 A4 画布按模板规则渲染，后端导出按同一规则落地到 `python-docx`。
 - 合规保障机制：强制字体检测、格式校验、一键排版、训练删除审计，兼顾效率与规范。
 - 知识沉淀闭环：公司 -> 题材库 -> 文档库 -> 正文编辑，全流程可追踪、可迭代。
+- 组织与文档统一治理：按公司同步部门和人员目录，并在公司公文库集中检索、上传和继续编辑公文。
 
 ## 2. 典型使用流程
 
-1. 在公司选择页创建/选择公司。
-2. 进入题材库，新建题材（例如“周例会纪要”）。
-3. 进入模板训练页，上传历史材料并分析。
-4. 在训练草稿上通过指令（可选 DeepSeek）修订规则并确认模板。
-5. 进入正文编辑入口，按模板新建文档。
-6. 在正文编辑页进行结构化填充、正文编写、规范校验、一键排版。
-7. 在“文档库”查看该题材下所有已保存文档并继续编辑或删除。
+1. 使用员工号登录，并从工作台进入“公文管理”。
+2. 在公司选择页创建/选择公司，查看该公司的部门、人员统计和公文列表。
+3. 在公司公文库上传 DOCX，系统解析正文并将文件归入当前公司；也可以直接打开已有公文继续编辑。
+4. 进入题材库，新建题材（例如“周例会纪要”）。
+5. 进入模板训练页，上传历史材料并分析。
+6. 在训练草稿上通过指令（可选 DeepSeek）修订规则并确认模板。
+7. 进入正文编辑入口，按模板新建文档并完成结构化填充、规范校验和一键排版。
 8. 导出 DOCX 用于流转盖章，保留二次编辑能力。
 
 ## 3. 功能全景
 
-### 3.1 公司与题材管理
+### 3.1 公司、组织与题材管理
 - 公司管理：创建、删除公司（删除时级联清理题材/文档/模板/对象存储）。
+- 组织架构：按公司展示部门目录、部门排序、人员数量和登录账号关联状态。
+- 人员目录：从 `backend/assets/employee_directory.json` 同步员工所属公司、部门与子部门信息。
 - 题材管理：创建、删除题材。
-- 页面流转：`公司选择 -> 题材库 -> 文档库 -> 正文编辑`。
+- 页面流转：`公司选择 -> 部门与公司公文库 -> 题材库 -> 题材文档库 -> 正文编辑`。
 - 全局返回按钮：按固定业务层级回退，避免跳转混乱。
 
 ### 3.2 模板训练与版本化
@@ -61,10 +64,12 @@
 - 导入 DOCX：抽取正文结构并输出导入报告。
 - 导出 DOCX：保持红头、页码、边距、标题层级、尾部格式一致。
 
-### 3.5 文档库（题材内）
-- 每个题材独立文档库。
-- 展示文档标题与更新时间（按本地时区格式化）。
-- 支持打开编辑与删除文档。
+### 3.5 公司公文库与题材文档库
+- 公司公文库：集中展示当前公司的全部公文，支持按标题、文号、题材、文种和状态搜索。
+- 文件上传：支持单个 DOCX 文件（最大 20MB），保留原文格式并根据文件名识别常见文种；上传完成后自动刷新列表。
+- 上传反馈：提供文件类型/大小校验、上传中状态、成功提示和后端错误提示。
+- 题材文档库：每个题材保留独立文档列表，支持打开编辑与删除文档。
+- 时间展示：公文更新时间统一按本地时区格式化。
 
 ### 3.6 规范与合规能力
 - 规范校验：节点类型、标题层级、编号连续性、标题句末标点、正文缩进等。
@@ -89,7 +94,7 @@ React + TypeScript + Tiptap (frontend)
 ```
 
 ### 4.2 前端实现
-- 路由：React Router，关键页面包括公司选择、题材库、文档库、训练页、正文编辑页。
+- 路由：React Router，关键页面包括公司选择、部门与公司公文库、题材库、题材文档库、训练页、正文编辑页。
 - 编辑器：Tiptap + 自定义扩展（段落/标题样式属性、后置名单标签装饰）。
 - 预览渲染：
   - 使用 CSS 变量承载模板规则（正文、H1~H4、后置标签）。
@@ -100,7 +105,7 @@ React + TypeScript + Tiptap (frontend)
 
 ### 4.3 后端实现
 - 框架：FastAPI + SQLAlchemy + Pydantic。
-- 数据模型：`Unit`、`Topic`、`TopicTemplateDraft`、`TopicTemplate`、`Document`、`DeletionAuditEvent` 等。
+- 数据模型：`Unit`、`Department`、`Personnel`、`Topic`、`TopicTemplateDraft`、`TopicTemplate`、`Document`、`DeletionAuditEvent` 等。
 - 关键服务：
   - `topic_inference.py`：训练材料样式抽取、模板规则推断、置信度计算。
   - `ai_agent.py`：DeepSeek 调用封装（文本改写、模板修订）。
@@ -134,7 +139,7 @@ React + TypeScript + Tiptap (frontend)
 │  │  └─ main.py          # 应用入口
 │  └─ assets/fonts        # 字体安装包入口
 ├─ frontend
-│  ├─ src/pages           # 业务页面
+│  ├─ src/pages           # 业务页面（含 DepartmentManagementPage 公司公文库）
 │  ├─ src/components      # 编辑器、校验、回退按钮等
 │  ├─ src/utils           # 一键排版、字体检测、时间格式化
 │  └─ src/api             # API 客户端与类型
@@ -171,7 +176,8 @@ docker compose up -d --build backend frontend
 在项目根目录创建 `.env`（供 `docker compose` 读取）：
 
 ```env
-DEEPSEEK_API_KEY=你的密钥
+DEEPSEEK_API_KEY=
+DEEPSEEK_REQUIRE_API_KEY=false
 DEEPSEEK_BASE_URL=http://10.211.49.42:8124/v1/models
 DEEPSEEK_MODEL=deepseek-chat
 DEEPSEEK_TIMEOUT_SEC=45
@@ -181,7 +187,8 @@ TEMPLATE_INFERENCE_AI_MAX_PARAGRAPHS=80
 ```
 
 说明：
-- 若不配置 `DEEPSEEK_API_KEY`，智能润色/智能修订会失败，其他功能可正常运行。
+- 内网 DeepSeek 若不需要鉴权，可保持 `DEEPSEEK_API_KEY` 为空且 `DEEPSEEK_REQUIRE_API_KEY=false`。
+- 若接入公网 DeepSeek 或需要鉴权的内网网关，请填写 `DEEPSEEK_API_KEY`，并可设置 `DEEPSEEK_REQUIRE_API_KEY=true` 让后端在缺少 key 时快速报配置错误。
 - `TEMPLATE_INFERENCE_ENGINE` 控制文件训练模板的识别方式：`rules` 为现有规则版，`hybrid` 为 DeepSeek 辅助判断段落角色并失败回退，`deepseek` 为强制使用 DeepSeek。
 - 若 DeepSeek 辅助识别效果不理想，将 `TEMPLATE_INFERENCE_ENGINE` 改回 `rules` 并重启后端即可回滚。
 - 更新 `.env` 后请重建 `backend` 容器使配置生效。
@@ -235,12 +242,77 @@ npm run dev
 
 如需指定后端地址，可在前端环境变量中设置 `VITE_API_BASE`。
 
+### 8.3 Gitea 推送注意事项
+
+当前 Gitea 远端：
+
+```bash
+origin https://gitea-ycjfdev.ycfin.net/liziyuan/Yunju-Document-Management.git
+```
+
+正常推送命令：
+
+```bash
+git push origin main:main
+```
+
+注意：
+- 仓库 owner 是 `liziyuan`，但 HTTPS 推送用户名使用 `lzy`。
+- Gitea Access Token 用作 HTTPS Git 的密码，令牌权限需要包含 `write:repository`。
+- 不要把真实 token 写入 README、`.env`、git remote URL 或其他可提交文件。
+- 如果截图显示 token “今天使用过”，仍然不能直接说明当前 Git 凭据链路正确。
+
+如果普通推送出现：
+
+```text
+remote: Repository cannot be accessed. You cannot push or open issues/pull-requests.
+fatal: unable to access 'https://gitea-ycjfdev.ycfin.net/liziyuan/Yunju-Document-Management.git/': The requested URL returned error: 403
+```
+
+优先检查 Git Credential Manager 是否缓存了旧账号或旧 token：
+
+```powershell
+cmdkey /list | findstr /i "gitea ycfin"
+cmdkey /delete:git:https://gitea-ycjfdev.ycfin.net
+```
+
+如果清理后仍然 403，不要立刻判定 token 无效。可以绕过 Git Credential Manager，用一次性 HTTP Basic header 推送；这不会修改 `origin`，也不会把 token 写入仓库文件：
+
+```powershell
+$secureToken = Read-Host "Gitea Access Token" -AsSecureString
+$bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureToken)
+
+try {
+  $token = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+  $basic = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("lzy:$token"))
+  $header = "Authorization: Basic $basic"
+
+  git -c credential.helper= `
+      -c "http.https://gitea-ycjfdev.ycfin.net/.extraHeader=$header" `
+      push origin main:main
+}
+finally {
+  if ($bstr -ne [IntPtr]::Zero) {
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+  }
+  Remove-Variable secureToken, token, basic, header -ErrorAction SilentlyContinue
+}
+```
+
+本次实际经验：
+- `git push origin main:main` 通过 GCM 返回 403。
+- Gitea API 用 token 验证也返回 403，不能据此直接判断 token 一定不可用。
+- 绕过 GCM 后，使用 `lzy + Access Token` 的一次性 Basic header 推送成功。
+- 成功后用 `git rev-parse HEAD`、`git rev-parse origin/main`、`git rev-parse github/main` 确认三者提交一致。
+
 ## 9. 核心 API（摘要）
 
 ### 公司与题材
 - `GET /api/companies`
 - `POST /api/units`
 - `DELETE /api/units/{unit_id}`
+- `GET /api/units/{unit_id}/departments`
+- `GET /api/management/units/{unit_id}/departments`（管理端别名）
 - `GET /api/topics?companyId=...`
 - `POST /api/topics`
 - `DELETE /api/topics/{topic_id}`
@@ -256,11 +328,13 @@ npm run dev
 ### 文档
 - `POST /api/topics/{topic_id}/docs`
 - `GET /api/docs?topicId=...`
+- `GET /api/docs?unitId=...`
 - `GET /api/docs/{doc_id}`
 - `PUT /api/docs/{doc_id}`
 - `DELETE /api/docs/{doc_id}`
 - `POST /api/docs/{doc_id}/check`
 - `POST /api/docs/importDocx`
+- `POST /api/layout/docs/importDocx`（排版端别名，公司公文库上传使用）
 - `POST /api/docs/{doc_id}/exportDocx`
 
 ### AI

@@ -72,6 +72,10 @@ def _deepseek_chat_endpoint(base_url: str) -> str:
     return f"{normalized}/chat/completions"
 
 
+def _deepseek_require_api_key(settings: Settings) -> bool:
+    return bool(getattr(settings, "deepseek_require_api_key", False))
+
+
 def _send_request(req: urllib.request.Request, timeout_sec: float) -> str:
     with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
         return resp.read().decode("utf-8")
@@ -86,20 +90,20 @@ class DeepSeekAgent:
         timeout_sec: float,
         temperature: float = 0.2,
         system_prompt: str | None = None,
+        require_api_key: bool = False,
     ):
         self.api_key = api_key.strip()
         self.endpoint = endpoint
         self.model = model
         self.timeout_sec = timeout_sec
         self.temperature = temperature
+        self.require_api_key = require_api_key
         self.system_prompt = (
             system_prompt
             or "You are an assistant for Chinese official-document rewriting. Return only the final rewritten text."
         )
 
     def rewrite(self, text: str, mode: str) -> dict[str, Any]:
-        if not self.api_key:
-            raise AgentConfigError("DeepSeek API key is missing. Set DEEPSEEK_API_KEY.")
         if not text.strip():
             raise AgentConfigError("Rewrite text cannot be empty.")
 
@@ -121,7 +125,7 @@ class DeepSeekAgent:
         }
 
     def chat(self, messages: list[dict[str, str]], temperature: float | None = None) -> dict[str, Any]:
-        if not self.api_key:
+        if self.require_api_key and not self.api_key:
             raise AgentConfigError("DeepSeek API key is missing. Set DEEPSEEK_API_KEY.")
         if not messages:
             raise AgentConfigError("DeepSeek chat messages cannot be empty.")
@@ -133,13 +137,14 @@ class DeepSeekAgent:
             "stream": False,
         }
 
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
         req = urllib.request.Request(
             self.endpoint,
             data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.api_key}",
-            },
+            headers=headers,
             method="POST",
         )
 
@@ -189,6 +194,7 @@ def rewrite_with_deepseek(text: str, mode: str, settings: Settings | None = None
         timeout_sec=cfg.deepseek_timeout_sec,
         temperature=cfg.deepseek_temperature,
         system_prompt=cfg.deepseek_system_prompt,
+        require_api_key=_deepseek_require_api_key(cfg),
     )
     return agent.rewrite(text=text, mode=mode)
 
@@ -211,6 +217,7 @@ def summarize_document_with_deepseek(
         timeout_sec=cfg.deepseek_timeout_sec,
         temperature=min(cfg.deepseek_temperature, 0.3),
         system_prompt=SUMMARY_SYSTEM_PROMPT,
+        require_api_key=_deepseek_require_api_key(cfg),
     )
 
     length_guide = SUMMARY_LENGTH_GUIDANCE.get(summary_length, SUMMARY_LENGTH_GUIDANCE["medium"])
@@ -266,6 +273,7 @@ def draft_document_with_knowledge(
         timeout_sec=cfg.deepseek_timeout_sec,
         temperature=min(cfg.deepseek_temperature, 0.35),
         system_prompt=KNOWLEDGE_DRAFT_SYSTEM_PROMPT,
+        require_api_key=_deepseek_require_api_key(cfg),
     )
 
     length_guide = SUMMARY_LENGTH_GUIDANCE.get(summary_length, SUMMARY_LENGTH_GUIDANCE["medium"])
@@ -355,6 +363,7 @@ def revise_topic_rules_with_deepseek(
         timeout_sec=cfg.deepseek_timeout_sec,
         temperature=cfg.deepseek_temperature,
         system_prompt=cfg.deepseek_system_prompt,
+        require_api_key=_deepseek_require_api_key(cfg),
     )
 
     cleaned_history: list[dict[str, str]] = []

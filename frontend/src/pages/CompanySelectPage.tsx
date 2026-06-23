@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type { Unit } from '../api/types'
@@ -8,11 +8,11 @@ import { canPerformAction } from '../utils/pagePermissions'
 
 type CompanySelectPageProps = {
   mode: 'layout' | 'management'
+  initialCompanies?: Unit[]
 }
 
-export function CompanySelectPage({ mode }: CompanySelectPageProps) {
-  const navigate = useNavigate()
-  const [companies, setCompanies] = useState<Unit[]>([])
+export function CompanySelectPage({ mode, initialCompanies = [] }: CompanySelectPageProps) {
+  const [companies, setCompanies] = useState<Unit[]>(initialCompanies)
   const [loading, setLoading] = useState(false)
   const [name, setName] = useState('')
   const [creating, setCreating] = useState(false)
@@ -24,6 +24,11 @@ export function CompanySelectPage({ mode }: CompanySelectPageProps) {
   const nextTopicsPrefix = useMemo(
     () => (mode === 'management' ? '/management/companies' : '/layout/companies'),
     [mode],
+  )
+  const getCompanyEntryPath = (companyId: string) => (
+    mode === 'management'
+      ? `/management/companies/${companyId}/departments`
+      : `${nextTopicsPrefix}/${companyId}/topics`
   )
 
   const load = async () => {
@@ -128,9 +133,9 @@ export function CompanySelectPage({ mode }: CompanySelectPageProps) {
                   <td>{company.name}</td>
                   <td>
                     <div className="row-gap table-actions">
-                      <button type="button" onClick={() => navigate(`${nextTopicsPrefix}/${company.id}/topics`)}>
-                        {canManageCompany ? '进入题材管理' : '进入排版题材库'}
-                      </button>
+                      <Link className="table-primary-link" to={getCompanyEntryPath(company.id)}>
+                        {canManageCompany ? '进入公司' : '进入排版题材库'}
+                      </Link>
                       {canDeleteCompany ? (
                         <button type="button" onClick={() => void deleteCompany(company)} disabled={deletingId === company.id}>
                           {deletingId === company.id ? '删除中...' : '删除'}

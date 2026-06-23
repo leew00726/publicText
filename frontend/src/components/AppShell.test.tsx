@@ -78,6 +78,19 @@ describe('AppShell chrome', () => {
     expect(html).not.toContain('上传文档后调用 DeepSeek 生成结构化总结并导出。')
   })
 
+  it('labels the company department route as department management', () => {
+    const html = renderToStaticMarkup(
+      <MemoryRouter initialEntries={['/management/companies/company-1/departments']}>
+        <AppShell>
+          <div>department content</div>
+        </AppShell>
+      </MemoryRouter>,
+    )
+
+    expect(html).toContain('部门管理')
+    expect(html).toContain('查看公司组织架构与人员归属')
+  })
+
   it('styles the summary shell as a premium blue-white document workspace chrome', () => {
     const styles = fs.readFileSync(appShellCssPath, 'utf8')
 

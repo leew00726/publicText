@@ -19,6 +19,24 @@ class UnitUpdate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
 
 
+class PersonnelOut(BaseModel):
+    id: str
+    employeeNo: str | None = None
+    name: str
+    subDepartmentName: str | None = None
+    hasLogin: bool
+
+
+class DepartmentOut(BaseModel):
+    id: str
+    companyId: str
+    name: str
+    code: str
+    sortOrder: int
+    memberCount: int
+    members: list[PersonnelOut] = Field(default_factory=list)
+
+
 class RedheadTextFont(BaseModel):
     family: str
     sizePt: float

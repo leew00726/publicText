@@ -20,6 +20,53 @@ class Unit(Base):
     topics: Mapped[list["Topic"]] = relationship("Topic", back_populates="company")
     deletion_audits: Mapped[list["DeletionAuditEvent"]] = relationship("DeletionAuditEvent", back_populates="company")
     employees: Mapped[list["Employee"]] = relationship("Employee", back_populates="company")
+    departments: Mapped[list["Department"]] = relationship(
+        "Department",
+        back_populates="company",
+        cascade="all, delete-orphan",
+    )
+
+
+class Department(Base):
+    __tablename__ = "departments"
+    __table_args__ = (
+        UniqueConstraint("company_id", "name", name="uq_departments_company_name"),
+        UniqueConstraint("company_id", "code", name="uq_departments_company_code"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    company_id: Mapped[str] = mapped_column(String(36), ForeignKey("units.id"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    code: Mapped[str] = mapped_column(String(80), nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    company: Mapped[Unit] = relationship("Unit", back_populates="departments")
+    personnel: Mapped[list["Personnel"]] = relationship(
+        "Personnel",
+        back_populates="department",
+        cascade="all, delete-orphan",
+    )
+
+
+class Personnel(Base):
+    __tablename__ = "personnel"
+    __table_args__ = (UniqueConstraint("company_id", "source_key", name="uq_personnel_company_source"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    company_id: Mapped[str] = mapped_column(String(36), ForeignKey("units.id"), nullable=False, index=True)
+    department_id: Mapped[str] = mapped_column(String(36), ForeignKey("departments.id"), nullable=False, index=True)
+    source_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    employee_no: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    sub_department_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    has_login: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    department: Mapped[Department] = relationship("Department", back_populates="personnel")
 
 
 class RedheadTemplate(Base):

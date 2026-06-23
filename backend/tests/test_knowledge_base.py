@@ -18,6 +18,7 @@ from app.database import Base, SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import KnowledgeDocument  # noqa: E402
 from app.services.knowledge_base import search_knowledge_documents  # noqa: E402
+from app.services.storage import storage_service  # noqa: E402
 
 
 class KnowledgeBaseTests(unittest.TestCase):
@@ -58,6 +59,33 @@ class KnowledgeBaseTests(unittest.TestCase):
         listed = self.client.get("/api/knowledge/docs")
         self.assertEqual(listed.status_code, 200)
         self.assertTrue(any(item["id"] == body["id"] for item in listed.json()))
+
+    def test_view_and_delete_knowledge_document(self) -> None:
+        response = self.client.post(
+            "/api/knowledge/docs",
+            data={"title": "安全生产工作报告"},
+            files={"file": ("safe.txt", io.BytesIO("安全生产整改措施和年度重点工作。".encode("utf-8")), "text/plain")},
+        )
+        self.assertEqual(response.status_code, 200)
+        doc_id = response.json()["id"]
+
+        detail = self.client.get(f"/api/knowledge/docs/{doc_id}")
+        self.assertEqual(detail.status_code, 200)
+        detail_body = detail.json()
+        self.assertEqual(detail_body["id"], doc_id)
+        self.assertIn("安全生产整改措施", detail_body["contentText"])
+
+        with SessionLocal() as db:
+            object_name = db.query(KnowledgeDocument).filter(KnowledgeDocument.id == doc_id).first().object_name
+
+        deleted = self.client.delete(f"/api/knowledge/docs/{doc_id}")
+        self.assertEqual(deleted.status_code, 200)
+        self.assertEqual(deleted.json()["message"], "ok")
+
+        listed = self.client.get("/api/knowledge/docs")
+        self.assertEqual(listed.status_code, 200)
+        self.assertFalse(any(item["id"] == doc_id for item in listed.json()))
+        self.assertFalse((storage_service.local_root / object_name).exists())
 
     def test_search_knowledge_documents_prefers_query_matches(self) -> None:
         with SessionLocal() as db:

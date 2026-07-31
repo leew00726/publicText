@@ -3,11 +3,12 @@ import type { StructuredFields } from '../api/types'
 interface Props {
   value: StructuredFields
   onChange: (v: StructuredFields) => void
+  disabled?: boolean
 }
 
 type TextFieldKey = 'title' | 'mainTo' | 'signOff' | 'date'
 
-export function StructuredFormPanel({ value, onChange }: Props) {
+export function StructuredFormPanel({ value, onChange, disabled = false }: Props) {
   const setTextField = (key: TextFieldKey, fieldValue: string) => {
     onChange({ ...value, [key]: fieldValue })
   }
@@ -29,29 +30,29 @@ export function StructuredFormPanel({ value, onChange }: Props) {
   }
 
   return (
-    <div className="panel structured-panel">
+    <div className="panel structured-panel" aria-disabled={disabled}>
       <h3>结构化要素</h3>
       <label>
         标题
-        <input value={value.title} onChange={(e) => setTextField('title', e.target.value)} />
+        <input value={value.title} onChange={(e) => setTextField('title', e.target.value)} disabled={disabled} />
       </label>
       <label>
         主送
-        <input value={value.mainTo} onChange={(e) => setTextField('mainTo', e.target.value)} />
+        <input value={value.mainTo} onChange={(e) => setTextField('mainTo', e.target.value)} disabled={disabled} />
       </label>
       <label>
         落款
-        <input value={value.signOff} onChange={(e) => setTextField('signOff', e.target.value)} placeholder="如：资本公司党委" />
+        <input value={value.signOff} onChange={(e) => setTextField('signOff', e.target.value)} placeholder="如：资本公司党委" disabled={disabled} />
       </label>
       <label>
         日期
-        <input type="date" value={value.date} onChange={(e) => setTextField('date', e.target.value)} />
+        <input type="date" value={value.date} onChange={(e) => setTextField('date', e.target.value)} disabled={disabled} />
       </label>
 
       <div className="attachments-box">
         <div className="row-between">
           <span>附件列表</span>
-          <button type="button" onClick={addAttachment}>
+          <button type="button" onClick={addAttachment} disabled={disabled}>
             + 添加
           </button>
         </div>
@@ -62,8 +63,9 @@ export function StructuredFormPanel({ value, onChange }: Props) {
               placeholder="附件名称"
               value={item.name}
               onChange={(e) => updateAttachment(idx, e.target.value)}
+              disabled={disabled}
             />
-            <button type="button" onClick={() => removeAttachment(idx)}>
+            <button type="button" onClick={() => removeAttachment(idx)} disabled={disabled}>
               删除
             </button>
           </div>

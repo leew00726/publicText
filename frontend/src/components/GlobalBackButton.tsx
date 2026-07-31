@@ -3,6 +3,7 @@ import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type { GovDoc } from '../api/types'
+import { confirmDiscardUnsavedEditorChanges } from '../utils/editorUnsavedChanges'
 import { resolveLayoutBackPath } from '../utils/layoutNavigation'
 
 interface GlobalBackButtonProps {
@@ -137,12 +138,15 @@ export function GlobalBackButton({ variant = 'floating' }: GlobalBackButtonProps
       className={`global-back-btn ${variant}`}
       onClick={() => {
         if (fixedBackPath) {
+          if (!confirmDiscardUnsavedEditorChanges()) return
           navigate(fixedBackPath)
           return
         }
         if (window.history.length > 1) {
+          // POP 导航由编辑器的 Data Router blocker 统一确认，避免重复弹窗。
           navigate(-1)
         } else {
+          if (!confirmDiscardUnsavedEditorChanges()) return
           navigate('/workspace')
         }
       }}

@@ -2,6 +2,7 @@ import { useMemo, type ReactNode } from 'react'
 import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 
 import { clearEmployeeSession, loadEmployeeSession } from '../utils/employeeAuth'
+import { confirmDiscardUnsavedEditorChanges } from '../utils/editorUnsavedChanges'
 import { LAYOUT_HOME_PATH } from '../utils/layoutNavigation'
 import { GlobalBackButton } from './GlobalBackButton'
 
@@ -206,6 +207,7 @@ export function AppShell({ children }: AppShellProps) {
               type="button"
               className="shell-logout-btn"
               onClick={() => {
+                if (!confirmDiscardUnsavedEditorChanges()) return
                 clearEmployeeSession()
                 navigate('/', { replace: true })
               }}

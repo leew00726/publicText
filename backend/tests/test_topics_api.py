@@ -19,7 +19,7 @@ os.environ["TEMPLATE_INFERENCE_ENGINE"] = "rules"
 
 from app.database import SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
-from app.models import DeletionAuditEvent, DocumentFile, Topic, TopicTemplate, TopicTemplateDraft  # noqa: E402
+from app.models import DeletionAuditEvent, Document as DocumentModel, DocumentFile, Topic, TopicTemplate, TopicTemplateDraft  # noqa: E402
 from app.routers.topics import _build_patch_from_instruction, _extract_font_name  # noqa: E402
 
 
@@ -994,6 +994,174 @@ class TopicApiTests(unittest.TestCase):
         filtered_b_ids = [item["id"] for item in filtered_b.json()]
         self.assertIn(doc_b_id, filtered_b_ids)
         self.assertNotIn(doc_a_id, filtered_b_ids)
+
+    def test_import_docx_keeps_source_topic_membership(self) -> None:
+        company_resp = self.client.post("/api/units", json={"name": f"topic_import_{uuid.uuid4().hex[:8]}"})
+        self.assertEqual(company_resp.status_code, 200)
+        company_id = company_resp.json()["id"]
+
+        topic_resp = self.client.post(
+            "/api/topics",
+            json={"companyId": company_id, "name": "导入归属测试", "description": "验证导入文档仍属于原题材"},
+        )
+        self.assertEqual(topic_resp.status_code, 200)
+        topic_id = topic_resp.json()["id"]
+
+        template_rules = {"body": {"fontFamily": "仿宋_GB2312", "lineSpacingPt": 28}}
+        with SessionLocal() as session:
+            template = TopicTemplate(
+                topic_id=topic_id,
+                version=7,
+                rules=template_rules,
+                effective=True,
+            )
+            session.add(template)
+            session.commit()
+            template_id = template.id
+
+        source_resp = self.client.post(f"/api/topics/{topic_id}/docs", json={"title": "来源文档"})
+        self.assertEqual(source_resp.status_code, 200)
+        source_doc_id = source_resp.json()["id"]
+
+        imported_resp = self.client.post(
+            "/api/docs/importDocx",
+            data={
+                "unitId": company_id,
+                "docType": "tongzhi",
+                "title": "上传文件名",
+                "sourceDocId": source_doc_id,
+                "preserveFormatting": "true",
+            },
+            files={
+                "file": (
+                    "imported.docx",
+                    _docx_bytes("导入正文"),
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                ),
+            },
+        )
+        self.assertEqual(imported_resp.status_code, 200)
+        imported_doc_id = imported_resp.json()["docId"]
+
+        imported_doc = self.client.get(f"/api/docs/{imported_doc_id}")
+        self.assertEqual(imported_doc.status_code, 200)
+        self.assertEqual(imported_doc.json()["structuredFields"]["topicId"], topic_id)
+        self.assertEqual(imported_doc.json()["structuredFields"]["topicName"], "导入归属测试")
+        self.assertEqual(imported_doc.json()["structuredFields"]["topicTemplateId"], template_id)
+        self.assertEqual(imported_doc.json()["structuredFields"]["topicTemplateVersion"], 7)
+        self.assertEqual(imported_doc.json()["structuredFields"]["topicTemplateRules"], template_rules)
+
+        topic_docs = self.client.get("/api/docs", params={"topicId": topic_id})
+        self.assertEqual(topic_docs.status_code, 200)
+        self.assertIn(imported_doc_id, [item["id"] for item in topic_docs.json()])
+
+        deleted_import = self.client.delete(f"/api/docs/{imported_doc_id}")
+        self.assertEqual(deleted_import.status_code, 200)
+
+    def test_import_docx_validates_source_before_parsing_upload(self) -> None:
+        company_resp = self.client.post("/api/units", json={"name": f"topic_import_invalid_{uuid.uuid4().hex[:8]}"})
+        self.assertEqual(company_resp.status_code, 200)
+
+        response = self.client.post(
+            "/api/docs/importDocx",
+            data={
+                "unitId": company_resp.json()["id"],
+                "sourceDocId": str(uuid.uuid4()),
+            },
+            files={
+                "file": (
+                    "invalid.docx",
+                    b"not-a-real-docx",
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                ),
+            },
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "来源文档不存在")
+
+    def test_import_docx_keeps_deleted_template_snapshot_on_reimport(self) -> None:
+        company_resp = self.client.post("/api/units", json={"name": f"topic_import_snapshot_{uuid.uuid4().hex[:8]}"})
+        self.assertEqual(company_resp.status_code, 200)
+        company_id = company_resp.json()["id"]
+        topic_resp = self.client.post(
+            "/api/topics",
+            json={"companyId": company_id, "name": "模板快照复用", "description": "验证二次导入"},
+        )
+        self.assertEqual(topic_resp.status_code, 200)
+        topic_id = topic_resp.json()["id"]
+        snapshot_rules = {"body": {"fontFamily": "仿宋_GB2312", "lineSpacingPt": 30}}
+
+        source_resp = self.client.post(
+            "/api/docs",
+            json={
+                "title": "仅保留模板快照的来源文档",
+                "docType": "tongzhi",
+                "unitId": company_id,
+                "structuredFields": {
+                    "topicId": topic_id,
+                    "topicName": "模板快照复用",
+                    "topicTemplateId": None,
+                    "topicTemplateVersion": 5,
+                    "topicTemplateRules": snapshot_rules,
+                },
+            },
+        )
+        self.assertEqual(source_resp.status_code, 200)
+
+        imported_resp = self.client.post(
+            "/api/docs/importDocx",
+            data={"unitId": company_id, "sourceDocId": source_resp.json()["id"]},
+            files={
+                "file": (
+                    "reimport.docx",
+                    _docx_bytes("二次导入正文"),
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                ),
+            },
+        )
+        self.assertEqual(imported_resp.status_code, 200)
+        imported_doc_id = imported_resp.json()["docId"]
+        imported_doc = self.client.get(f"/api/docs/{imported_doc_id}").json()
+        self.assertEqual(imported_doc["structuredFields"]["topicId"], topic_id)
+        self.assertIsNone(imported_doc["structuredFields"]["topicTemplateId"])
+        self.assertEqual(imported_doc["structuredFields"]["topicTemplateVersion"], 5)
+        self.assertEqual(imported_doc["structuredFields"]["topicTemplateRules"], snapshot_rules)
+
+        self.assertEqual(self.client.delete(f"/api/docs/{imported_doc_id}").status_code, 200)
+        self.assertEqual(self.client.delete(f"/api/docs/{source_resp.json()['id']}").status_code, 200)
+
+    def test_import_docx_rolls_back_document_when_storage_fails(self) -> None:
+        company_resp = self.client.post("/api/units", json={"name": f"topic_import_storage_{uuid.uuid4().hex[:8]}"})
+        self.assertEqual(company_resp.status_code, 200)
+        company_id = company_resp.json()["id"]
+
+        with SessionLocal() as session:
+            before = session.query(DocumentFile).count()
+
+        with (
+            patch("app.routers.docs.storage_service.save_bytes", side_effect=RuntimeError("storage failed")),
+            patch("app.routers.docs.storage_service.delete_object") as delete_object,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "storage failed"):
+                self.client.post(
+                    "/api/docs/importDocx",
+                    data={"unitId": company_id, "title": "失败导入"},
+                    files={
+                        "file": (
+                            "failed.docx",
+                            _docx_bytes("不会落库"),
+                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        ),
+                    },
+                )
+            delete_object.assert_called_once()
+
+        with SessionLocal() as session:
+            after = session.query(DocumentFile).count()
+            failed_docs = session.query(DocumentModel).filter(DocumentModel.unit_id == company_id).count()
+        self.assertEqual(after, before)
+        self.assertEqual(failed_docs, 0)
 
     @patch("app.routers.topics.extract_pdf_features", create=True)
     def test_topic_analyze_accepts_pdf_file(self, mock_extract_pdf) -> None:

@@ -1,9 +1,30 @@
-import { DragEvent, useEffect, useRef, useState } from 'react'
+import { DragEvent, KeyboardEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type { KnowledgeDocument } from '../api/types'
 import { isSupportedSummaryFileName } from '../utils/documentSummary'
+
+function useElapsedSeconds(active: boolean) {
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
+
+  useEffect(() => {
+    if (!active) {
+      setElapsedSeconds(0)
+      return
+    }
+
+    const startedAt = Date.now()
+    setElapsedSeconds(0)
+    const intervalId = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000))
+    }, 1000)
+
+    return () => window.clearInterval(intervalId)
+  }, [active])
+
+  return elapsedSeconds
+}
 
 export function KnowledgeBasePage() {
   const inputRef = useRef<HTMLInputElement | null>(null)
@@ -14,12 +35,26 @@ export function KnowledgeBasePage() {
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [statusMessage, setStatusMessage] = useState('')
+  const elapsedSeconds = useElapsedSeconds(uploading || loading)
+  const activeOperationLabel = uploading ? '正在将材料加入知识库' : loading ? '正在同步知识库' : ''
+  const activeOperationMessage = activeOperationLabel ? `${activeOperationLabel}，已等待 ${elapsedSeconds} 秒` : ''
+  const announcedElapsedSeconds = Math.floor(elapsedSeconds / 10) * 10
+  const activeOperationAnnouncement = activeOperationLabel
+    ? announcedElapsedSeconds > 0
+      ? `${activeOperationLabel}，已等待约 ${announcedElapsedSeconds} 秒。`
+      : `${activeOperationLabel}。`
+    : ''
 
-  const loadDocs = async () => {
+  const loadDocs = async (announce = false) => {
     setLoading(true)
+    setErrorMessage('')
+    setStatusMessage('')
     try {
       const res = await api.get<KnowledgeDocument[]>('/api/knowledge/docs')
       setDocs(res.data)
+      if (announce) {
+        setStatusMessage(`知识库已同步，共 ${res.data.length} 份材料。`)
+      }
     } catch {
       setErrorMessage('知识库文档加载失败，请稍后重试。')
     } finally {
@@ -35,6 +70,7 @@ export function KnowledgeBasePage() {
     if (!file) return
     if (!isSupportedSummaryFileName(file.name)) {
       setErrorMessage('仅支持 DOCX / PDF / TXT 文件')
+      setStatusMessage('')
       return
     }
 
@@ -63,19 +99,47 @@ export function KnowledgeBasePage() {
   const handleDrop = (event: DragEvent<HTMLElement>) => {
     event.preventDefault()
     setDragging(false)
+    if (uploading || loading) return
     const file = event.dataTransfer.files?.[0] || null
     void uploadFile(file)
   }
 
+  const handleUploadKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    inputRef.current?.click()
+  }
+
+  const openSummaryWithKnowledgeBase = () => {
+    navigate('/layout/summary', {
+      state: {
+        useKnowledgeBase: true,
+        knowledgeSource: {
+          label: '云矩知识库',
+          documentCount: docs.length,
+        },
+      },
+    })
+  }
+
   return (
-    <main className="page workspace-page module-workbench-page knowledge-base-page">
+    <main className="page workspace-page module-workbench-page knowledge-base-page" aria-busy={uploading || loading}>
       <section className="panel knowledge-upload-panel">
         <h3>云矩知识库</h3>
         <p>上传本地公文材料后，系统会提取正文并沉淀为 DeepSeek 写作参考。</p>
 
         <section
           className={`knowledge-upload-zone ${dragging ? 'dragging' : ''}`}
-          onClick={() => inputRef.current?.click()}
+          role="button"
+          tabIndex={0}
+          aria-label="选择要加入云矩知识库的公文材料"
+          aria-disabled={uploading || loading}
+          onClick={() => {
+            if (!uploading && !loading) inputRef.current?.click()
+          }}
+          onKeyDown={(event) => {
+            if (!uploading && !loading) handleUploadKeyDown(event)
+          }}
           onDragOver={(event) => {
             event.preventDefault()
             setDragging(true)
@@ -88,30 +152,47 @@ export function KnowledgeBasePage() {
         >
           <strong>{uploading ? '正在入库...' : '上传公文材料'}</strong>
           <span>支持 DOCX / PDF / TXT，单文件 ≤ 20MB</span>
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".docx,.pdf,.txt,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            style={{ display: 'none' }}
-            onChange={(event) => {
-              const file = event.target.files?.[0] || null
-              void uploadFile(file)
-              event.currentTarget.value = ''
-            }}
-          />
         </section>
+        <input
+          ref={inputRef}
+          type="file"
+          aria-label="选择要加入云矩知识库的公文材料"
+          accept=".docx,.pdf,.txt,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          style={{ display: 'none' }}
+          onChange={(event) => {
+            const file = event.target.files?.[0] || null
+            void uploadFile(file)
+            event.currentTarget.value = ''
+          }}
+        />
 
         <div className="row-gap">
-          <button type="button" className="secondary-button" onClick={() => void loadDocs()} disabled={loading}>
+          <button type="button" className="secondary-button" onClick={() => void loadDocs(true)} disabled={loading}>
             {loading ? '同步中...' : '刷新列表'}
           </button>
-          <button type="button" onClick={() => navigate('/layout/summary')}>
+          <button type="button" onClick={openSummaryWithKnowledgeBase} disabled={loading || uploading}>
             去公文总结调用
           </button>
         </div>
 
-        {statusMessage ? <p className="summary-side-note">{statusMessage}</p> : null}
-        {errorMessage ? <p className="summary-error">{errorMessage}</p> : null}
+        {activeOperationMessage ? (
+          <>
+            <p className="summary-operation-status">{activeOperationMessage}</p>
+            <span className="summary-operation-announcement" role="status" aria-live="polite" aria-atomic="true">
+              {activeOperationAnnouncement}
+            </span>
+          </>
+        ) : null}
+        {statusMessage ? (
+          <p className="summary-success" role="status" aria-live="polite">
+            {statusMessage}
+          </p>
+        ) : null}
+        {errorMessage ? (
+          <p className="summary-error" role="alert">
+            {errorMessage}
+          </p>
+        ) : null}
       </section>
 
       <section className="workspace-table-card knowledge-doc-panel">
@@ -120,7 +201,12 @@ export function KnowledgeBasePage() {
             <h3>知识库文档</h3>
             <p>{loading ? '正在同步知识库...' : `共 ${docs.length} 份材料`}</p>
           </div>
-          <button type="button" className="secondary-button" onClick={() => navigate('/layout/summary')}>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={openSummaryWithKnowledgeBase}
+            disabled={loading || uploading}
+          >
             调用写作
           </button>
         </div>

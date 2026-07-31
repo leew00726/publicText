@@ -205,6 +205,11 @@
   z-index: 1;
 }
 
+.editor-content .editor-prose-wrapper .ProseMirror:focus-visible {
+  outline: 3px solid rgba(36, 87, 214, 0.58);
+  outline-offset: -3px;
+}
+
 .editor-content .editor-prose-wrapper .ProseMirror p {
   margin: 0;
   text-indent: var(--pt-body-text-indent, 2em);
@@ -376,6 +381,42 @@
 
 .validation-panel .full-btn {
   width: 100%;
+}
+
+.save-state,
+.editor-operation-feedback,
+.ai-operation-status,
+.validation-state {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.save-state {
+  min-width: 112px;
+}
+
+.save-state.dirty,
+.save-state.error,
+.editor-operation-feedback.error,
+.validation-state.error {
+  color: var(--danger, #b42318);
+}
+
+.save-state.saving,
+.validation-state.running {
+  color: var(--brand, #2457d6);
+}
+
+.save-state.saved,
+.editor-operation-feedback.success,
+.validation-state.passed {
+  color: var(--success, #157347);
+}
+
+.validation-state.stale,
+.validation-state.issues-found {
+  color: var(--warn, #9a6700);
 }
 
 .issues {

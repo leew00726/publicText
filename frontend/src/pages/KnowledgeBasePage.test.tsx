@@ -27,6 +27,27 @@ describe('KnowledgeBasePage', () => {
     expect(source).toContain("api.get<KnowledgeDocument[]>('/api/knowledge/docs')")
     expect(source).toContain("api.post<KnowledgeDocument>('/api/knowledge/docs'")
     expect(source).not.toContain('/api/layout/ai/knowledge-docs')
+    expect(source).toContain("navigate('/layout/summary', {")
+    expect(source).toContain('useKnowledgeBase: true')
+    expect(source).toContain('documentCount: docs.length')
+  })
+
+  it('makes upload keyboard accessible and exposes persistent operation feedback', () => {
+    const html = renderToStaticMarkup(
+      <MemoryRouter initialEntries={['/knowledge']}>
+        <KnowledgeBasePage />
+      </MemoryRouter>,
+    )
+    const source = fs.readFileSync(path.resolve(__dirname, './KnowledgeBasePage.tsx'), 'utf8')
+
+    expect(html).toContain('role="button"')
+    expect(html).toContain('tabindex="0"')
+    expect(html).toContain('aria-label="选择要加入云矩知识库的公文材料"')
+    expect(source).toContain("event.key !== 'Enter' && event.key !== ' '")
+    expect(source).toContain('已等待 ${elapsedSeconds} 秒')
+    expect(source).toContain('Math.floor(elapsedSeconds / 10) * 10')
+    expect(source).toContain('aria-live="polite"')
+    expect(source).toContain('role="alert"')
   })
 
   it('uses the shared premium blue-white module workbench visual language', () => {

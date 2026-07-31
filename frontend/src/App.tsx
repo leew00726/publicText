@@ -109,6 +109,11 @@ function LegacyDocRedirect() {
   return <Navigate to={`/layout/docs/${id}`} replace />
 }
 
+function KeyedDocEditorRoute() {
+  const { id = '' } = useParams()
+  return <DocEditorPage key={id} />
+}
+
 function FallbackRoute() {
   return <Navigate to={loadEmployeeSession() ? '/workspace' : '/'} replace />
 }
@@ -134,7 +139,7 @@ export default function App() {
       <Route path="/layout/companies/:companyId/topics" element={withShell('layout.topicList', <TopicListPage mode="layout" />)} />
       <Route path="/layout/topics/:topicId" element={withShell('layout.topicCompose', <TopicComposePage />)} />
       <Route path="/layout/topics/:topicId/library" element={withShell('layout.topicLibrary', <TopicLibraryPage />)} />
-      <Route path="/layout/docs/:id" element={withShell('layout.docEditor', <DocEditorPage />)} />
+      <Route path="/layout/docs/:id" element={withShell('layout.docEditor', <KeyedDocEditorRoute />)} />
       <Route path="/management" element={<Navigate to="/management/companies" replace />} />
       <Route path="/management/companies" element={withShell('management.company', <CompanySelectPage mode="management" />)} />
       <Route

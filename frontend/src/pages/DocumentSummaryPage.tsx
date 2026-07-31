@@ -1,5 +1,5 @@
-import { DragEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { useInRouterContext, useNavigate } from 'react-router-dom'
+import { DragEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { useInRouterContext, useLocation, useNavigate } from 'react-router-dom'
 
 import { api } from '../api/client'
 import type { Topic, TopicTemplate } from '../api/types'
@@ -39,36 +39,118 @@ type SummaryApiResponse = {
   knowledgeReferences?: Array<Record<string, any>>
 }
 
-function KnowledgeBaseEntryButton() {
+type SummaryRouteState = {
+  useKnowledgeBase?: boolean
+  knowledgeSource?: {
+    label?: string
+    documentCount?: number
+  }
+}
+
+type DocumentSummaryWorkspaceProps = {
+  initialUseKnowledgeBase?: boolean
+  knowledgeSourceContext?: string
+}
+
+export function getNextSummarySourceMode(currentMode: SummarySourceMode, key: string): SummarySourceMode | null {
+  if (key === 'Home') return 'file'
+  if (key === 'End') return 'text'
+  if (key === 'ArrowLeft' || key === 'ArrowRight') {
+    return currentMode === 'file' ? 'text' : 'file'
+  }
+  return null
+}
+
+function useElapsedSeconds(active: boolean) {
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
+
+  useEffect(() => {
+    if (!active) {
+      setElapsedSeconds(0)
+      return
+    }
+
+    const startedAt = Date.now()
+    setElapsedSeconds(0)
+    const intervalId = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000))
+    }, 1000)
+
+    return () => window.clearInterval(intervalId)
+  }, [active])
+
+  return elapsedSeconds
+}
+
+function SummaryOperationStatus({ message, announcement }: { message: string; announcement: string }) {
+  return (
+    <>
+      <p className="summary-operation-status">{message}</p>
+      <span className="summary-operation-announcement" role="status" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </span>
+    </>
+  )
+}
+
+function KnowledgeBaseEntryButton({ disabled = false }: { disabled?: boolean }) {
   const inRouter = useInRouterContext()
   if (inRouter) {
-    return <KnowledgeBaseRouterEntryButton />
+    return <KnowledgeBaseRouterEntryButton disabled={disabled} />
   }
 
   return (
-    <button type="button" className="secondary-button" onClick={() => window.location.assign('/knowledge')}>
+    <button type="button" className="secondary-button" onClick={() => window.location.assign('/knowledge')} disabled={disabled}>
       进入知识库
     </button>
   )
 }
 
-function KnowledgeBaseRouterEntryButton() {
+function KnowledgeBaseRouterEntryButton({ disabled = false }: { disabled?: boolean }) {
   const navigate = useNavigate()
   return (
-    <button type="button" className="secondary-button" onClick={() => navigate('/knowledge')}>
+    <button type="button" className="secondary-button" onClick={() => navigate('/knowledge')} disabled={disabled}>
       进入知识库
     </button>
   )
 }
 
 export function DocumentSummaryPage() {
+  const inRouter = useInRouterContext()
+  return inRouter ? <RoutedDocumentSummaryPage /> : <DocumentSummaryWorkspace />
+}
+
+function RoutedDocumentSummaryPage() {
+  const location = useLocation()
+  const routeState = (location.state as SummaryRouteState | null) || null
+  const documentCount = routeState?.knowledgeSource?.documentCount
+  const sourceLabel = routeState?.knowledgeSource?.label?.trim() || '云矩知识库'
+  const knowledgeSourceContext = routeState?.useKnowledgeBase
+    ? typeof documentCount === 'number'
+      ? `写作来源：${sourceLabel} · 当前可调用 ${documentCount} 份材料`
+      : `写作来源：${sourceLabel}`
+    : ''
+
+  return (
+    <DocumentSummaryWorkspace
+      key={location.key}
+      initialUseKnowledgeBase={Boolean(routeState?.useKnowledgeBase)}
+      knowledgeSourceContext={knowledgeSourceContext}
+    />
+  )
+}
+
+function DocumentSummaryWorkspace({
+  initialUseKnowledgeBase = false,
+  knowledgeSourceContext = '',
+}: DocumentSummaryWorkspaceProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const employeeSession = useMemo(() => loadEmployeeSession(), [])
   const [dragging, setDragging] = useState(false)
   const [sourceMode, setSourceMode] = useState<SummarySourceMode>('file')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [sourceText, setSourceText] = useState('')
-  const [useKnowledgeBase, setUseKnowledgeBase] = useState(false)
+  const [useKnowledgeBase, setUseKnowledgeBase] = useState(initialUseKnowledgeBase)
   const [summaryLength, setSummaryLength] = useState<SummaryLength>('medium')
   const [agentMessages, setAgentMessages] = useState<AgentMessage[]>([])
   const [agentDraft, setAgentDraft] = useState('')
@@ -77,6 +159,8 @@ export function DocumentSummaryPage() {
   const [summarizing, setSummarizing] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const [statusMessage, setStatusMessage] = useState('')
+  const [feedbackTarget, setFeedbackTarget] = useState<'input' | 'output'>('input')
   const [templateOptions, setTemplateOptions] = useState<SummaryExportTemplateOption[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [templatesLoading, setTemplatesLoading] = useState(false)
@@ -91,9 +175,51 @@ export function DocumentSummaryPage() {
       .filter(Boolean)
       .join('\n')
   }, [agentDraft, agentMessages])
-  const canSummarize = (useKnowledgeBase ? Boolean(activeInstruction) : Boolean(sourceMode === 'file' ? selectedFile : normalizedSourceText)) && !summarizing
-  const canExport = summary.trim().length > 0 && !exporting && (templateOptions.length === 0 || Boolean(selectedTemplateId))
+  const canSummarize =
+    (useKnowledgeBase
+      ? Boolean(activeInstruction)
+      : Boolean(sourceMode === 'file' ? selectedFile : normalizedSourceText)) &&
+    !summarizing &&
+    !exporting
+  const canExport =
+    summary.trim().length > 0 &&
+    !exporting &&
+    !summarizing &&
+    !templatesLoading &&
+    (templateOptions.length === 0 || Boolean(selectedTemplateId))
+  const inputControlsLocked = summarizing || exporting
   const showGeneratedSummary = Boolean(summary.trim() || resultMeta)
+  const elapsedSeconds = useElapsedSeconds(summarizing || exporting)
+  const activeOperationLabel = summarizing
+    ? useKnowledgeBase
+      ? '正在调用知识库写作'
+      : '正在生成总结'
+    : exporting
+      ? '正在导出总结'
+      : ''
+  const activeOperationDetail = summarizing
+    ? showGeneratedSummary
+      ? '当前结果已锁定'
+      : '完成后将在右侧显示结果'
+    : exporting
+      ? '导出内容与模板已锁定'
+      : ''
+  const activeOperationMessage = activeOperationLabel
+    ? `${activeOperationLabel}，已等待 ${elapsedSeconds} 秒；${activeOperationDetail}`
+    : ''
+  const announcedElapsedSeconds = Math.floor(elapsedSeconds / 10) * 10
+  const activeOperationAnnouncement = activeOperationLabel
+    ? announcedElapsedSeconds > 0
+      ? `${activeOperationLabel}，已等待约 ${announcedElapsedSeconds} 秒。`
+      : `${activeOperationLabel}。`
+    : ''
+  const userRequirements = useMemo(
+    () =>
+      agentMessages
+        .map((message, index) => ({ message, index }))
+        .filter(({ message }) => message.role === 'user' && Boolean(message.content.trim())),
+    [agentMessages],
+  )
 
   const usageSummary = useMemo(() => {
     if (!resultMeta) return ''
@@ -163,21 +289,43 @@ export function DocumentSummaryPage() {
   }, [employeeSession?.companyId])
 
   const pickFile = (file: File | null) => {
+    if (inputControlsLocked) return
     if (!file) return
     if (!isSupportedSummaryFileName(file.name)) {
+      setFeedbackTarget('input')
       setErrorMessage('仅支持 DOCX / PDF / TXT 文件')
+      setStatusMessage('')
       return
     }
     setSelectedFile(file)
     setSourceMode('file')
+    setFeedbackTarget('input')
     setErrorMessage('')
+    setStatusMessage(`已选择文件：${file.name}`)
   }
 
   const handleDrop = (event: DragEvent<HTMLElement>) => {
     event.preventDefault()
     setDragging(false)
+    if (summarizing || exporting) return
     const file = event.dataTransfer.files?.[0]
     pickFile(file || null)
+  }
+
+  const handleUploadKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    if (summarizing || exporting) return
+    fileInputRef.current?.click()
+  }
+
+  const handleSourceTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (inputControlsLocked) return
+    const nextMode = getNextSummarySourceMode(sourceMode, event.key)
+    if (!nextMode) return
+    event.preventDefault()
+    setSourceMode(nextMode)
+    document.getElementById(`summary-source-tab-${nextMode}`)?.focus()
   }
 
   const summarize = async () => {
@@ -194,12 +342,15 @@ export function DocumentSummaryPage() {
 
     if (useKnowledgeBase) {
       if (!extraInstruction) {
+        setFeedbackTarget('input')
         setErrorMessage('请先填写写作要求，再调用知识库写作。')
         return
       }
 
       setSummarizing(true)
+      setFeedbackTarget('input')
       setErrorMessage('')
+      setStatusMessage('')
       setAgentMessages(nextAgentMessages)
       setAgentDraft('')
       try {
@@ -220,6 +371,8 @@ export function DocumentSummaryPage() {
         ])
         if (!res.data.summary?.trim()) {
           setErrorMessage('生成结果为空，请重试。')
+        } else {
+          setStatusMessage('知识库写作已完成，可继续编辑或导出。')
         }
       } catch (error: any) {
         const detail = error?.response?.data?.detail
@@ -250,7 +403,9 @@ export function DocumentSummaryPage() {
     }
 
     setSummarizing(true)
+    setFeedbackTarget('input')
     setErrorMessage('')
+    setStatusMessage('')
     setAgentMessages(nextAgentMessages)
     setAgentDraft('')
     try {
@@ -271,6 +426,8 @@ export function DocumentSummaryPage() {
       ])
       if (!res.data.summary?.trim()) {
         setErrorMessage('总结结果为空，请重试。')
+      } else {
+        setStatusMessage('总结已生成，可继续编辑或导出。')
       }
     } catch (error: any) {
       const detail = error?.response?.data?.detail
@@ -285,25 +442,30 @@ export function DocumentSummaryPage() {
   }
 
   const exportDocx = async () => {
-    if (!summary.trim()) return
+    const exportSummarySnapshot = summary.trim()
+    if (!exportSummarySnapshot) return
 
-    const exportSourceFileName =
-      resultMeta?.source.fileName && resultMeta.source.fileName !== '直接粘贴文本'
+    const exportSourceFileName = resultMeta
+      ? resultMeta.source.fileName && resultMeta.source.fileName !== '直接粘贴文本'
         ? resultMeta.source.fileName
-        : sourceMode === 'file'
-          ? selectedFile?.name || ''
-          : ''
+        : ''
+      : sourceMode === 'file'
+        ? selectedFile?.name || ''
+        : ''
+    const exportTemplateSnapshot = selectedTemplateId || null
     const title = suggestSummaryExportTitle(exportSourceFileName)
     setExporting(true)
+    setFeedbackTarget('output')
     setErrorMessage('')
+    setStatusMessage('')
     try {
       const res = await api.post(
         '/api/layout/ai/export-summary-docx',
         {
           title,
-          summary: summary.trim(),
+          summary: exportSummarySnapshot,
           sourceFileName: exportSourceFileName || null,
-          topicTemplateId: selectedTemplateId || null,
+          topicTemplateId: exportTemplateSnapshot,
         },
         {
           responseType: 'blob',
@@ -318,6 +480,7 @@ export function DocumentSummaryPage() {
       a.download = `${title}.docx`
       a.click()
       URL.revokeObjectURL(url)
+      setStatusMessage(`总结 DOCX 已开始下载：${title}.docx（已按点击导出时的内容与模板生成）`)
     } catch (error: any) {
       const detail = error?.response?.data?.detail
       if (typeof detail === 'string') {
@@ -331,7 +494,7 @@ export function DocumentSummaryPage() {
   }
 
   return (
-    <main className="page summary-page">
+    <main className="page summary-page" aria-busy={summarizing || exporting}>
       <section className="summary-studio">
         <aside className="summary-sidebar">
           <article className="summary-control-card">
@@ -345,16 +508,30 @@ export function DocumentSummaryPage() {
             <div className="summary-panel-body">
               <div className="summary-source-switch" role="tablist" aria-label="总结输入方式">
                 <button
+                  id="summary-source-tab-file"
                   type="button"
+                  role="tab"
+                  aria-selected={sourceMode === 'file'}
+                  aria-controls="summary-source-panel-file"
+                  tabIndex={sourceMode === 'file' ? 0 : -1}
                   className={`summary-source-tab ${sourceMode === 'file' ? 'active' : ''}`}
                   onClick={() => setSourceMode('file')}
+                  onKeyDown={handleSourceTabKeyDown}
+                  disabled={inputControlsLocked}
                 >
                   上传文件
                 </button>
                 <button
+                  id="summary-source-tab-text"
                   type="button"
+                  role="tab"
+                  aria-selected={sourceMode === 'text'}
+                  aria-controls="summary-source-panel-text"
+                  tabIndex={sourceMode === 'text' ? 0 : -1}
                   className={`summary-source-tab ${sourceMode === 'text' ? 'active' : ''}`}
                   onClick={() => setSourceMode('text')}
+                  onKeyDown={handleSourceTabKeyDown}
+                  disabled={inputControlsLocked}
                 >
                   粘贴文本
                 </button>
@@ -362,26 +539,40 @@ export function DocumentSummaryPage() {
 
               {sourceMode === 'file' ? (
                 <section
-                  className={`summary-source-panel summary-drop-zone ${dragging ? 'dragging' : ''}`}
-                  onClick={() => {
-                    fileInputRef.current?.click()
-                  }}
-                  onDragOver={(event) => {
-                    event.preventDefault()
-                    setDragging(true)
-                  }}
-                  onDragLeave={(event) => {
-                    event.preventDefault()
-                    setDragging(false)
-                  }}
-                  onDrop={handleDrop}
+                  id="summary-source-panel-file"
+                  role="tabpanel"
+                  aria-labelledby="summary-source-tab-file"
+                  className="summary-source-panel"
                 >
-                  <p>{selectedFile ? `已选择：${selectedFile.name}` : '拖拽或点击选择文件'}</p>
-                  <small>支持 DOCX / PDF / TXT，单文件 ≤ 20MB</small>
+                  <div
+                    className={`summary-drop-zone ${dragging ? 'dragging' : ''}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={selectedFile ? `更换总结文件，当前已选择 ${selectedFile.name}` : '选择需要总结的文件'}
+                    aria-disabled={summarizing || exporting}
+                    onClick={() => {
+                      if (!summarizing && !exporting) fileInputRef.current?.click()
+                    }}
+                    onKeyDown={handleUploadKeyDown}
+                    onDragOver={(event) => {
+                      event.preventDefault()
+                      setDragging(true)
+                    }}
+                    onDragLeave={(event) => {
+                      event.preventDefault()
+                      setDragging(false)
+                    }}
+                    onDrop={handleDrop}
+                  >
+                    <p>{selectedFile ? `已选择：${selectedFile.name}` : '拖拽或点击选择文件'}</p>
+                    <small>支持 DOCX / PDF / TXT，单文件 ≤ 20MB</small>
+                  </div>
                   <input
                     ref={fileInputRef}
                     type="file"
+                    aria-label="选择需要总结的文件"
                     accept=".docx,.pdf,.txt,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    disabled={inputControlsLocked}
                     style={{ display: 'none' }}
                     onChange={(event) => {
                       const file = event.target.files?.[0] || null
@@ -391,13 +582,19 @@ export function DocumentSummaryPage() {
                   />
                 </section>
               ) : (
-                <section className="summary-source-panel summary-text-panel">
+                <section
+                  id="summary-source-panel-text"
+                  role="tabpanel"
+                  aria-labelledby="summary-source-tab-text"
+                  className="summary-source-panel summary-text-panel"
+                >
                   <label htmlFor="summary-source-textarea">正文</label>
                   <textarea
                     id="summary-source-textarea"
                     value={sourceText}
                     rows={10}
                     placeholder="粘贴需要总结的正文"
+                    disabled={inputControlsLocked}
                     onChange={(event) => {
                       setSourceText(event.target.value)
                       if (event.target.value.trim()) {
@@ -417,18 +614,28 @@ export function DocumentSummaryPage() {
                   <input
                     type="checkbox"
                     checked={useKnowledgeBase}
+                    disabled={inputControlsLocked}
                     onChange={(event) => setUseKnowledgeBase(event.target.checked)}
                   />
                   调用知识库写作
                 </label>
 
+                {useKnowledgeBase && knowledgeSourceContext ? (
+                  <p className="summary-knowledge-context" role="status">
+                    {knowledgeSourceContext}
+                  </p>
+                ) : null}
                 <p className="summary-side-note">启用后将根据补充要求调阅云矩知识库生成材料。</p>
-                <KnowledgeBaseEntryButton />
+                <KnowledgeBaseEntryButton disabled={inputControlsLocked} />
               </section>
 
               <label>
                 总结长度
-                <select value={summaryLength} onChange={(event) => setSummaryLength(event.target.value as SummaryLength)}>
+                <select
+                  value={summaryLength}
+                  onChange={(event) => setSummaryLength(event.target.value as SummaryLength)}
+                  disabled={inputControlsLocked}
+                >
                   <option value="short">短（100-180字）</option>
                   <option value="medium">中（220-320字）</option>
                   <option value="long">长（380-520字）</option>
@@ -447,7 +654,36 @@ export function DocumentSummaryPage() {
                   rows={4}
                   placeholder="例如：突出结论、关键事项、时间节点。"
                   onChange={(event) => setAgentDraft(event.target.value)}
+                  disabled={inputControlsLocked}
                 />
+
+                <div className="summary-requirement-list" aria-label="已添加的补充要求">
+                  {userRequirements.length > 0 ? (
+                    <ol>
+                      {userRequirements.map(({ message, index }, displayIndex) => (
+                        <li key={`${index}-${message.content}`}>
+                          <span className="summary-requirement-index">{displayIndex + 1}</span>
+                          <span>{message.content}</span>
+                          <button
+                            type="button"
+                            className="secondary-button summary-requirement-remove"
+                            aria-label={`删除补充要求 ${displayIndex + 1}`}
+                            disabled={inputControlsLocked}
+                            onClick={() => {
+                              setAgentMessages((current) => current.filter((_, currentIndex) => currentIndex !== index))
+                              setFeedbackTarget('input')
+                              setStatusMessage(`已删除补充要求 ${displayIndex + 1}`)
+                            }}
+                          >
+                            删除
+                          </button>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <p>尚未添加补充要求。</p>
+                  )}
+                </div>
 
                 <div className="row-gap">
                   <button
@@ -457,8 +693,11 @@ export function DocumentSummaryPage() {
                       if (!next) return
                       setAgentMessages((current) => [...current, { role: 'user', content: next }])
                       setAgentDraft('')
+                      setFeedbackTarget('input')
+                      setErrorMessage('')
+                      setStatusMessage('已添加补充要求。')
                     }}
-                    disabled={!agentDraft.trim()}
+                    disabled={inputControlsLocked || !agentDraft.trim()}
                   >
                     添加
                   </button>
@@ -468,8 +707,10 @@ export function DocumentSummaryPage() {
                     onClick={() => {
                       setAgentMessages([])
                       setAgentDraft('')
+                      setFeedbackTarget('input')
+                      setStatusMessage('补充要求已清空。')
                     }}
-                    disabled={agentMessages.length === 0 && !agentDraft.trim()}
+                    disabled={inputControlsLocked || (agentMessages.length === 0 && !agentDraft.trim())}
                   >
                     清空
                   </button>
@@ -482,7 +723,19 @@ export function DocumentSummaryPage() {
                 </button>
               </div>
 
-              {errorMessage ? <p className="summary-error">{errorMessage}</p> : null}
+              {feedbackTarget === 'input' && activeOperationMessage ? (
+                <SummaryOperationStatus message={activeOperationMessage} announcement={activeOperationAnnouncement} />
+              ) : null}
+              {feedbackTarget === 'input' && statusMessage ? (
+                <p className="summary-success" role="status" aria-live="polite">
+                  {statusMessage}
+                </p>
+              ) : null}
+              {feedbackTarget === 'input' && errorMessage ? (
+                <p className="summary-error" role="alert">
+                  {errorMessage}
+                </p>
+              ) : null}
             </div>
           </article>
         </aside>
@@ -515,12 +768,18 @@ export function DocumentSummaryPage() {
 
               <section className="summary-output-surface">
                 {showGeneratedSummary ? (
-                  <section className="summary-editor">
+                  <section className={`summary-editor ${summarizing || exporting ? 'summary-editor-locked' : ''}`}>
+                    {summarizing || exporting ? (
+                      <p className="summary-editor-lock-note">
+                        {summarizing ? '正在生成新结果，当前总结暂不可编辑。' : '正在导出，当前总结与模板暂不可修改。'}
+                      </p>
+                    ) : null}
                     <textarea
                       id="summary-textarea"
                       aria-label="总结内容"
                       rows={16}
                       value={summary}
+                      disabled={summarizing || exporting}
                       onChange={(event) => setSummary(event.target.value)}
                     />
                   </section>
@@ -540,7 +799,7 @@ export function DocumentSummaryPage() {
                     className="summary-template-select"
                     value={selectedTemplateId}
                     onChange={(event) => setSelectedTemplateId(event.target.value)}
-                    disabled={templatesLoading || templateOptions.length === 0}
+                    disabled={templatesLoading || templateOptions.length === 0 || summarizing || exporting}
                   >
                     {templateOptions.length === 0 ? (
                       <option value="">通用模板 · v1（当前生效）</option>
@@ -564,6 +823,20 @@ export function DocumentSummaryPage() {
                   {exporting ? '导出中...' : '导出总结 DOCX'}
                 </button>
               </section>
+
+              {feedbackTarget === 'output' && activeOperationMessage ? (
+                <SummaryOperationStatus message={activeOperationMessage} announcement={activeOperationAnnouncement} />
+              ) : null}
+              {feedbackTarget === 'output' && statusMessage ? (
+                <p className="summary-success" role="status" aria-live="polite">
+                  {statusMessage}
+                </p>
+              ) : null}
+              {feedbackTarget === 'output' && errorMessage ? (
+                <p className="summary-error" role="alert">
+                  {errorMessage}
+                </p>
+              ) : null}
             </div>
           </article>
         </section>

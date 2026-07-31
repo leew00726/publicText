@@ -33,6 +33,7 @@ interface Props {
   signatory?: string
   topicTemplateRules?: Record<string, any> | null
   importedTitleAttrs?: Record<string, any> | null
+  editable?: boolean
 }
 
 const ALLOWED_TAGS = new Set([
@@ -449,6 +450,7 @@ export function TiptapEditor({
   signatory,
   topicTemplateRules,
   importedTitleAttrs,
+  editable = true,
 }: Props) {
   const editor = useEditor({
     extensions: [
@@ -462,10 +464,21 @@ export function TiptapEditor({
       TableCell,
     ],
     content: value,
+    editable,
     onUpdate: ({ editor: ed }) => {
+      // Tiptap/ProseMirror may normalize the initial JSON after mounting. That
+      // transaction is not a user edit and must not make a freshly loaded
+      // document look dirty. Real typing, paste and selection replacement all
+      // happen while the editor is focused.
+      if (!ed.isFocused) return
       onChange(ed.getJSON())
     },
     editorProps: {
+      attributes: {
+        'aria-label': '公文正文编辑区',
+        'aria-multiline': 'true',
+        role: 'textbox',
+      },
       handlePaste(view, event) {
         const html = event.clipboardData?.getData('text/html')
         if (!html) return false
@@ -488,6 +501,11 @@ export function TiptapEditor({
     if (!editor) return
     editor.commands.setContent(value || { type: 'doc', content: [] }, false)
   }, [editor, syncToken])
+
+  useEffect(() => {
+    if (!editor) return
+    editor.setEditable(editable)
+  }, [editor, editable])
 
   const title = (titleText || '').trim()
   const mainTo = (mainToText || '').trim()

@@ -2,9 +2,10 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import { renderToStaticMarkup } from 'react-dom/server'
+import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 
-import { DocumentSummaryPage } from './DocumentSummaryPage'
+import { DocumentSummaryPage, getNextSummarySourceMode } from './DocumentSummaryPage'
 
 const pagesCssPath = path.resolve(__dirname, '../styles/pages.css')
 
@@ -40,12 +41,89 @@ describe('DocumentSummaryPage', () => {
 
   it('renders a simplified agent requirement area without helper copy or empty thread panel', () => {
     const html = renderToStaticMarkup(<DocumentSummaryPage />)
+    const source = fs.readFileSync(path.resolve(__dirname, './DocumentSummaryPage.tsx'), 'utf8')
 
     expect(html).toContain('补充要求')
     expect(html).not.toContain('summary-agent-thread')
     expect(html).not.toContain('告诉智能体你希望的总结格式')
     expect(html).toContain('placeholder="例如：突出结论、关键事项、时间节点。"')
     expect(html).not.toContain('要求输入')
+    expect(html).toContain('已添加的补充要求')
+    expect(html).toContain('尚未添加补充要求。')
+    expect(source).toContain('删除补充要求')
+    expect(source).toContain('current.filter((_, currentIndex) => currentIndex !== index)')
+  })
+
+  it('opens in knowledge-writing mode with visible source context when routed from the knowledge base', () => {
+    const html = renderToStaticMarkup(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/layout/summary',
+            state: {
+              useKnowledgeBase: true,
+              knowledgeSource: { label: '云矩知识库', documentCount: 3 },
+            },
+          },
+        ]}
+      >
+        <DocumentSummaryPage />
+      </MemoryRouter>,
+    )
+
+    expect(html).toMatch(/type="checkbox" checked=""/)
+    expect(html).toContain('写作来源：云矩知识库 · 当前可调用 3 份材料')
+  })
+
+  it('exposes accessible tabs, upload activation, and long-operation feedback', () => {
+    const html = renderToStaticMarkup(<DocumentSummaryPage />)
+    const source = fs.readFileSync(path.resolve(__dirname, './DocumentSummaryPage.tsx'), 'utf8')
+
+    expect(html).toContain('role="tablist"')
+    expect(html).toContain('role="tab"')
+    expect(html).toContain('aria-selected="true"')
+    expect(html).toContain('role="tabpanel"')
+    expect(html).toContain('role="button"')
+    expect(html).toContain('aria-label="选择需要总结的文件"')
+    expect(source).toContain("event.key !== 'Enter' && event.key !== ' '")
+    expect(source).toContain('已等待 ${elapsedSeconds} 秒')
+    expect(source).toContain('总结 DOCX 已开始下载')
+    expect(source).toContain('aria-live="polite"')
+  })
+
+  it('cycles source tabs correctly with arrow keys and respects Home and End', () => {
+    expect(getNextSummarySourceMode('file', 'ArrowLeft')).toBe('text')
+    expect(getNextSummarySourceMode('file', 'ArrowRight')).toBe('text')
+    expect(getNextSummarySourceMode('text', 'ArrowLeft')).toBe('file')
+    expect(getNextSummarySourceMode('text', 'ArrowRight')).toBe('file')
+    expect(getNextSummarySourceMode('text', 'Home')).toBe('file')
+    expect(getNextSummarySourceMode('file', 'End')).toBe('text')
+    expect(getNextSummarySourceMode('file', 'Enter')).toBeNull()
+  })
+
+  it('locks generated content and the selected template while generation or export is in flight', () => {
+    const source = fs.readFileSync(path.resolve(__dirname, './DocumentSummaryPage.tsx'), 'utf8')
+    const styles = fs.readFileSync(pagesCssPath, 'utf8')
+
+    expect(source).toContain('disabled={summarizing || exporting}')
+    expect(source).toContain('templatesLoading || templateOptions.length === 0 || summarizing || exporting')
+    expect(source).toContain('const exportSummarySnapshot = summary.trim()')
+    expect(source).toContain('const exportTemplateSnapshot = selectedTemplateId || null')
+    expect(source).toContain('summary: exportSummarySnapshot')
+    expect(source).toContain('topicTemplateId: exportTemplateSnapshot')
+    expect(source).toContain('当前结果已锁定')
+    expect(source).toContain('导出内容与模板已锁定')
+    expect(styles).toContain('.summary-editor-lock-note')
+  })
+
+  it('keeps visual elapsed seconds but throttles live-region announcements to ten-second steps', () => {
+    const source = fs.readFileSync(path.resolve(__dirname, './DocumentSummaryPage.tsx'), 'utf8')
+    const styles = fs.readFileSync(pagesCssPath, 'utf8')
+
+    expect(source).toContain('Math.floor(elapsedSeconds / 10) * 10')
+    expect(source).toContain('className="summary-operation-status"')
+    expect(source).toContain('className="summary-operation-announcement" role="status" aria-live="polite"')
+    expect(styles).toContain('.summary-operation-announcement')
   })
 
   it('keeps the export template selector visible even before templates load', () => {

@@ -8,7 +8,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Document, DocumentFile, Unit
+from app.models import Document, DocumentFile, Topic, TopicTemplate, Unit
 from app.schemas import (
     ApiMessage,
     CheckResponse,
@@ -143,14 +143,83 @@ async def import_docx_api(
     docType: str = Form("qingshi"),
     title: str = Form("导入文档"),
     redheadTemplateId: str | None = Form(default=None),
+    sourceDocId: str | None = Form(default=None),
     preserveFormatting: bool = Form(default=True),
     db: Session = Depends(get_db),
 ):
     if not file.filename.lower().endswith(".docx"):
         raise HTTPException(status_code=400, detail="仅支持 DOCX")
 
+    topic_context: dict = {}
+    if sourceDocId:
+        source_doc = db.query(Document).filter(Document.id == sourceDocId).first()
+        if not source_doc:
+            raise HTTPException(status_code=404, detail="来源文档不存在")
+        if source_doc.unit_id != unitId:
+            raise HTTPException(status_code=400, detail="来源文档与当前单位不一致")
+
+        source_fields = source_doc.structured_fields if isinstance(source_doc.structured_fields, dict) else {}
+        topic_id = source_fields.get("topicId")
+        if topic_id:
+            topic = (
+                db.query(Topic)
+                .filter(Topic.id == topic_id, Topic.company_id == unitId)
+                .first()
+            )
+            if not topic:
+                raise HTTPException(status_code=400, detail="来源文档的题材归属无效")
+
+            topic_context = {
+                "topicId": topic.id,
+                "topicName": topic.name,
+                "topicTemplateId": None,
+                "topicTemplateVersion": None,
+                "topicTemplateRules": None,
+            }
+            template_id = source_fields.get("topicTemplateId")
+            if template_id:
+                template = db.query(TopicTemplate).filter(TopicTemplate.id == template_id).first()
+                if template and template.topic_id != topic.id:
+                    raise HTTPException(status_code=400, detail="来源文档的题材模板归属无效")
+                if template:
+                    topic_context.update(
+                        {
+                            "topicTemplateId": template.id,
+                            "topicTemplateVersion": template.version,
+                            "topicTemplateRules": template.rules,
+                        }
+                    )
+                else:
+                    snapshot_rules = source_fields.get("topicTemplateRules")
+                    snapshot_version = source_fields.get("topicTemplateVersion")
+                    if isinstance(snapshot_rules, dict):
+                        topic_context.update(
+                            {
+                                "topicTemplateId": None,
+                                "topicTemplateVersion": snapshot_version if isinstance(snapshot_version, int) else None,
+                                "topicTemplateRules": snapshot_rules,
+                            }
+                        )
+            else:
+                snapshot_rules = source_fields.get("topicTemplateRules")
+                snapshot_version = source_fields.get("topicTemplateVersion")
+                if isinstance(snapshot_rules, dict):
+                    topic_context.update(
+                        {
+                            "topicTemplateVersion": snapshot_version if isinstance(snapshot_version, int) else None,
+                            "topicTemplateRules": snapshot_rules,
+                        }
+                    )
+        elif any(
+            source_fields.get(field_name) is not None
+            for field_name in ("topicName", "topicTemplateId", "topicTemplateVersion", "topicTemplateRules")
+        ):
+            raise HTTPException(status_code=400, detail="来源文档的题材归属不完整")
+
     data = await file.read()
     body, structured_fields, report = import_docx(data, preserve_formatting=preserveFormatting)
+    structured_fields.update(topic_context)
+
     resolved_title = (structured_fields.get("title") or "").strip() or title
 
     row = Document(
@@ -163,13 +232,26 @@ async def import_docx_api(
         body=body,
         import_report=report,
     )
-    db.add(row)
-    db.commit()
-
-    object_name = f"imports/{row.id}/{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{file.filename}"
-    storage_service.save_bytes(object_name, data, content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-    db.add(DocumentFile(document_id=row.id, file_kind="import_source", object_name=object_name))
-    db.commit()
+    object_name: str | None = None
+    try:
+        db.add(row)
+        db.flush()
+        object_name = f"imports/{row.id}/{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{file.filename}"
+        storage_service.save_bytes(
+            object_name,
+            data,
+            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+        db.add(DocumentFile(document_id=row.id, file_kind="import_source", object_name=object_name))
+        db.commit()
+    except Exception:
+        db.rollback()
+        if object_name:
+            try:
+                storage_service.delete_object(object_name)
+            except Exception:
+                pass
+        raise
 
     return ImportResponse(docId=row.id, importReport=report)
 

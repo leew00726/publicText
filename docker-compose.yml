@@ -1,4 +1,6 @@
-﻿services:
+﻿name: publictext
+
+services:
   postgres:
     image: postgres:16
     container_name: public-text-postgres
@@ -22,8 +24,8 @@
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     ports:
-      - '9000:9000'
-      - '9001:9001'
+      - '127.0.0.1:9000:9000'
+      - '127.0.0.1:9001:9001'
     volumes:
       - minio_data:/data
 
@@ -51,7 +53,7 @@
       minio-init:
         condition: service_completed_successfully
     environment:
-      DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/public_text
+      DATABASE_URL: postgresql+psycopg2://postgres:Postgres%401234@postgres:5432/public_text
       CORS_ORIGINS: http://localhost:5174,http://127.0.0.1:5174
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: minioadmin
@@ -68,7 +70,7 @@
       TEMPLATE_INFERENCE_ENGINE: ${TEMPLATE_INFERENCE_ENGINE:-rules}
       TEMPLATE_INFERENCE_AI_MAX_PARAGRAPHS: ${TEMPLATE_INFERENCE_AI_MAX_PARAGRAPHS:-80}
     ports:
-      - '8000:8000'
+      - '127.0.0.1:8000:8000'
     restart: unless-stopped
 
   frontend:
@@ -81,7 +83,7 @@
     environment:
       VITE_API_BASE: http://localhost:8000
     ports:
-      - '5174:5174'
+      - '127.0.0.1:5174:5174'
     restart: unless-stopped
 
 volumes:

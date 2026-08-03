@@ -39,7 +39,7 @@ const MODULE_PRESENTATIONS: Record<ModuleKey, ModulePresentation> = {
   management: {
     eyebrow: '公文管理',
     heading: '集中维护模板与权限边界',
-    summary: '管理公司、题材、模板版本和文档资产，保障发文流程持续可控。',
+    summary: '管理公司、题材和模板版本，保障模板治理流程持续可控。',
     steps: ['维护公司', '治理题材', '管理模板'],
     accentClass: 'is-management',
   },

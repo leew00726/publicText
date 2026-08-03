@@ -8,6 +8,7 @@ from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 from app.services.checker import normalize_doc_no_brackets
+from app.services.docx_media import extract_header_image_nodes, extract_paragraph_image_nodes
 
 RE_H1 = re.compile(r"^[一二三四五六七八九十百千]+、")
 RE_H2 = re.compile(r"^（[一二三四五六七八九十百千]+）")
@@ -397,7 +398,10 @@ def import_docx(file_bytes: bytes, preserve_formatting: bool = True) -> tuple[di
     title_consumed = False
     extracted_title_attrs: dict[str, Any] | None = None
 
+    nodes.extend(extract_header_image_nodes(doc))
+
     for paragraph_index, p in enumerate(doc.paragraphs):
+        nodes.extend(extract_paragraph_image_nodes(p))
         text = (p.text or "").strip()
         if not text:
             continue

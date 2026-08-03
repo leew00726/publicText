@@ -4,7 +4,7 @@ import copy
 import re
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -24,6 +24,7 @@ from app.schemas import (
     UnitOut,
 )
 from app.services.ai_agent import AgentConfigError, AgentUpstreamError, revise_topic_rules_with_deepseek
+from app.services.template_rules import normalize_template_rules
 from app.services.template_ai_inference import infer_topic_rules_with_optional_deepseek
 from app.services.topic_inference import extract_docx_features, extract_pdf_features
 
@@ -743,7 +744,11 @@ def _sanitize_rule_patch(value):
                     sanitized["useBookTitleMarks"] = normalized
                 continue
             sanitized[key] = _sanitize_rule_patch(item)
-        return sanitized
+        return normalize_template_rules(
+            sanitized,
+            include_schema_version=False,
+            include_page_defaults=False,
+        )
     if isinstance(value, list):
         return [_sanitize_rule_patch(item) for item in value]
     return value
@@ -768,7 +773,7 @@ def _draft_out(row: TopicTemplateDraft) -> TopicDraftOut:
         topicId=row.topic_id,
         version=row.version,
         status=row.status,
-        inferredRules=row.inferred_rules,
+        inferredRules=normalize_template_rules(row.inferred_rules),
         confidenceReport=row.confidence_report,
         agentSummary=row.agent_summary,
         createdAt=row.created_at,
@@ -781,7 +786,7 @@ def _template_out(row: TopicTemplate) -> TopicTemplateOut:
         id=row.id,
         topicId=row.topic_id,
         version=row.version,
-        rules=row.rules,
+        rules=normalize_template_rules(row.rules),
         sourceDraftId=row.source_draft_id,
         effective=row.effective,
         createdAt=row.created_at,
@@ -832,6 +837,36 @@ def _merge_patch(target: dict, patch: dict) -> dict:
             continue
         target[key] = value
     return target
+
+
+def _merge_missing_rules(target: dict, source: dict) -> dict:
+    for key, value in source.items():
+        if key not in target:
+            target[key] = copy.deepcopy(value)
+        elif isinstance(value, dict) and isinstance(target.get(key), dict):
+            _merge_missing_rules(target[key], value)
+    return target
+
+
+def _collect_rule_conflicts(current: object, sample: object, path: str = "") -> list[dict[str, object]]:
+    if not isinstance(current, dict) or not isinstance(sample, dict):
+        return []
+    conflicts: list[dict[str, object]] = []
+    for key in sorted(set(current).intersection(sample)):
+        current_value = current[key]
+        sample_value = sample[key]
+        next_path = f"{path}.{key}" if path else key
+        if isinstance(current_value, dict) and isinstance(sample_value, dict):
+            conflicts.extend(_collect_rule_conflicts(current_value, sample_value, next_path))
+        elif current_value != sample_value and key != "schemaVersion":
+            conflicts.append(
+                {
+                    "path": next_path,
+                    "current": copy.deepcopy(current_value),
+                    "sample": copy.deepcopy(sample_value),
+                }
+            )
+    return conflicts[:50]
 
 
 def _node_text(node: dict) -> str:
@@ -896,13 +931,26 @@ def _normalize_trailing_suffix_node(node: dict, body_style: dict, force: bool = 
     body_indent_pt = body_style.get("firstLineIndentPt")
     body_indent_chars = body_style.get("firstLineIndentChars")
     if isinstance(body_indent_pt, (int, float)):
-        next_attrs["firstLineIndentPt"] = body_indent_pt
+        next_attrs["leftIndentPt"] = body_indent_pt
+        next_attrs["firstLineIndentPt"] = 0
+        next_attrs.pop("leftIndentChars", None)
         next_attrs.pop("firstLineIndentChars", None)
     elif isinstance(body_indent_chars, (int, float)):
-        next_attrs["firstLineIndentChars"] = body_indent_chars
-        next_attrs.pop("firstLineIndentPt", None)
-    elif "firstLineIndentPt" not in next_attrs and "firstLineIndentChars" not in next_attrs:
-        next_attrs["firstLineIndentChars"] = 2
+        next_attrs["leftIndentChars"] = body_indent_chars
+        next_attrs["firstLineIndentPt"] = 0
+        next_attrs.pop("leftIndentPt", None)
+        next_attrs.pop("firstLineIndentChars", None)
+    else:
+        source_indent_pt = next_attrs.get("firstLineIndentPt")
+        source_indent_chars = next_attrs.get("firstLineIndentChars")
+        if isinstance(source_indent_pt, (int, float)):
+            next_attrs["leftIndentPt"] = source_indent_pt
+            next_attrs.pop("leftIndentChars", None)
+        else:
+            next_attrs["leftIndentChars"] = source_indent_chars if isinstance(source_indent_chars, (int, float)) else 2
+            next_attrs.pop("leftIndentPt", None)
+        next_attrs["firstLineIndentPt"] = 0
+        next_attrs.pop("firstLineIndentChars", None)
 
     next_attrs["textAlign"] = "left"
     next_attrs["bold"] = False
@@ -1051,7 +1099,12 @@ def delete_topic(topic_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/api/topics/{topic_id}/analyze", response_model=TopicAnalyzeResponse)
-async def analyze_topic(topic_id: str, files: list[UploadFile] = File(...), db: Session = Depends(get_db)):
+async def analyze_topic(
+    topic_id: str,
+    files: list[UploadFile] = File(...),
+    mergeStrategy: str = Form(default="preferSample"),
+    db: Session = Depends(get_db),
+):
     topic = db.query(Topic).filter(Topic.id == topic_id).first()
     if not topic:
         raise HTTPException(status_code=404, detail="题材不存在")
@@ -1081,6 +1134,7 @@ async def analyze_topic(topic_id: str, files: list[UploadFile] = File(...), db: 
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
 
         rules, confidence = infer_topic_rules_with_optional_deepseek(features_list)
+        sample_rules = normalize_template_rules(rules)
         latest = (
             db.query(TopicTemplateDraft)
             .filter(TopicTemplateDraft.topic_id == topic_id)
@@ -1088,14 +1142,43 @@ async def analyze_topic(topic_id: str, files: list[UploadFile] = File(...), db: 
             .first()
         )
         version = (latest.version + 1) if latest else 1
+        conflicts: list[dict[str, object]] = []
+        if latest:
+            current_rules = normalize_template_rules(latest.inferred_rules)
+            conflicts = _collect_rule_conflicts(current_rules, sample_rules)
+            if mergeStrategy == "preferText":
+                merged_rules = copy.deepcopy(sample_rules)
+                _merge_patch(merged_rules, current_rules)
+            elif mergeStrategy == "review":
+                merged_rules = copy.deepcopy(current_rules)
+                _merge_missing_rules(merged_rules, sample_rules)
+            else:
+                mergeStrategy = "preferSample"
+                merged_rules = copy.deepcopy(current_rules)
+                _merge_patch(merged_rules, sample_rules)
+        else:
+            merged_rules = sample_rules
+            mergeStrategy = "preferSample"
+
+        confidence = copy.deepcopy(confidence)
+        confidence["sampleMerge"] = {
+            "strategy": mergeStrategy,
+            "conflictCount": len(conflicts),
+            "conflicts": conflicts,
+        }
+        summary_by_strategy = {
+            "preferText": "系统已分析上传样本，并在冲突项中保留原文字规则。",
+            "preferSample": "系统已分析上传样本，并在冲突项中采用样本规则。",
+            "review": "系统已分析上传样本；冲突项暂时保留原规则，等待逐项复核。",
+        }
 
         draft = TopicTemplateDraft(
             topic_id=topic_id,
             version=version,
             status="draft",
-            inferred_rules=rules,
+            inferred_rules=normalize_template_rules(merged_rules),
             confidence_report=confidence,
-            agent_summary="系统已基于上传材料生成初版模板草案。",
+            agent_summary=summary_by_strategy[mergeStrategy],
         )
         db.add(draft)
         db.add(
@@ -1189,7 +1272,7 @@ def revise_draft(topic_id: str, payload: TopicReviseRequest, db: Session = Depen
         .order_by(TopicTemplateDraft.version.desc())
         .first()
     )
-    new_rules = copy.deepcopy(latest.inferred_rules) if latest else {}
+    new_rules = normalize_template_rules(copy.deepcopy(latest.inferred_rules) if latest else {})
     patch = _sanitize_rule_patch(copy.deepcopy(payload.patch or {}))
     agent_summary = payload.instruction
     instruction_patch = _sanitize_rule_patch(_build_patch_from_instruction(payload.instruction))
@@ -1223,6 +1306,7 @@ def revise_draft(topic_id: str, payload: TopicReviseRequest, db: Session = Depen
 
     if patch:
         _merge_patch(new_rules, _sanitize_rule_patch(patch))
+    new_rules = normalize_template_rules(new_rules)
 
     new_draft = TopicTemplateDraft(
         topic_id=topic_id,
@@ -1253,6 +1337,24 @@ def confirm_template(topic_id: str, db: Session = Depends(get_db)):
     if not latest_draft:
         raise HTTPException(status_code=400, detail="没有可确认的模板草案")
 
+    existing_template = (
+        db.query(TopicTemplate)
+        .filter(
+            TopicTemplate.topic_id == topic_id,
+            TopicTemplate.source_draft_id == latest_draft.id,
+        )
+        .first()
+    )
+    if existing_template:
+        if not existing_template.effective:
+            db.query(TopicTemplate).filter(TopicTemplate.topic_id == topic_id).update(
+                {"effective": False}, synchronize_session=False
+            )
+            existing_template.effective = True
+            db.commit()
+            db.refresh(existing_template)
+        return TopicConfirmResponse(topicId=topic_id, template=_template_out(existing_template))
+
     db.query(TopicTemplate).filter(TopicTemplate.topic_id == topic_id).update(
         {"effective": False}, synchronize_session=False
     )
@@ -1268,7 +1370,7 @@ def confirm_template(topic_id: str, db: Session = Depends(get_db)):
     template = TopicTemplate(
         topic_id=topic_id,
         version=next_version,
-        rules=latest_draft.inferred_rules,
+        rules=normalize_template_rules(latest_draft.inferred_rules),
         source_draft_id=latest_draft.id,
         effective=True,
     )
@@ -1311,8 +1413,9 @@ def create_doc_from_topic(topic_id: str, payload: TopicCreateDocRequest, db: Ses
     title = (payload.title or "").strip() or f"{topic.name}（新建）"
     doc_type = _infer_doc_type(topic.name, payload.docType)
 
+    initial_structured_title = _resolve_initial_structured_title(template) or title
     structured_fields = {
-        "title": _resolve_initial_structured_title(template),
+        "title": initial_structured_title,
         "mainTo": "",
         "signOff": "",
         "docNo": "",
@@ -1325,7 +1428,7 @@ def create_doc_from_topic(topic_id: str, payload: TopicCreateDocRequest, db: Ses
         "topicName": topic.name,
         "topicTemplateId": template.id if template else None,
         "topicTemplateVersion": template.version if template else None,
-        "topicTemplateRules": template.rules if template else None,
+        "topicTemplateRules": normalize_template_rules(template.rules) if template else None,
     }
 
     row = Document(
@@ -1368,6 +1471,24 @@ def list_templates(topic_id: str, db: Session = Depends(get_db)):
         .all()
     )
     return [_template_out(row) for row in rows]
+
+
+@router.post("/api/topics/{topic_id}/templates/{template_id}/activate", response_model=TopicTemplateOut)
+def activate_topic_template(topic_id: str, template_id: str, db: Session = Depends(get_db)):
+    template = (
+        db.query(TopicTemplate)
+        .filter(TopicTemplate.id == template_id, TopicTemplate.topic_id == topic_id)
+        .first()
+    )
+    if not template:
+        raise HTTPException(status_code=404, detail="模板不存在")
+    db.query(TopicTemplate).filter(TopicTemplate.topic_id == topic_id).update(
+        {"effective": False}, synchronize_session=False
+    )
+    template.effective = True
+    db.commit()
+    db.refresh(template)
+    return _template_out(template)
 
 
 @router.delete("/api/topics/{topic_id}/templates/{template_id}", response_model=ApiMessage)

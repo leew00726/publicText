@@ -11,6 +11,7 @@ import TableRow from '@tiptap/extension-table-row'
 import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
 import type { RedheadTemplate } from '../api/types'
+import { resolveLayoutSpec } from '../utils/templateRules'
 
 interface AttachmentPreviewItem {
   index: number
@@ -273,7 +274,12 @@ function _buildInlineStyle(attrs: Record<string, unknown>, nodeText: string = ''
   if (spaceAfterPt !== null) styles.push(`margin-bottom:${spaceAfterPt}pt`)
 
   const leftIndentPt = _toFiniteNumber(attrs.leftIndentPt)
-  if (leftIndentPt !== null) styles.push(`margin-left:${leftIndentPt}pt`)
+  if (leftIndentPt !== null) {
+    styles.push(`margin-left:${leftIndentPt}pt`)
+  } else {
+    const leftIndentChars = _toFiniteNumber(attrs.leftIndentChars)
+    if (leftIndentChars !== null) styles.push(`margin-left:${leftIndentChars}em`)
+  }
 
   const rightIndentPt = _toFiniteNumber(attrs.rightIndentPt)
   if (rightIndentPt !== null) styles.push(`margin-right:${rightIndentPt}pt`)
@@ -298,7 +304,22 @@ function _buildInlineStyle(attrs: Record<string, unknown>, nodeText: string = ''
     styles.push('font-size:var(--pt-body-font-size)')
     styles.push('line-height:var(--pt-body-line-height)')
     styles.push('font-weight:400')
-    styles.push('text-indent:var(--pt-body-text-indent, 2em)')
+    styles.push('margin-left:var(--pt-body-text-indent, 2em)')
+    styles.push('text-indent:0')
+  }
+
+  const templateImageDataUrl = typeof attrs.templateImageDataUrl === 'string' ? attrs.templateImageDataUrl.trim() : ''
+  if (templateImageDataUrl.startsWith('data:image/')) {
+    const escapedUrl = templateImageDataUrl.replace(/"/g, '\\"')
+    const imageWidthCm = _toFiniteNumber(attrs.templateImageWidthCm) ?? 3
+    const imageHeightCm = _toFiniteNumber(attrs.templateImageHeightCm) ?? 1
+    const imagePosition = textAlign === 'right' ? 'right center' : textAlign === 'center' ? 'center center' : 'left center'
+    styles.push(`min-height:${imageHeightCm}cm`)
+    styles.push(`background-image:url("${escapedUrl}")`)
+    styles.push(`background-size:${imageWidthCm}cm ${imageHeightCm}cm`)
+    styles.push(`background-position:${imagePosition}`)
+    styles.push('background-repeat:no-repeat')
+    styles.push('text-indent:0')
   }
 
   return styles.join(';')
@@ -323,7 +344,13 @@ const StyledParagraph = Paragraph.extend({
       lineSpacingPt: { default: null },
       firstLineIndentPt: { default: null },
       firstLineIndentChars: { default: null },
+      leftIndentPt: { default: null },
+      leftIndentChars: { default: null },
+      rightIndentPt: { default: null },
       dividerRed: { default: null },
+      templateImageDataUrl: { default: null },
+      templateImageWidthCm: { default: null },
+      templateImageHeightCm: { default: null },
     }
   },
   renderHTML({ node, HTMLAttributes }) {
@@ -514,11 +541,12 @@ export function TiptapEditor({
   const hasSignDateBlock = Boolean(previewSignOff || previewDate)
   const hasTailmatter = Boolean(hasSignDateBlock || previewAttachments.length)
   const activeRedheadTemplate = showRedhead && redheadTemplate ? redheadTemplate : null
+  const topicLayoutSpec = resolveLayoutSpec(topicTemplateRules, activeRedheadTemplate?.page?.marginsCm)
   const redheadMargins = {
-    top: activeRedheadTemplate?.page?.marginsCm?.top ?? 3.7,
-    bottom: activeRedheadTemplate?.page?.marginsCm?.bottom ?? 3.5,
-    left: activeRedheadTemplate?.page?.marginsCm?.left ?? 2.7,
-    right: activeRedheadTemplate?.page?.marginsCm?.right ?? 2.5,
+    top: topicLayoutSpec.page.marginsCm.top,
+    bottom: topicLayoutSpec.page.marginsCm.bottom,
+    left: topicLayoutSpec.page.marginsCm.left,
+    right: topicLayoutSpec.page.marginsCm.right,
   }
   const redheadBindMap = {
     unitName: (unitName || '').trim() || '某某单位',

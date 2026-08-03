@@ -32,7 +32,7 @@ describe('CompanySelectPage', () => {
     expect(html).toContain('company-create-card')
     expect(html).toContain('company-create-copy')
     expect(html).toContain('company-create-form')
-    expect(html).toContain('新增公司后即可进入对应题材、模板与文档治理流程。')
+    expect(html).toContain('新增公司后即可进入对应题材与模板治理流程。')
     expect(html).toContain('公司名称（必填）')
   })
 })

@@ -497,6 +497,48 @@
   box-shadow: 0 8px 18px rgba(18, 41, 76, 0.05);
 }
 
+.editor-save-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.editor-save-status.saved {
+  color: #23734d;
+  background: rgba(46, 160, 99, 0.1);
+}
+
+.editor-save-status.dirty {
+  color: #8a5a13;
+  background: rgba(212, 145, 35, 0.12);
+}
+
+.editor-save-status.error {
+  color: #a73333;
+  background: rgba(201, 55, 55, 0.1);
+}
+
+.structured-field-hint {
+  margin: -4px 0 8px;
+  color: #68758a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.template-provenance-card {
+  padding: 10px 14px;
+  border: 1px solid rgba(36, 87, 214, 0.14);
+  border-radius: 7px;
+  color: #46556d;
+  background: rgba(36, 87, 214, 0.05);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 @media (max-width: 1440px) {
   .editor-layout {
     grid-template-columns: 240px minmax(0, 1fr) 240px;

@@ -57,8 +57,6 @@ async def upload_knowledge_document_api(
     doc_id = str(uuid.uuid4())
     resolved_title = (title or "").strip() or _safe_filename_stem(file_name.rsplit(".", 1)[0])
     object_name = f"knowledge/{doc_id}/{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}_{_safe_object_filename(file_name)}"
-    storage_service.save_bytes(object_name, raw, content_type=file.content_type or "application/octet-stream")
-
     text = extracted["text"]
     row = KnowledgeDocument(
         id=doc_id,
@@ -70,7 +68,16 @@ async def upload_knowledge_document_api(
         excerpt=text[:260],
         source_chars=extracted["originalChars"],
     )
-    db.add(row)
-    db.commit()
+    object_saved = False
+    try:
+        storage_service.save_bytes(object_name, raw, content_type=file.content_type or "application/octet-stream")
+        object_saved = True
+        db.add(row)
+        db.commit()
+    except Exception:
+        db.rollback()
+        if object_saved:
+            storage_service.delete_object(object_name)
+        raise
     db.refresh(row)
     return knowledge_document_to_out(row)

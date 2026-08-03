@@ -41,6 +41,8 @@ TOPIC_REVISION_SYSTEM_PROMPT = (
     " Use references.citationOrder='titleThenDocNo' for 先引标题后引发号, references.yearBrackets='〔〕' for 六角括号."
     " Use attachments.spacingBeforeLines/indentChars/itemSuffixPunctuation/wrapAlign/useBookTitleMarks for 附件规则."
     " Use signature.spacingBeforeLines for 落款前空行."
+    " Use page.marginsCm.top/bottom/left/right for A4 page margins in centimeters."
+    " Never return pageMargins, topCm, bottomCm, leftCm, or rightCm."
     " textAlign must be one of left/center/right/justify."
     " Prefer numeric values in points or chars instead of natural-language prose."
     " Example mappings: 二号=22, 三号=16, 固定值28磅=lineSpacingPt 28, 首行左空两格=firstLineIndentChars 2."

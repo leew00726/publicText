@@ -24,6 +24,7 @@ export function TopicListPage({ mode }: TopicListPageProps) {
   const [topics, setTopics] = useState<Topic[]>([])
   const [loading, setLoading] = useState(false)
   const [name, setName] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
   const [creating, setCreating] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const role = loadEmployeeSession()?.role || 'staff'
@@ -51,6 +52,11 @@ export function TopicListPage({ mode }: TopicListPageProps) {
   }, [companyId])
 
   const currentCompany = useMemo(() => companies.find((item) => item.id === companyId), [companies, companyId])
+  const filteredTopics = useMemo(() => {
+    const keyword = searchQuery.trim().toLocaleLowerCase('zh-CN')
+    if (!keyword) return topics
+    return topics.filter((topic) => topic.name.toLocaleLowerCase('zh-CN').includes(keyword))
+  }, [topics, searchQuery])
 
   const createTopic = async () => {
     if (!canCreateTopic) {
@@ -118,12 +124,25 @@ export function TopicListPage({ mode }: TopicListPageProps) {
       ) : null}
 
       <section className="workspace-table-card">
+        <div className="table-filter-bar">
+          <input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder={`搜索${currentCompany?.name ? `“${currentCompany.name}”的` : ''}题材`}
+            aria-label="搜索题材"
+          />
+          <span>共 {filteredTopics.length} 个题材</span>
+        </div>
         {loading ? (
           <p>加载中...</p>
         ) : topics.length === 0 ? (
           <div className="empty-state">
             <strong>该公司题材库为空</strong>
-            <p>请先新建题材并上传训练材料，再进入文档编排与治理流程。</p>
+            <p>
+              {canManageTopic
+                ? '请先新建题材并完成模板训练。'
+                : '请先由管理员新建题材并完成模板训练，再进入文档编排流程。'}
+            </p>
           </div>
         ) : (
           <table className="data-table">
@@ -136,7 +155,7 @@ export function TopicListPage({ mode }: TopicListPageProps) {
               </tr>
             </thead>
             <tbody>
-              {topics.map((topic) => (
+              {filteredTopics.map((topic) => (
                 <tr key={topic.id}>
                   <td>{topic.name}</td>
                   <td>{TOPIC_STATUS_LABEL[topic.status] || topic.status}</td>
@@ -148,11 +167,13 @@ export function TopicListPage({ mode }: TopicListPageProps) {
                           <button type="button" onClick={() => navigate(`/management/topics/${topic.id}/train`)}>
                             模板训练
                           </button>
-                          <button type="button" onClick={() => navigate(`/layout/topics/${topic.id}/library`)}>
-                            文档库
-                          </button>
                           {canDeleteTopic ? (
-                            <button type="button" onClick={() => void deleteTopic(topic)} disabled={deletingId === topic.id}>
+                            <button
+                              type="button"
+                              className="danger-action-button"
+                              onClick={() => void deleteTopic(topic)}
+                              disabled={deletingId === topic.id}
+                            >
                               {deletingId === topic.id ? '删除中...' : '删除'}
                             </button>
                           ) : null}

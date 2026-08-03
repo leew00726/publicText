@@ -32,9 +32,10 @@ export function StructuredFormPanel({ value, onChange }: Props) {
     <div className="panel structured-panel">
       <h3>结构化要素</h3>
       <label>
-        标题
-        <input value={value.title} onChange={(e) => setTextField('title', e.target.value)} />
+        公文主标题（显示在正文）
+        <input id="structured-document-title" value={value.title} onChange={(e) => setTextField('title', e.target.value)} />
       </label>
+      <p className="structured-field-hint">这里控制正文中的主标题；页面顶部的文档名称只用于列表和导出文件名。</p>
       <label>
         主送
         <input value={value.mainTo} onChange={(e) => setTextField('mainTo', e.target.value)} />

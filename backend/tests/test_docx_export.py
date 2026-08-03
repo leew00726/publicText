@@ -1,5 +1,6 @@
 import io
 import unittest
+import base64
 
 from docx import Document
 from docx.oxml.ns import qn
@@ -124,6 +125,8 @@ class DocxExportTests(unittest.TestCase):
         self.assertFalse(bool(host_paragraph.runs[0].bold))
         self.assertEqual(host_paragraph.runs[1].font.name, "仿宋_GB2312")
         self.assertFalse(bool(host_paragraph.runs[1].bold))
+        self.assertEqual(float(host_paragraph.paragraph_format.left_indent.pt), 32.0)
+        self.assertEqual(float(host_paragraph.paragraph_format.first_line_indent.pt), 0.0)
 
         continuation = next((p for p in doc.paragraphs if p.text.strip() == "王振宇、刘冬冬、徐国涛"), None)
         self.assertIsNotNone(continuation)
@@ -237,6 +240,35 @@ class DocxExportTests(unittest.TestCase):
         self.assertIsNotNone(attachment_paragraph.paragraph_format.first_line_indent)
         self.assertGreater(float(attachment_paragraph.paragraph_format.left_indent.pt), 0)
         self.assertLess(float(attachment_paragraph.paragraph_format.first_line_indent.pt), 0)
+
+    def test_export_renders_preserved_template_image(self) -> None:
+        image_data = base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl9sAAAAASUVORK5CYII="
+        )
+        payload = {
+            "title": "测试",
+            "structuredFields": {"title": "", "mainTo": "", "topicTemplateRules": {}},
+            "body": {
+                "type": "doc",
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "attrs": {
+                            "templateImageDataUrl": f"data:image/png;base64,{base64.b64encode(image_data).decode('ascii')}",
+                            "templateImageWidthCm": 2,
+                            "templateImageHeightCm": 0.7,
+                            "textAlign": "right",
+                        },
+                        "content": [],
+                    }
+                ],
+            },
+        }
+
+        raw = export_docx(payload, unit_name="测试单位", redhead_template={"elements": [], "page": {}}, include_redhead=False)
+        doc = Document(io.BytesIO(raw))
+
+        self.assertEqual(len(doc.inline_shapes), 1)
 
 
 if __name__ == "__main__":

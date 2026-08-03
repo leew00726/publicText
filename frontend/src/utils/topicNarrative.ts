@@ -1,5 +1,6 @@
-type AnyRecord = Record<string, any>
+import { normalizeTemplateRules } from './templateRules'
 
+type AnyRecord = Record<string, any>
 const RULE_PATH_ORDER = [
   'title.fontFamily',
   'title.fontSizePt',
@@ -149,6 +150,7 @@ function confidenceLevel(confidence: number): string {
 }
 
 export function summarizeRulesAsNarrative(inferredRules: AnyRecord): string[] {
+  inferredRules = normalizeTemplateRules(inferredRules)
   const lines = RULE_PATH_ORDER.map((path) => {
     const value = readPath(inferredRules, path)
     if (value === undefined || value === null || value === '') return null

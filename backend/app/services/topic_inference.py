@@ -11,6 +11,8 @@ from typing import Any
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
+from app.services.docx_media import extract_header_image_nodes, extract_paragraph_image_nodes
+
 try:
     from pypdf import PdfReader
 except Exception:  # pragma: no cover - runtime dependency fallback
@@ -33,6 +35,7 @@ RE_SECRET_MARKER = re.compile(r"(秘密|机密|绝密|商密)")
 RE_TITLE_KEYWORD = re.compile(
     r"(报告|纪要|请示|函|通知|方案|总结|通报|决定|公告|意见|办法|细则|规定|计划|说明|简报|要点|清单|材料)$"
 )
+RE_FIXED_MEETING_TITLE = re.compile(r"^(?!关于).{2,24}(?:会议纪要|例会纪要)$")
 
 
 def _normalize_value(value: Any) -> Any:
@@ -593,11 +596,30 @@ def _normalize_suffix_line_node(node: dict[str, Any], body_style: dict[str, Any]
     body_indent_pt = body_style.get("firstLineIndentPt")
     body_indent_chars = body_style.get("firstLineIndentChars")
     if isinstance(body_indent_pt, (int, float)):
-        next_attrs["firstLineIndentPt"] = _normalize_value(float(body_indent_pt))
+        next_attrs["leftIndentPt"] = _normalize_value(float(body_indent_pt))
+        next_attrs["firstLineIndentPt"] = 0
+        next_attrs.pop("leftIndentChars", None)
         next_attrs.pop("firstLineIndentChars", None)
     elif isinstance(body_indent_chars, (int, float)):
-        next_attrs["firstLineIndentChars"] = _normalize_value(float(body_indent_chars))
-        next_attrs.pop("firstLineIndentPt", None)
+        next_attrs["leftIndentChars"] = _normalize_value(float(body_indent_chars))
+        next_attrs["firstLineIndentPt"] = 0
+        next_attrs.pop("leftIndentPt", None)
+        next_attrs.pop("firstLineIndentChars", None)
+    else:
+        source_indent_pt = next_attrs.get("firstLineIndentPt")
+        source_indent_chars = next_attrs.get("firstLineIndentChars")
+        if isinstance(source_indent_pt, (int, float)):
+            next_attrs["leftIndentPt"] = _normalize_value(float(source_indent_pt))
+            next_attrs.pop("leftIndentChars", None)
+        else:
+            next_attrs["leftIndentChars"] = (
+                _normalize_value(float(source_indent_chars))
+                if isinstance(source_indent_chars, (int, float))
+                else 2
+            )
+            next_attrs.pop("leftIndentPt", None)
+        next_attrs["firstLineIndentPt"] = 0
+        next_attrs.pop("firstLineIndentChars", None)
 
     next_attrs["textAlign"] = "left"
     next_attrs["bold"] = False
@@ -643,7 +665,33 @@ def extract_docx_features(data: bytes) -> dict[str, Any]:
     paragraph_entries: list[dict[str, Any]] = []
     paragraph_snapshots: list[dict[str, Any]] = []
 
+    for image_node in extract_header_image_nodes(doc):
+        template_nodes.append(image_node)
+        paragraph_entries.append({"level": None, "sample": {}})
+        paragraph_snapshots.append(
+            {
+                "index": len(paragraph_snapshots),
+                "text": "",
+                "node": copy.deepcopy(image_node),
+                "sample": {},
+                "detectedLevel": None,
+            }
+        )
+
     for paragraph in doc.paragraphs:
+        for image_node in extract_paragraph_image_nodes(paragraph):
+            template_nodes.append(image_node)
+            paragraph_entries.append({"level": None, "sample": {}})
+            paragraph_snapshots.append(
+                {
+                    "index": len(paragraph_snapshots),
+                    "text": "",
+                    "node": copy.deepcopy(image_node),
+                    "sample": {},
+                    "detectedLevel": None,
+                }
+            )
+
         text = (paragraph.text or "").strip()
         if not text:
             continue
@@ -903,7 +951,9 @@ def infer_topic_rules(features_list: list[dict[str, Any]]) -> tuple[dict[str, An
         if isinstance(candidate, dict) and isinstance(candidate.get("node"), dict) and isinstance(candidate.get("text"), str)
     ]
     title_texts = [str(candidate.get("text") or "") for candidate in title_candidates]
-    fixed_title_enabled = _titles_match_exactly(title_texts)
+    fixed_title_enabled = _titles_match_exactly(title_texts) or (
+        len(title_texts) == 1 and bool(RE_FIXED_MEETING_TITLE.match(title_texts[0].strip()))
+    )
     if fixed_title_enabled and title_candidates:
         selected_title = title_candidates[0]
         selected_template = selected_template or {

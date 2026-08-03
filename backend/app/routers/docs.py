@@ -22,11 +22,15 @@ from app.services.checker import check_document, normalize_doc_no_brackets
 from app.services.docx_export import export_docx
 from app.services.docx_import import import_docx
 from app.services.storage import storage_service
+from app.services.template_rules import normalize_template_rules
 
 router = APIRouter(prefix="/api/docs", tags=["docs"])
 
 
 def _to_out(row: Document) -> DocumentOut:
+    structured_fields = dict(row.structured_fields or {})
+    if structured_fields.get("topicTemplateRules"):
+        structured_fields["topicTemplateRules"] = normalize_template_rules(structured_fields["topicTemplateRules"])
     return DocumentOut(
         id=row.id,
         title=row.title,
@@ -34,7 +38,7 @@ def _to_out(row: Document) -> DocumentOut:
         unitId=row.unit_id,
         redheadTemplateId=row.redhead_template_id,
         status=row.status,
-        structuredFields=row.structured_fields,
+        structuredFields=structured_fields,
         body=row.body,
         importReport=row.import_report,
         createdAt=row.created_at,
@@ -58,12 +62,14 @@ def list_docs(topicId: str | None = Query(default=None), unitId: str | None = Qu
 def create_doc(payload: DocumentCreate, db: Session = Depends(get_db)):
     sf = payload.structuredFields.model_dump()
     sf["docNo"] = normalize_doc_no_brackets(sf.get("docNo", ""))
+    if sf.get("topicTemplateRules"):
+        sf["topicTemplateRules"] = normalize_template_rules(sf["topicTemplateRules"])
 
     row = Document(
         title=payload.title,
         doc_type=payload.docType,
         unit_id=payload.unitId,
-        redhead_template_id=None,
+        redhead_template_id=payload.redheadTemplateId,
         status=payload.status,
         structured_fields=sf,
         body=payload.body,
@@ -96,12 +102,14 @@ def update_doc(doc_id: str, payload: DocumentUpdate, db: Session = Depends(get_d
     if "unitId" in data:
         row.unit_id = data["unitId"]
     if "redheadTemplateId" in data:
-        row.redhead_template_id = None
+        row.redhead_template_id = data["redheadTemplateId"]
     if "status" in data:
         row.status = data["status"]
     if "structuredFields" in data:
         sf = data["structuredFields"]
         sf["docNo"] = normalize_doc_no_brackets(sf.get("docNo", ""))
+        if sf.get("topicTemplateRules"):
+            sf["topicTemplateRules"] = normalize_template_rules(sf["topicTemplateRules"])
         row.structured_fields = sf
     if "body" in data:
         row.body = data["body"]
@@ -132,13 +140,14 @@ def check_doc(doc_id: str, db: Session = Depends(get_db)):
     if not row:
         raise HTTPException(status_code=404, detail="文档不存在")
 
-    issues = check_document(row.body)
+    issues = check_document(row.body, row.structured_fields, row.title)
     return CheckResponse(issues=issues)
 
 
 @router.post("/importDocx", response_model=ImportResponse)
 async def import_docx_api(
     file: UploadFile = File(...),
+    documentId: str | None = Form(default=None),
     unitId: str = Form(...),
     docType: str = Form("qingshi"),
     title: str = Form("导入文档"),
@@ -153,23 +162,57 @@ async def import_docx_api(
     body, structured_fields, report = import_docx(data, preserve_formatting=preserveFormatting)
     resolved_title = (structured_fields.get("title") or "").strip() or title
 
-    row = Document(
-        title=resolved_title,
-        doc_type=docType,
-        unit_id=unitId,
-        redhead_template_id=None,
-        status="draft",
-        structured_fields=structured_fields,
-        body=body,
-        import_report=report,
-    )
-    db.add(row)
-    db.commit()
+    row = db.query(Document).filter(Document.id == documentId).first() if documentId else None
+    if documentId and not row:
+        raise HTTPException(status_code=404, detail="文档不存在")
+
+    if row:
+        existing_fields = row.structured_fields if isinstance(row.structured_fields, dict) else {}
+        preserved_keys = {
+            "topicId",
+            "topicName",
+            "topicTemplateId",
+            "topicTemplateVersion",
+            "topicTemplateRules",
+            "exportWithRedhead",
+        }
+        for key in preserved_keys:
+            if key in existing_fields:
+                structured_fields[key] = existing_fields[key]
+        row.title = resolved_title
+        row.structured_fields = structured_fields
+        row.body = body
+        row.import_report = report
+    else:
+        row = Document(
+            title=resolved_title,
+            doc_type=docType,
+            unit_id=unitId,
+            redhead_template_id=redheadTemplateId,
+            status="draft",
+            structured_fields=structured_fields,
+            body=body,
+            import_report=report,
+        )
+        db.add(row)
+        db.flush()
 
     object_name = f"imports/{row.id}/{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{file.filename}"
-    storage_service.save_bytes(object_name, data, content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-    db.add(DocumentFile(document_id=row.id, file_kind="import_source", object_name=object_name))
-    db.commit()
+    object_saved = False
+    try:
+        storage_service.save_bytes(
+            object_name,
+            data,
+            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+        object_saved = True
+        db.add(DocumentFile(document_id=row.id, file_kind="import_source", object_name=object_name))
+        db.commit()
+    except Exception:
+        db.rollback()
+        if object_saved:
+            storage_service.delete_object(object_name)
+        raise
 
     return ImportResponse(docId=row.id, importReport=report)
 
@@ -200,9 +243,21 @@ def export_docx_api(doc_id: str, db: Session = Depends(get_db)):
 
     filename = f"{row.title or '公文'}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.docx"
     object_name = f"exports/{row.id}/{filename}"
-    storage_service.save_bytes(object_name, output, content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-    db.add(DocumentFile(document_id=row.id, file_kind="export_docx", object_name=object_name))
-    db.commit()
+    object_saved = False
+    try:
+        storage_service.save_bytes(
+            object_name,
+            output,
+            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+        object_saved = True
+        db.add(DocumentFile(document_id=row.id, file_kind="export_docx", object_name=object_name))
+        db.commit()
+    except Exception:
+        db.rollback()
+        if object_saved:
+            storage_service.delete_object(object_name)
+        raise
 
     return StreamingResponse(
         iter([output]),

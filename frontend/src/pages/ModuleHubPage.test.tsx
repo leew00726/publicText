@@ -36,7 +36,7 @@ vi.mock('../utils/employeeAuth', () => ({
     {
       key: 'management',
       title: '公文管理',
-      description: '管理公司、题材和历史文档，支持后续权限精细化治理。',
+      description: '管理公司、题材和模板版本，支持后续权限精细化治理。',
       entryPath: '/management',
       enabled: true,
     },

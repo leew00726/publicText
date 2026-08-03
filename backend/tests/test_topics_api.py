@@ -137,6 +137,11 @@ class TopicApiTests(unittest.TestCase):
         first_template_id = template["id"]
         first_template_version = template["version"]
 
+        confirmed_duplicate = self.client.post(f"/api/topics/{topic_id}/confirm-template")
+        self.assertEqual(confirmed_duplicate.status_code, 200)
+        self.assertEqual(confirmed_duplicate.json()["template"]["id"], first_template_id)
+        self.assertEqual(confirmed_duplicate.json()["template"]["version"], first_template_version)
+
         revised_again = self.client.post(
             f"/api/topics/{topic_id}/agent/revise",
             json={"instruction": "正文改成仿宋_GB2312", "patch": {"body": {"fontFamily": "仿宋_GB2312"}}},
@@ -175,6 +180,30 @@ class TopicApiTests(unittest.TestCase):
         self.assertEqual(sf["topicId"], topic_id)
         self.assertEqual(sf["topicTemplateId"], first_template_id)
         self.assertEqual(sf["topicTemplateVersion"], first_template_version)
+        self.assertEqual(sf["title"], "周例会纪要（新建）")
+
+        imported = self.client.post(
+            "/api/docs/importDocx",
+            data={
+                "documentId": created_doc_id,
+                "unitId": company_id,
+                "docType": "jiyao",
+                "title": "周例会纪要（新建）",
+                "preserveFormatting": "true",
+            },
+            files={
+                "file": (
+                    "replacement.docx",
+                    _docx_bytes("导入替换后的正文"),
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
+            },
+        )
+        self.assertEqual(imported.status_code, 200)
+        self.assertEqual(imported.json()["docId"], created_doc_id)
+        imported_doc = self.client.get(f"/api/docs/{created_doc_id}").json()
+        self.assertEqual(imported_doc["structuredFields"]["topicTemplateId"], first_template_id)
+        self.assertEqual(imported_doc["structuredFields"]["topicTemplateVersion"], first_template_version)
 
     @patch("app.routers.topics.infer_topic_rules_with_optional_deepseek")
     def test_topic_analyze_uses_isolated_template_inference_entrypoint(self, mock_infer) -> None:

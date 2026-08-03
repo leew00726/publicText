@@ -119,6 +119,28 @@ def _build_content_template_from_roles(
         for node in (_node_for_paragraph(by_index.get(index)) for index in _coerce_index_list(role_file.get("leadingIndexes")))
         if node is not None
     ]
+    existing_template = feature.get("contentTemplate")
+    existing_leading = existing_template.get("leadingNodes") if isinstance(existing_template, dict) else []
+    media_nodes = [
+        copy.deepcopy(node)
+        for node in existing_leading
+        if isinstance(node, dict)
+        and isinstance(node.get("attrs"), dict)
+        and str(node["attrs"].get("templateImageDataUrl") or "").startswith("data:image/")
+    ]
+    existing_media_urls = {
+        str((node.get("attrs") or {}).get("templateImageDataUrl") or "")
+        for node in leading_nodes
+        if isinstance(node, dict)
+    }
+    leading_nodes = [
+        *[
+            node
+            for node in media_nodes
+            if str((node.get("attrs") or {}).get("templateImageDataUrl") or "") not in existing_media_urls
+        ],
+        *leading_nodes,
+    ]
     trailing_nodes = [
         node
         for node in (_node_for_paragraph(by_index.get(index)) for index in _coerce_index_list(role_file.get("trailingIndexes")))
@@ -185,6 +207,10 @@ def _feature_from_ai_roles(feature: dict[str, Any], role_file: dict[str, Any]) -
     content_template = _build_content_template_from_roles(feature, role_file, by_index)
     if content_template:
         next_feature["contentTemplate"] = content_template
+
+    title_candidate = feature.get("_titleCandidate")
+    if isinstance(title_candidate, dict):
+        next_feature["_titleCandidate"] = copy.deepcopy(title_candidate)
 
     if not next_feature["body"] and not next_feature["headings"] and "title" not in next_feature:
         raise AgentUpstreamError("DeepSeek did not identify usable template roles.")

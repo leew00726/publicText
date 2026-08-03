@@ -7,6 +7,7 @@ import { loadEmployeeSession } from '../utils/employeeAuth'
 import { canAccessPage, canPerformAction } from '../utils/pagePermissions'
 import { pickDefaultTopicTemplateId } from '../utils/topicCompose'
 import { summarizeRulesAsNarrative } from '../utils/topicNarrative'
+import { getTemplateRuleCoverage } from '../utils/templateRules'
 
 type CreateDocResponse = {
   id: string
@@ -57,6 +58,10 @@ export function TopicComposePage() {
   )
   const selectedTemplateNarrative = useMemo(
     () => (selectedTemplate ? summarizeRulesAsNarrative(selectedTemplate.rules || {}) : []),
+    [selectedTemplate],
+  )
+  const selectedTemplateCoverage = useMemo(
+    () => (selectedTemplate ? getTemplateRuleCoverage(selectedTemplate.rules || {}) : []),
     [selectedTemplate],
   )
 
@@ -136,7 +141,7 @@ export function TopicComposePage() {
         </section>
       ) : (
         <section className="panel">
-          <h3>选择模板并进入正文编辑</h3>
+          <h3>选择模板并新建文档</h3>
           <label>
             模板版本
             <select value={selectedTemplateId} onChange={(e) => setSelectedTemplateId(e.target.value)}>
@@ -153,7 +158,7 @@ export function TopicComposePage() {
           </label>
           <div className="row-gap">
             <button type="button" onClick={() => void createDoc()} disabled={creating}>
-              {creating ? '创建中...' : '进入正文编辑'}
+              {creating ? '创建中...' : `基于 v${selectedTemplate?.version || '-'} 新建文档`}
             </button>
             {canEnterManagementTrain ? (
               <button type="button" onClick={goTrainPage}>
@@ -163,6 +168,7 @@ export function TopicComposePage() {
             {canDeleteTemplate ? (
               <button
                 type="button"
+                className="danger-action-button"
                 onClick={() => void deleteSelectedTemplate()}
                 disabled={!selectedTemplate || deletingTemplateId === selectedTemplate?.id}
               >
@@ -177,6 +183,15 @@ export function TopicComposePage() {
                 {selectedTemplate.effective ? '（生效中）' : ''}
               </p>
               <h4>当前模板明细</h4>
+              <div className="template-rule-coverage" aria-label="模板规则覆盖情况">
+                {selectedTemplateCoverage.map((item) => (
+                  <div key={item.key} className={`template-rule-coverage-item ${item.status}`}>
+                    <strong>{item.label}</strong>
+                    <span>{item.status === 'captured' ? '已捕获' : '使用默认值'}</span>
+                    <small>{item.detail}</small>
+                  </div>
+                ))}
+              </div>
               <ul className="narrative-list">
                 {selectedTemplateNarrative.map((line) => (
                   <li key={line}>{line}</li>

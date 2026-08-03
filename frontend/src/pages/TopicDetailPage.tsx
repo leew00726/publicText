@@ -6,6 +6,7 @@ import type { DeletionAuditEvent, TopicAnalyzeResponse, TopicConfirmResponse, To
 import { formatApiErrorDetail, getApiErrorMessage } from '../utils/apiError'
 import { formatServerDateTime } from '../utils/time'
 import { summarizeConfidenceAsNarrative, summarizeRulesAsNarrative } from '../utils/topicNarrative'
+import { getTemplateRuleCoverage } from '../utils/templateRules'
 
 const DRAFT_STATUS_LABEL: Record<string, string> = {
   draft: '草稿',
@@ -34,7 +35,10 @@ export function TopicDetailPage() {
   const [revising, setRevising] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null)
+  const [activatingTemplateId, setActivatingTemplateId] = useState<string | null>(null)
+  const [previewTemplateId, setPreviewTemplateId] = useState<string | null>(null)
   const [files, setFiles] = useState<File[]>([])
+  const [sampleMergeStrategy, setSampleMergeStrategy] = useState<'preferText' | 'preferSample' | 'review'>('review')
   const [instruction, setInstruction] = useState('')
   const [useDeepSeek, setUseDeepSeek] = useState(true)
   const [conversation, setConversation] = useState<RevisionMessage[]>([])
@@ -76,6 +80,7 @@ export function TopicDetailPage() {
 
     const form = new FormData()
     files.forEach((file) => form.append('files', file))
+    form.append('mergeStrategy', sampleMergeStrategy)
 
     setAnalyzing(true)
     setMessage('')
@@ -177,7 +182,34 @@ export function TopicDetailPage() {
     }
   }
 
+  const activateTemplate = async (template: TopicTemplate) => {
+    if (!topicId || template.effective) return
+    const confirmed = window.confirm(`确认将模板 v${template.version} 设为当前生效版本？已有文档仍保留原模板快照。`)
+    if (!confirmed) return
+    setActivatingTemplateId(template.id)
+    setMessage('')
+    try {
+      const res = await api.post<TopicTemplate>(`/api/management/topics/${topicId}/templates/${template.id}/activate`)
+      setMessage(`模板 v${res.data.version} 已设为当前版本；已有文档未被静默修改。`)
+      await load()
+    } catch (error: any) {
+      alert(formatApiErrorDetail(error?.response?.data?.detail, '切换模板版本失败'))
+    } finally {
+      setActivatingTemplateId(null)
+    }
+  }
+
   const rulesNarrative = draft ? summarizeRulesAsNarrative(draft.inferredRules) : []
+  const ruleCoverage = draft ? getTemplateRuleCoverage(draft.inferredRules) : []
+  const draftAlreadyPublished = Boolean(
+    draft && (draft.status === 'confirmed' || templates.some((template) => template.sourceDraftId === draft.id)),
+  )
+  const sampleMergeReport = draft?.confidenceReport?.sampleMerge as
+    | { strategy?: string; conflictCount?: number; conflicts?: Array<{ path: string; current: unknown; sample: unknown }> }
+    | undefined
+  const previewTemplate = templates.find((template) => template.id === previewTemplateId) || null
+  const previewTemplateNarrative = previewTemplate ? summarizeRulesAsNarrative(previewTemplate.rules) : []
+  const previewTemplateCoverage = previewTemplate ? getTemplateRuleCoverage(previewTemplate.rules) : []
   const confidenceNarrative = draft ? summarizeConfidenceAsNarrative(draft.confidenceReport) : []
   const hasDraft = Boolean(draft)
   const hasConversation = conversation.length > 0
@@ -231,6 +263,9 @@ export function TopicDetailPage() {
             <input type="checkbox" checked={useDeepSeek} onChange={(e) => setUseDeepSeek(e.target.checked)} />
             启用 DeepSeek 智能修订
           </label>
+          {useDeepSeek ? (
+            <p className="topic-revision-hint">提交修订时会向已配置的 DeepSeek 服务发送当前模板规则、修订要求和本轮对话；上传的原始样本文件不会随修订请求发送。</p>
+          ) : null}
           {useDeepSeek && hasConversation ? (
             <div className="topic-history-card">
               <div className="row-between">
@@ -267,11 +302,33 @@ export function TopicDetailPage() {
             <p>仅在你手头已有标准样稿时使用。样本分析会生成新的草稿版本，适合作为文字训练后的补充校准。</p>
           </div>
           <div className="row-gap">
-            <input type="file" multiple accept=".docx,.pdf,application/pdf" onChange={(e) => setFiles(Array.from(e.target.files || []))} />
+            <label className="file-picker-button">
+              选择 DOCX / PDF 样本
+              <input
+                className="visually-hidden-file-input"
+                type="file"
+                multiple
+                accept=".docx,.pdf,application/pdf"
+                onChange={(e) => setFiles(Array.from(e.target.files || []))}
+              />
+            </label>
           </div>
           <p className="topic-revision-hint">
             {files.length > 0 ? `已选择 ${files.length} 个文件。` : '1）上传并分析训练材料（可选）'}
           </p>
+          {hasDraft ? (
+            <label>
+              样本与当前文字规则冲突时
+              <select
+                value={sampleMergeStrategy}
+                onChange={(event) => setSampleMergeStrategy(event.target.value as 'preferText' | 'preferSample' | 'review')}
+              >
+                <option value="review">保留当前规则，并标记冲突供复核</option>
+                <option value="preferText">优先采用文字规则</option>
+                <option value="preferSample">优先采用样本规则</option>
+              </select>
+            </label>
+          ) : null}
           <button type="button" onClick={() => void analyze()} disabled={analyzing || loading || files.length === 0}>
             {analyzing ? '分析中...' : hasDraft ? '从样本生成新的草稿版本' : '从样本生成首版草稿'}
           </button>
@@ -291,10 +348,31 @@ export function TopicDetailPage() {
               </div>
               <p>摘要：{draft.agentSummary || '-'}</p>
               <div className="row-gap">
-                <button type="button" onClick={() => void confirmTemplate()} disabled={confirming}>
-                  {confirming ? '确认中...' : '确认当前草稿并保存模板'}
+                <button type="button" onClick={() => void confirmTemplate()} disabled={confirming || draftAlreadyPublished}>
+                  {confirming ? '确认中...' : draftAlreadyPublished ? '当前草稿已发布' : '确认当前草稿并发布模板'}
                 </button>
               </div>
+              {draftAlreadyPublished ? <p className="inline-success-text">当前草稿已发布为模板，无需重复确认。</p> : null}
+              <div className="template-rule-coverage" aria-label="模板规则覆盖情况">
+                {ruleCoverage.map((item) => (
+                  <div key={item.key} className={`template-rule-coverage-item ${item.status}`}>
+                    <strong>{item.label}</strong>
+                    <span>{item.status === 'captured' ? '已捕获' : '使用默认值'}</span>
+                    <small>{item.detail}</small>
+                  </div>
+                ))}
+              </div>
+              {sampleMergeReport?.conflictCount ? (
+                <div className="template-conflict-card">
+                  <strong>发现 {sampleMergeReport.conflictCount} 项文字规则与样本规则差异</strong>
+                  <p>当前处理方式：{sampleMergeReport.strategy === 'preferSample' ? '采用样本' : sampleMergeReport.strategy === 'preferText' ? '采用文字规则' : '保留原规则并等待复核'}</p>
+                  <ul>
+                    {(sampleMergeReport.conflicts || []).slice(0, 8).map((item) => (
+                      <li key={item.path}>{item.path}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
               <h4>规则摘要</h4>
               <ul className="narrative-list">
                 {rulesNarrative.map((line) => (
@@ -338,19 +416,58 @@ export function TopicDetailPage() {
                     <td>{item.effective ? '是' : '否'}</td>
                     <td>{formatServerDateTime(item.createdAt)}</td>
                     <td>
-                      <button
-                        type="button"
-                        onClick={() => void deleteTemplate(item)}
-                        disabled={deletingTemplateId === item.id}
-                      >
-                        {deletingTemplateId === item.id ? '删除中...' : '删除'}
-                      </button>
+                      <div className="row-gap table-actions">
+                        <button type="button" onClick={() => setPreviewTemplateId(item.id)}>
+                          查看规则
+                        </button>
+                        {!item.effective ? (
+                          <button
+                            type="button"
+                            onClick={() => void activateTemplate(item)}
+                            disabled={activatingTemplateId === item.id}
+                          >
+                            {activatingTemplateId === item.id ? '切换中...' : '设为当前'}
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="danger-action-button"
+                          onClick={() => void deleteTemplate(item)}
+                          disabled={deletingTemplateId === item.id}
+                        >
+                          {deletingTemplateId === item.id ? '删除中...' : '删除'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
+          {previewTemplate ? (
+            <div className="topic-template-summary">
+              <div className="row-between">
+                <h4>模板 v{previewTemplate.version} 规则预览</h4>
+                <button type="button" className="secondary-button" onClick={() => setPreviewTemplateId(null)}>
+                  关闭
+                </button>
+              </div>
+              <div className="template-rule-coverage">
+                {previewTemplateCoverage.map((item) => (
+                  <div key={item.key} className={`template-rule-coverage-item ${item.status}`}>
+                    <strong>{item.label}</strong>
+                    <span>{item.status === 'captured' ? '已捕获' : '使用默认值'}</span>
+                    <small>{item.detail}</small>
+                  </div>
+                ))}
+              </div>
+              <ul className="narrative-list">
+                {previewTemplateNarrative.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       </section>
 

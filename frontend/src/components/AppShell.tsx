@@ -111,7 +111,7 @@ const PAGE_META_ROUTES: Array<{ path: string; meta: PageMeta }> = [
     meta: {
       kicker: '',
       title: '题材治理',
-      subtitle: '管理题材、模板版本和文档库。',
+      subtitle: '管理题材与模板版本。',
     },
   },
   {

@@ -275,6 +275,7 @@ function trimLeadingBlankParagraphs(docJson: any): any {
   while (content.length > 0) {
     const first = content[0]
     if (!first || (first.type !== 'paragraph' && first.type !== 'heading')) break
+    if (typeof first?.attrs?.templateImageDataUrl === 'string' && first.attrs.templateImageDataUrl.startsWith('data:image/')) break
     if (normalizeCommonText(getNodeText(first))) break
     content.shift()
   }
@@ -327,14 +328,31 @@ function normalizeFixedSuffixNodeAttrs(node: any, bodyRules: Record<string, any>
     nextAttrs.lineSpacingPt = bodyRules.lineSpacingPt
   }
   if (typeof bodyRules.firstLineIndentPt === 'number' && Number.isFinite(bodyRules.firstLineIndentPt)) {
-    nextAttrs.firstLineIndentPt = bodyRules.firstLineIndentPt
+    nextAttrs.leftIndentPt = bodyRules.firstLineIndentPt
+    nextAttrs.firstLineIndentPt = 0
+    delete nextAttrs.leftIndentChars
+    delete nextAttrs.firstLineIndentChars
   } else if (
     typeof bodyRules.firstLineIndentChars === 'number' &&
     Number.isFinite(bodyRules.firstLineIndentChars)
   ) {
-    nextAttrs.firstLineIndentChars = bodyRules.firstLineIndentChars
+    nextAttrs.leftIndentChars = bodyRules.firstLineIndentChars
+    nextAttrs.firstLineIndentPt = 0
+    delete nextAttrs.leftIndentPt
+    delete nextAttrs.firstLineIndentChars
   } else if (nextAttrs.firstLineIndentPt == null && nextAttrs.firstLineIndentChars == null) {
-    nextAttrs.firstLineIndentChars = 2
+    nextAttrs.leftIndentChars = 2
+    nextAttrs.firstLineIndentPt = 0
+  } else if (typeof nextAttrs.firstLineIndentPt === 'number') {
+    nextAttrs.leftIndentPt = nextAttrs.firstLineIndentPt
+    nextAttrs.firstLineIndentPt = 0
+    delete nextAttrs.leftIndentChars
+    delete nextAttrs.firstLineIndentChars
+  } else {
+    nextAttrs.leftIndentChars = typeof nextAttrs.firstLineIndentChars === 'number' ? nextAttrs.firstLineIndentChars : 2
+    nextAttrs.firstLineIndentPt = 0
+    delete nextAttrs.leftIndentPt
+    delete nextAttrs.firstLineIndentChars
   }
 
   nextAttrs.textAlign = 'left'
@@ -351,8 +369,10 @@ function isSameTemplateBoundaryNode(currentNode: any, templateNode: any): boolea
   const templateText = normalizeCommonText(getNodeText(templateNode))
   const currentDivider = Boolean(currentNode?.attrs?.dividerRed)
   const templateDivider = Boolean(templateNode?.attrs?.dividerRed)
+  const currentImage = String(currentNode?.attrs?.templateImageDataUrl || '')
+  const templateImage = String(templateNode?.attrs?.templateImageDataUrl || '')
 
-  return currentText === templateText && currentDivider === templateDivider
+  return currentText === templateText && currentDivider === templateDivider && currentImage === templateImage
 }
 
 function countMatchingLeadingTemplateNodes(content: any[], preserveLeadingNodes: any[]): number {

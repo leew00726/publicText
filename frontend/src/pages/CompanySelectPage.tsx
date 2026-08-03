@@ -15,6 +15,7 @@ export function CompanySelectPage({ mode }: CompanySelectPageProps) {
   const [companies, setCompanies] = useState<Unit[]>([])
   const [loading, setLoading] = useState(false)
   const [name, setName] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
   const [creating, setCreating] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const role = loadEmployeeSession()?.role || 'staff'
@@ -25,6 +26,11 @@ export function CompanySelectPage({ mode }: CompanySelectPageProps) {
     () => (mode === 'management' ? '/management/companies' : '/layout/companies'),
     [mode],
   )
+  const filteredCompanies = useMemo(() => {
+    const keyword = searchQuery.trim().toLocaleLowerCase('zh-CN')
+    if (!keyword) return companies
+    return companies.filter((company) => company.name.toLocaleLowerCase('zh-CN').includes(keyword))
+  }, [companies, searchQuery])
 
   const load = async () => {
     setLoading(true)
@@ -90,7 +96,7 @@ export function CompanySelectPage({ mode }: CompanySelectPageProps) {
         <section className="unit-editor-card company-create-card">
           <div className="company-create-copy">
             <strong>新建公司</strong>
-            <p>新增公司后即可进入对应题材、模板与文档治理流程。</p>
+            <p>新增公司后即可进入对应题材与模板治理流程。</p>
           </div>
           <div className="company-create-form">
             <input
@@ -107,6 +113,15 @@ export function CompanySelectPage({ mode }: CompanySelectPageProps) {
       ) : null}
 
       <section className="workspace-table-card">
+        <div className="table-filter-bar">
+          <input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="搜索公司"
+            aria-label="搜索公司"
+          />
+          <span>共 {filteredCompanies.length} 家</span>
+        </div>
         {loading ? (
           <p>加载中...</p>
         ) : companies.length === 0 ? (
@@ -123,7 +138,7 @@ export function CompanySelectPage({ mode }: CompanySelectPageProps) {
               </tr>
             </thead>
             <tbody>
-              {companies.map((company) => (
+              {filteredCompanies.map((company) => (
                 <tr key={company.id}>
                   <td>{company.name}</td>
                   <td>
@@ -132,7 +147,12 @@ export function CompanySelectPage({ mode }: CompanySelectPageProps) {
                         {canManageCompany ? '进入题材管理' : '进入排版题材库'}
                       </button>
                       {canDeleteCompany ? (
-                        <button type="button" onClick={() => void deleteCompany(company)} disabled={deletingId === company.id}>
+                        <button
+                          type="button"
+                          className="danger-action-button"
+                          onClick={() => void deleteCompany(company)}
+                          disabled={deletingId === company.id}
+                        >
                           {deletingId === company.id ? '删除中...' : '删除'}
                         </button>
                       ) : null}

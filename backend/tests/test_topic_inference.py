@@ -1,10 +1,12 @@
 import io
+import base64
 import unittest
 from unittest.mock import MagicMock, patch
 
 from docx import Document
 from docx.shared import RGBColor
 from docx.shared import Pt
+from docx.shared import Cm
 
 from app.services.topic_inference import extract_docx_features, extract_pdf_features, infer_topic_rules
 
@@ -262,6 +264,24 @@ def _build_docx_without_body_with_header_and_suffix() -> bytes:
     return bio.getvalue()
 
 
+def _build_docx_with_header_logo() -> bytes:
+    doc = Document()
+    logo = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl9sAAAAASUVORK5CYII="
+    )
+    logo_paragraph = doc.sections[0].header.paragraphs[0]
+    logo_paragraph.alignment = 2
+    logo_paragraph.add_run().add_picture(io.BytesIO(logo), width=Cm(2), height=Cm(0.7))
+    doc.add_paragraph("华能云成数字产融科技（雄安）有限公司")
+    doc.add_paragraph("周例会会议纪要")
+    doc.add_paragraph("2026年第21期")
+    doc.add_paragraph("本周公司召开周例会，形成会议纪要如下。")
+    doc.add_paragraph("主 持：金刚善")
+    bio = io.BytesIO()
+    doc.save(bio)
+    return bio.getvalue()
+
+
 class TopicInferenceTests(unittest.TestCase):
     def test_extract_docx_features_reads_basic_styles(self) -> None:
         content = _build_docx_bytes("仿宋_GB2312", "黑体", 16, 16)
@@ -407,6 +427,47 @@ class TopicInferenceTests(unittest.TestCase):
             node for node in trailing if isinstance(node, dict) and (node.get("attrs") or {}).get("dividerRed")
         ]
         self.assertGreaterEqual(len(trailing_dividers), 2)
+
+    def test_infer_topic_rules_keeps_single_meeting_minutes_title_fixed(self) -> None:
+        features = extract_docx_features(_build_docx_with_fixed_blocks())
+
+        rules, _ = infer_topic_rules([features])
+
+        content_template = rules.get("contentTemplate") or {}
+        leading_texts = [
+            "".join(part.get("text", "") for part in (node.get("content") or []))
+            for node in content_template.get("leadingNodes", [])
+            if isinstance(node, dict)
+        ]
+        self.assertEqual(content_template.get("titleMode"), "fixed")
+        self.assertIn("周例会会议纪要", leading_texts)
+
+    def test_extract_docx_features_keeps_header_logo_as_template_content(self) -> None:
+        features = extract_docx_features(_build_docx_with_header_logo())
+
+        leading = (features.get("contentTemplate") or {}).get("leadingNodes") or []
+        image_node = next(
+            (
+                node
+                for node in leading
+                if isinstance(node, dict)
+                and str((node.get("attrs") or {}).get("templateImageDataUrl") or "").startswith("data:image/")
+            ),
+            None,
+        )
+        self.assertIsNotNone(image_node)
+        self.assertAlmostEqual(float(image_node["attrs"]["templateImageWidthCm"]), 2.0, places=2)
+
+    def test_infer_topic_rules_uses_two_character_continuation_indent_for_suffix(self) -> None:
+        features = extract_docx_features(_build_docx_with_mixed_suffix_fonts())
+
+        rules, _ = infer_topic_rules([features])
+
+        trailing = (rules.get("contentTemplate") or {}).get("trailingNodes") or []
+        host_node = next(node for node in trailing if "主 持" in "".join(part.get("text", "") for part in node.get("content", [])))
+        attrs = host_node.get("attrs") or {}
+        self.assertEqual(attrs.get("leftIndentPt"), 32.0)
+        self.assertEqual(attrs.get("firstLineIndentPt"), 0)
 
     def test_infer_topic_rules_keeps_fixed_title_content_when_multiple_titles_match(self) -> None:
         title_text = "关于数字化治理情况的报告"

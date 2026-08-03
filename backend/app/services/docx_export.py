@@ -3,6 +3,7 @@
 import io
 import os
 import re
+import base64
 from collections import defaultdict
 from typing import Any
 
@@ -14,6 +15,7 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
 from app.services.checker import normalize_doc_no_brackets
+from app.services.template_rules import resolve_layout_spec
 
 RE_SUFFIX_LINE = re.compile(
     r"^(主\s*持(?:\s*人|\s*者)?|参\s*(?:加|会)(?:\s*人|\s*人员|\s*名单)?|列\s*席(?:\s*人|\s*人员)?|出\s*席(?:\s*人|\s*人员)?|记\s*录(?:\s*人|\s*员)?|发\s*(?:送|至|文)|主\s*送|抄\s*送|分\s*送)\s*[：:]"
@@ -474,6 +476,10 @@ def _apply_node_paragraph_overrides(paragraph, node_attrs: dict[str, Any], defau
     left_indent_pt = _safe_float_or_none(node_attrs.get("leftIndentPt"))
     if left_indent_pt is not None:
         paragraph.paragraph_format.left_indent = Pt(left_indent_pt)
+    else:
+        left_indent_chars = _safe_float_or_none(node_attrs.get("leftIndentChars"))
+        if left_indent_chars is not None:
+            paragraph.paragraph_format.left_indent = Pt(left_indent_chars * default_font_size_pt)
 
     right_indent_pt = _safe_float_or_none(node_attrs.get("rightIndentPt"))
     if right_indent_pt is not None:
@@ -488,6 +494,33 @@ def _apply_node_paragraph_overrides(paragraph, node_attrs: dict[str, Any], defau
             paragraph.paragraph_format.first_line_indent = Pt(first_indent_chars * default_font_size_pt)
         elif align in {"center", "right"}:
             paragraph.paragraph_format.first_line_indent = Pt(0)
+
+
+def _append_template_image_paragraph(doc: Document, node_attrs: dict[str, Any]) -> bool:
+    data_url = str(node_attrs.get("templateImageDataUrl") or "").strip()
+    match = re.match(r"^data:image/[^;]+;base64,(.+)$", data_url, flags=re.IGNORECASE | re.DOTALL)
+    if not match:
+        return False
+    try:
+        image_bytes = base64.b64decode(match.group(1), validate=True)
+    except (ValueError, TypeError):
+        return False
+
+    paragraph = doc.add_paragraph()
+    align = str(node_attrs.get("textAlign") or "left").strip().lower()
+    paragraph.alignment = {
+        "center": WD_ALIGN_PARAGRAPH.CENTER,
+        "right": WD_ALIGN_PARAGRAPH.RIGHT,
+    }.get(align, WD_ALIGN_PARAGRAPH.LEFT)
+    paragraph.paragraph_format.first_line_indent = Pt(0)
+    paragraph.paragraph_format.space_before = Pt(0)
+    paragraph.paragraph_format.space_after = Pt(0)
+
+    width_cm = _safe_float(node_attrs.get("templateImageWidthCm"), 3.0)
+    height_cm = _safe_float(node_attrs.get("templateImageHeightCm"), 1.0)
+    run = paragraph.add_run()
+    run.add_picture(io.BytesIO(image_bytes), width=Cm(width_cm), height=Cm(height_cm))
+    return True
 
 
 def _resolve_node_run_style(node_attrs: dict[str, Any], fallback_family: str, fallback_size_pt: float, fallback_bold: bool):
@@ -529,12 +562,19 @@ def _normalize_suffix_line_attrs(node_attrs: dict[str, Any], body_style: dict[st
 
     body_indent_pt = _safe_float_or_none(body_style.get("firstLineIndentPt"))
     body_indent_chars = _safe_float_or_none(body_style.get("firstLineIndentChars"))
+    if body_indent_pt is None and body_indent_chars is None:
+        body_indent_pt = _safe_float_or_none(normalized.get("firstLineIndentPt"))
+        body_indent_chars = _safe_float_or_none(normalized.get("firstLineIndentChars"))
     if body_indent_pt is not None:
-        normalized["firstLineIndentPt"] = body_indent_pt
+        normalized["leftIndentPt"] = body_indent_pt
+        normalized["firstLineIndentPt"] = 0
+        normalized.pop("leftIndentChars", None)
         normalized.pop("firstLineIndentChars", None)
-    elif body_indent_chars is not None:
-        normalized["firstLineIndentChars"] = body_indent_chars
-        normalized.pop("firstLineIndentPt", None)
+    else:
+        normalized["leftIndentChars"] = body_indent_chars if body_indent_chars is not None else 2
+        normalized["firstLineIndentPt"] = 0
+        normalized.pop("leftIndentPt", None)
+        normalized.pop("firstLineIndentChars", None)
 
     normalized["textAlign"] = "left"
     normalized["bold"] = False
@@ -565,24 +605,27 @@ def export_docx(
 ) -> bytes:
     doc = Document()
     section = doc.sections[0]
+    structured_fields = document_data.get("structuredFields", {})
+    topic_template_rules = structured_fields.get("topicTemplateRules") if isinstance(structured_fields, dict) else {}
+    if not isinstance(topic_template_rules, dict):
+        topic_template_rules = {}
+    redhead_page = redhead_template.get("page") if isinstance(redhead_template, dict) else {}
+    layout_spec = resolve_layout_spec(topic_template_rules, fallback_page=redhead_page)
+    margins = layout_spec["page"]["marginsCm"]
 
     section.page_width = Cm(21)
     section.page_height = Cm(29.7)
-    section.top_margin = Cm(3.7)
-    section.bottom_margin = Cm(3.5)
-    section.left_margin = Cm(2.7)
-    section.right_margin = Cm(2.5)
+    section.top_margin = Cm(margins["top"])
+    section.bottom_margin = Cm(margins["bottom"])
+    section.left_margin = Cm(margins["left"])
+    section.right_margin = Cm(margins["right"])
 
     footer = section.footer
     footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
     footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
     _insert_page_number(footer_para)
 
-    structured_fields = document_data.get("structuredFields", {})
     body_style, heading_styles = _resolve_topic_style_rules(structured_fields)
-    topic_template_rules = structured_fields.get("topicTemplateRules") if isinstance(structured_fields, dict) else {}
-    if not isinstance(topic_template_rules, dict):
-        topic_template_rules = {}
     title_style = topic_template_rules.get("title")
     if not isinstance(title_style, dict):
         title_style = {}
@@ -658,6 +701,8 @@ def export_docx(
             continue
 
         if ntype == "paragraph":
+            if _append_template_image_paragraph(doc, node_attrs):
+                continue
             if bool(node_attrs.get("dividerRed")):
                 _append_red_divider_paragraph(doc)
                 continue

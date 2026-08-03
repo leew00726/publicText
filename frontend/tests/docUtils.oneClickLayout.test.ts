@@ -122,6 +122,8 @@ describe('one-click layout normalization', () => {
     expect(hostNode.attrs.fontFamily).toBe('仿宋_GB2312')
     expect(hostNode.attrs.bold).toBe(false)
     expect(hostNode.attrs.textAlign).toBe('left')
+    expect(hostNode.attrs.leftIndentPt).toBe(32)
+    expect(hostNode.attrs.firstLineIndentPt).toBe(0)
 
     const dividerNode = result.body.content.find(
       (node: any) => node?.type === 'paragraph' && node?.attrs?.dividerRed === true,

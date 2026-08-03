@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import type { Editor } from '@tiptap/react'
 
 import { api } from '../api/client'
@@ -89,11 +89,14 @@ export function sanitizeTemplateBodyContent(
 }
 
 function normalizeDoc(doc: GovDoc): GovDoc {
-  const structuredFields = {
+  const structuredFields: StructuredFields = {
     ...DEFAULT_STRUCTURED_FIELDS,
     ...(doc.structuredFields || {}),
     attachments: Array.isArray(doc.structuredFields?.attachments) ? doc.structuredFields.attachments : [],
     exportWithRedhead: false,
+  }
+  if (!structuredFields.title.trim() && !hasFixedTemplateTitle(structuredFields.topicTemplateRules || null)) {
+    structuredFields.title = doc.title
   }
   return {
     ...doc,
@@ -145,12 +148,19 @@ export function resolvePreviewTitleText(
 
 export function DocEditorPage() {
   const { id } = useParams()
-  const navigate = useNavigate()
 
   const [doc, setDoc] = useState<GovDoc | null>(null)
   const [issues, setIssues] = useState<CheckIssue[]>([])
+  const [validationStatus, setValidationStatus] = useState<'idle' | 'checking' | 'valid' | 'invalid' | 'stale'>('idle')
   const [syncToken, setSyncToken] = useState(0)
   const [saving, setSaving] = useState(false)
+  const [dirty, setDirty] = useState(false)
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
+  const [saveError, setSaveError] = useState('')
+  const [layoutBackup, setLayoutBackup] = useState<Pick<GovDoc, 'title' | 'body' | 'structuredFields'> | null>(null)
+  const [importing, setImporting] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [exportMessage, setExportMessage] = useState('')
   const [installerOpen, setInstallerOpen] = useState(false)
   const [aiMode, setAiMode] = useState<'formal' | 'concise' | 'polish'>('formal')
   const [aiRewriting, setAiRewriting] = useState(false)
@@ -158,13 +168,24 @@ export function DocEditorPage() {
 
   const editorRef = useRef<Editor | null>(null)
   const importInputRef = useRef<HTMLInputElement | null>(null)
+  const docRef = useRef<GovDoc | null>(null)
+  const revisionRef = useRef(0)
 
   const { status, missing, ready, checking, recheck } = useFontCheck()
 
   const loadBase = useCallback(async () => {
     if (!id) return
     const docRes = await api.get<GovDoc>(`/api/layout/docs/${id}`)
-    setDoc(normalizeDoc(docRes.data))
+    const normalized = normalizeDoc(docRes.data)
+    docRef.current = normalized
+    revisionRef.current = 0
+    setDoc(normalized)
+    setDirty(false)
+    setLastSavedAt(normalized.updatedAt ? new Date(normalized.updatedAt) : null)
+    setSaveError('')
+    setIssues([])
+    setValidationStatus('idle')
+    setLayoutBackup(null)
   }, [id])
 
   useEffect(() => {
@@ -172,37 +193,90 @@ export function DocEditorPage() {
   }, [loadBase])
 
   const setDocField = (patch: Partial<GovDoc>) => {
-    if (!doc) return
-    setDoc({ ...doc, ...patch })
+    if (!docRef.current) return
+    const nextDoc = { ...docRef.current, ...patch }
+    docRef.current = nextDoc
+    revisionRef.current += 1
+    setDoc(nextDoc)
+    setDirty(true)
+    setSaveError('')
+    setValidationStatus((current) => (current === 'idle' ? 'idle' : 'stale'))
   }
 
-  const saveDoc = async () => {
-    if (!doc) return
+  const saveDoc = useCallback(async (): Promise<boolean> => {
+    const currentDoc = docRef.current
+    if (!currentDoc) return false
+    const savedRevision = revisionRef.current
     setSaving(true)
+    setSaveError('')
     try {
       const payload = {
-        title: doc.title,
-        docType: doc.docType,
-        unitId: doc.unitId,
-        redheadTemplateId: doc.redheadTemplateId,
-        status: doc.status,
-        structuredFields: doc.structuredFields,
-        body: doc.body,
+        title: currentDoc.title,
+        docType: currentDoc.docType,
+        unitId: currentDoc.unitId,
+        redheadTemplateId: currentDoc.redheadTemplateId,
+        status: currentDoc.status,
+        structuredFields: currentDoc.structuredFields,
+        body: currentDoc.body,
       }
-      await api.put(`/api/layout/docs/${doc.id}`, payload)
+      await api.put(`/api/layout/docs/${currentDoc.id}`, payload)
+      if (savedRevision === revisionRef.current) {
+        setDirty(false)
+      }
+      setLastSavedAt(new Date())
+      return true
+    } catch (error: any) {
+      const detail = error?.response?.data?.detail
+      setSaveError(typeof detail === 'string' ? detail : '保存失败，请重试。')
+      return false
     } finally {
       setSaving(false)
     }
-  }
+  }, [])
 
   const runCheck = async () => {
-    if (!doc) return
-    const res = await api.post<{ issues: CheckIssue[] }>(`/api/layout/docs/${doc.id}/check`)
-    setIssues(res.data.issues)
+    const currentDoc = docRef.current
+    if (!currentDoc) return
+    setValidationStatus('checking')
+    const saved = await saveDoc()
+    if (!saved) {
+      setValidationStatus('stale')
+      return
+    }
+    try {
+      const res = await api.post<{ issues: CheckIssue[] }>(`/api/layout/docs/${currentDoc.id}/check`)
+      setIssues(res.data.issues)
+      setValidationStatus(res.data.issues.length > 0 ? 'invalid' : 'valid')
+    } catch {
+      setValidationStatus('stale')
+    }
   }
+
+  useEffect(() => {
+    if (!dirty || !doc) return
+    const timer = window.setTimeout(() => {
+      void saveDoc()
+    }, 1500)
+    return () => window.clearTimeout(timer)
+  }, [dirty, doc, saveDoc])
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!dirty) return
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [dirty])
 
   const doOneClickLayout = () => {
     if (!doc) return
+    setLayoutBackup({
+      title: doc.title,
+      body: doc.body,
+      structuredFields: doc.structuredFields,
+    })
     const result = applyOneClickLayoutWithFields(doc.body, doc.structuredFields)
     const nextBody = result.body
     const nextFields = { ...result.structuredFields }
@@ -210,8 +284,7 @@ export function DocEditorPage() {
     const isDefaultTitle = doc.title === '新建公文' || doc.title === '新建通知'
     const nextTitle = isDefaultTitle && nextFields.title.trim() ? nextFields.title : doc.title
 
-    setDoc({
-      ...doc,
+    setDocField({
       title: nextTitle,
       body: nextBody,
       structuredFields: nextFields,
@@ -219,7 +292,22 @@ export function DocEditorPage() {
     setSyncToken((v) => v + 1)
   }
 
+  const undoOneClickLayout = () => {
+    if (!layoutBackup) return
+    setDocField({
+      title: layoutBackup.title,
+      body: layoutBackup.body,
+      structuredFields: layoutBackup.structuredFields,
+    })
+    setLayoutBackup(null)
+    setSyncToken((value) => value + 1)
+  }
+
   const locatePath = (path: string) => {
+    if (path === 'structuredFields.title') {
+      document.getElementById('structured-document-title')?.focus()
+      return
+    }
     const m = path.match(/body\.content\[(\d+)\]/)
     if (!m) return
     const index = Number(m[1])
@@ -239,6 +327,9 @@ export function DocEditorPage() {
 
   const exportDocx = async () => {
     if (!doc) return
+    setExporting(true)
+    setExportMessage('')
+    try {
     const latest = await recheck()
     const missingNow = Object.entries(latest)
       .filter(([, ok]) => !ok)
@@ -249,7 +340,15 @@ export function DocEditorPage() {
       return
     }
 
-    await saveDoc()
+    const saved = await saveDoc()
+    if (!saved) return
+    const checkRes = await api.post<{ issues: CheckIssue[] }>(`/api/layout/docs/${doc.id}/check`)
+    setIssues(checkRes.data.issues)
+    setValidationStatus(checkRes.data.issues.length > 0 ? 'invalid' : 'valid')
+    const errorCount = checkRes.data.issues.filter((issue) => issue.level === 'error').length
+    if (errorCount > 0 && !window.confirm(`当前仍有 ${errorCount} 项校验错误。是否继续导出？`)) {
+      return
+    }
     const res = await api.post(`/api/layout/docs/${doc.id}/exportDocx`, null, { responseType: 'blob' })
     const blob = new Blob([res.data], {
       type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -260,6 +359,10 @@ export function DocEditorPage() {
     a.download = `${doc.title || '公文'}.docx`
     a.click()
     URL.revokeObjectURL(url)
+    setExportMessage(`已导出 ${doc.title || '公文'}.docx`)
+    } finally {
+      setExporting(false)
+    }
   }
 
   const aiRewriteSelection = async () => {
@@ -342,20 +445,29 @@ export function DocEditorPage() {
     setRewritePreview(null)
   }
 
-  const handleImportClick = () => {
+  const handleImportClick = async () => {
+    if (dirty) {
+      const saved = await saveDoc()
+      if (!saved) return
+    }
     importInputRef.current?.click()
   }
 
   const handleImportFile = async (file?: File) => {
     if (!file || !doc) return
+    const confirmed = window.confirm('导入会替换当前文档的正文和识别出的结构化字段，模板关联与版本信息会保留。是否继续？')
+    if (!confirmed) return
     const form = new FormData()
     form.append('file', file)
+    form.append('documentId', doc.id)
     form.append('unitId', doc.unitId)
     form.append('docType', doc.docType)
     form.append('preserveFormatting', 'true')
     form.append('title', doc.title || '导入文档')
 
-    const res = await api.post<{ docId: string; importReport: any }>('/api/layout/docs/importDocx', form)
+    setImporting(true)
+    try {
+      const res = await api.post<{ docId: string; importReport: any }>('/api/layout/docs/importDocx', form)
     const report = res.data.importReport || {}
     const messages: string[] = []
     if ((report.unrecognizedTitleCount || 0) > 0) {
@@ -368,7 +480,11 @@ export function DocEditorPage() {
       messages.push(`表格提醒 ${report.tableWarnings.length} 项`)
     }
     alert(messages.length > 0 ? `导入完成：${messages.join('；')}` : '导入完成')
-    navigate(`/layout/docs/${res.data.docId}`)
+      await loadBase()
+      setSyncToken((value) => value + 1)
+    } finally {
+      setImporting(false)
+    }
   }
 
   const hasFixedTemplateTitleContent = useMemo(
@@ -390,17 +506,19 @@ export function DocEditorPage() {
             className="doc-title-input"
             value={doc.title}
             onChange={(e) => setDocField({ title: e.target.value })}
-            placeholder="文档标题"
+            placeholder="文档名称（用于列表和导出文件名）"
+            aria-label="文档名称（用于列表和导出文件名）"
+            title="文档名称用于列表和导出文件名；正文中的主标题请在左侧结构化要素中填写。"
           />
           <div className="row-gap">
-            <button type="button" onClick={saveDoc} disabled={saving}>
+            <button type="button" onClick={() => void saveDoc()} disabled={saving}>
               {saving ? '保存中...' : '保存'}
             </button>
-            <button type="button" onClick={handleImportClick}>
+            <button type="button" onClick={() => void handleImportClick()} disabled={importing} title="导入并替换当前正文">
               导入 DOCX
             </button>
-            <button type="button" onClick={exportDocx} disabled={!ready}>
-              导出 DOCX
+            <button type="button" onClick={exportDocx} disabled={!ready || exporting}>
+              {exporting ? '导出中...' : '导出 DOCX'}
             </button>
             <select value={aiMode} onChange={(e) => setAiMode(e.target.value as 'formal' | 'concise' | 'polish')} disabled={aiRewriting}>
               <option value="formal">智能体模式：正式</option>
@@ -410,9 +528,27 @@ export function DocEditorPage() {
             <button type="button" onClick={aiRewriteSelection} disabled={aiRewriting}>
               {aiRewriting ? '生成预览中...' : rewritePreview ? '重新润色预览' : '智能润色选中'}
             </button>
+            <span className={`editor-save-status ${saveError ? 'error' : dirty ? 'dirty' : 'saved'}`} aria-live="polite">
+              {saveError
+                ? saveError
+                : saving
+                  ? '正在保存'
+                  : dirty
+                    ? '有未保存修改'
+                    : lastSavedAt
+                      ? `已保存 ${lastSavedAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
+                      : '已保存'}
+            </span>
           </div>
         </div>
       </section>
+      {exportMessage ? <div className="inline-status-card" aria-live="polite">{exportMessage}</div> : null}
+      {doc.structuredFields.topicTemplateId ? (
+        <div className="template-provenance-card">
+          基于“{doc.structuredFields.topicName || '未命名题材'}”模板 v{doc.structuredFields.topicTemplateVersion || '-'} 的固定快照。
+          后续模板升级不会静默改动当前文档。
+        </div>
+      ) : null}
 
       <input
         ref={importInputRef}
@@ -479,7 +615,15 @@ export function DocEditorPage() {
           importedTitleAttrs={doc.structuredFields.importedTitleAttrs || null}
         />
 
-        <ValidationPanel issues={issues} onCheck={runCheck} onOneClickLayout={doOneClickLayout} onLocate={locatePath} />
+        <ValidationPanel
+          issues={issues}
+          status={validationStatus}
+          onCheck={runCheck}
+          onOneClickLayout={doOneClickLayout}
+          onUndoLayout={undoOneClickLayout}
+          canUndoLayout={Boolean(layoutBackup)}
+          onLocate={locatePath}
+        />
       </div>
 
       <FontInstallModal

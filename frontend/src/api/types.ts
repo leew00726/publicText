@@ -54,6 +54,33 @@ export type AttachmentItem = {
   name: string
 }
 
+export type TemplateStyleRules = {
+  fontFamily?: string
+  fontSizePt?: number
+  lineSpacingPt?: number
+  firstLineIndentPt?: number
+  firstLineIndentChars?: number
+  textAlign?: 'left' | 'center' | 'right' | 'justify'
+  [key: string]: unknown
+}
+
+export type TemplateRules = {
+  schemaVersion?: 1
+  page?: {
+    paper?: 'A4'
+    marginsCm?: Partial<{ top: number; bottom: number; left: number; right: number }>
+    [key: string]: unknown
+  }
+  title?: TemplateStyleRules
+  body?: TemplateStyleRules
+  headings?: Record<string, TemplateStyleRules>
+  contentTemplate?: Record<string, unknown>
+  references?: Record<string, unknown>
+  attachments?: Record<string, unknown>
+  signature?: Record<string, unknown>
+  [key: string]: unknown
+}
+
 export type StructuredFields = {
   title: string
   mainTo: string
@@ -68,7 +95,7 @@ export type StructuredFields = {
   topicName?: string | null
   topicTemplateId?: string | null
   topicTemplateVersion?: number | null
-  topicTemplateRules?: Record<string, any> | null
+  topicTemplateRules?: TemplateRules | null
   importedTitleAttrs?: Record<string, any> | null
 }
 
@@ -121,7 +148,7 @@ export type TopicDraft = {
   topicId: string
   version: number
   status: string
-  inferredRules: Record<string, any>
+  inferredRules: TemplateRules
   confidenceReport: Record<string, any>
   agentSummary?: string | null
   createdAt: string
@@ -137,7 +164,7 @@ export type TopicTemplate = {
   id: string
   topicId: string
   version: number
-  rules: Record<string, any>
+  rules: TemplateRules
   sourceDraftId?: string | null
   effective: boolean
   createdAt: string
@@ -159,4 +186,3 @@ export type DeletionAuditEvent = {
   startedAt: string
   endedAt: string
 }
-

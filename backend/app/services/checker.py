@@ -2,6 +2,7 @@
 from typing import Any
 
 from app.schemas import CheckIssue
+from app.services.template_rules import resolve_layout_spec
 
 PUNCTUATION_END = "。！？；："
 
@@ -56,10 +57,78 @@ def _expected_prefix(level: int, counters: dict[int, int], current_prefix: str |
     return f"（{counters[4]}）"
 
 
-def check_document(body: dict[str, Any]) -> list[CheckIssue]:
+def _style_issue(
+    issues: list[CheckIssue],
+    *,
+    code: str,
+    label: str,
+    path: str,
+    actual: Any,
+    expected: Any,
+) -> None:
+    if actual is None or expected is None:
+        return
+    if isinstance(actual, (int, float)) and isinstance(expected, (int, float)):
+        matches = abs(float(actual) - float(expected)) < 0.01
+    else:
+        matches = str(actual).strip().lower() == str(expected).strip().lower()
+    if matches:
+        return
+    issues.append(
+        CheckIssue(
+            code=code,
+            type="A",
+            message=f"{label}与模板不一致，当前 {actual}，模板要求 {expected}。",
+            path=path,
+            level="warning",
+        )
+    )
+
+
+def check_document(
+    body: dict[str, Any],
+    structured_fields: dict[str, Any] | None = None,
+    document_title: str | None = None,
+) -> list[CheckIssue]:
     issues: list[CheckIssue] = []
 
     content = body.get("content", []) if isinstance(body, dict) else []
+    structured_fields = structured_fields if isinstance(structured_fields, dict) else {}
+    template_rules = structured_fields.get("topicTemplateRules")
+    layout_spec = resolve_layout_spec(template_rules)
+    body_rules = layout_spec["body"]
+    heading_rules = layout_spec["headings"]
+    content_template = template_rules.get("contentTemplate") if isinstance(template_rules, dict) else {}
+    has_fixed_title = isinstance(content_template, dict) and content_template.get("titleMode") == "fixed"
+
+    has_meaningful_content = any(
+        node.get("type") == "table" or bool(_get_text(node).strip())
+        for node in content
+        if isinstance(node, dict)
+    )
+    if not has_meaningful_content:
+        issues.append(
+            CheckIssue(
+                code="A_DOCUMENT_EMPTY",
+                type="A",
+                message="正文尚未填写。",
+                path="body",
+                level="error",
+            )
+        )
+
+    structured_title = str(structured_fields.get("title") or "").strip()
+    if not has_fixed_title and not structured_title:
+        issues.append(
+            CheckIssue(
+                code="A_TITLE_EMPTY",
+                type="A",
+                message=f"公文主标题尚未填写（当前文档名称：{document_title or '未命名'}）。",
+                path="structuredFields.title",
+                level="error",
+            )
+        )
+
     counters = {1: 0, 2: 0, 3: 0, 4: 0}
 
     for idx, node in enumerate(content):
@@ -95,6 +164,24 @@ def check_document(body: dict[str, Any]) -> list[CheckIssue]:
             text = _get_text(node).strip()
             if not text:
                 continue
+
+            attrs = node.get("attrs") or {}
+            expected_heading = heading_rules.get(f"level{level}") if isinstance(heading_rules, dict) else {}
+            expected_heading = expected_heading if isinstance(expected_heading, dict) else {}
+            for key, label in (
+                ("fontFamily", "标题字体"),
+                ("fontSizePt", "标题字号"),
+                ("lineSpacingPt", "标题行距"),
+                ("textAlign", "标题对齐方式"),
+            ):
+                _style_issue(
+                    issues,
+                    code=f"A_HEADING_{key.upper()}",
+                    label=label,
+                    path=f"{path}.attrs.{key}",
+                    actual=attrs.get(key),
+                    expected=expected_heading.get(key),
+                )
 
             for deeper in range(level + 1, 5):
                 counters[deeper] = 0
@@ -150,6 +237,21 @@ def check_document(body: dict[str, Any]) -> list[CheckIssue]:
                         level="warning",
                     )
                 )
+            if _get_text(node).strip():
+                for key, label in (
+                    ("fontFamily", "正文字体"),
+                    ("fontSizePt", "正文字号"),
+                    ("lineSpacingPt", "正文行距"),
+                    ("textAlign", "正文对齐方式"),
+                ):
+                    _style_issue(
+                        issues,
+                        code=f"A_BODY_{key.upper()}",
+                        label=label,
+                        path=f"{path}.attrs.{key}",
+                        actual=attrs.get(key),
+                        expected=body_rules.get(key) if isinstance(body_rules, dict) else None,
+                    )
 
     return issues
 

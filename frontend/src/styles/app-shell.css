@@ -427,6 +427,23 @@
   outline-offset: 2px;
 }
 
+@media (min-width: 1181px) {
+  .app-shell-workspace {
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .app-shell-main-workspace {
+    height: 100%;
+  }
+
+  .app-shell-scroll-workspace {
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+}
+
 @media (max-width: 1180px) {
   .app-shell {
     padding: 16px;

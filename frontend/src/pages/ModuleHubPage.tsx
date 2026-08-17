@@ -89,13 +89,15 @@ export function ModuleHubPage() {
           <span className="workspace-module-count">当前可用 {enabledModules.length} 个模块</span>
         </section>
 
-        {primaryModule ? <PrimaryModuleCard moduleItem={primaryModule} onEnter={() => navigate(primaryModule.entryPath)} /> : null}
+        <div className="workspace-module-stack">
+          {primaryModule ? <PrimaryModuleCard moduleItem={primaryModule} onEnter={() => navigate(primaryModule.entryPath)} /> : null}
 
-        <section className="workspace-secondary-modules" aria-label="当前可用模块">
-          {secondaryModules.map((moduleItem) => (
-            <SecondaryModuleCard key={moduleItem.key} moduleItem={moduleItem} onEnter={() => navigate(moduleItem.entryPath)} />
-          ))}
-        </section>
+          <section className="workspace-secondary-modules" aria-label="当前可用模块">
+            {secondaryModules.map((moduleItem) => (
+              <SecondaryModuleCard key={moduleItem.key} moduleItem={moduleItem} onEnter={() => navigate(moduleItem.entryPath)} />
+            ))}
+          </section>
+        </div>
       </section>
     </main>
   )

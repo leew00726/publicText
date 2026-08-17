@@ -37,7 +37,6 @@ class SummaryDocxExportRequest(BaseModel):
 
 class KnowledgeDraftRequest(BaseModel):
     instruction: str = Field(min_length=1, max_length=4000)
-    summaryLength: Literal["short", "medium", "long"] = "medium"
     limit: int = Field(default=5, ge=1, le=10)
 
 
@@ -73,7 +72,6 @@ def rewrite_api(payload: RewriteRequest):
 async def summarize_document_api(
     file: UploadFile | None = File(default=None),
     sourceText: str | None = Form(default=None),
-    summaryLength: Literal["short", "medium", "long"] = Form(default="medium"),
     extraInstruction: str | None = Form(default=None),
 ):
     pasted_text = sourceText.strip() if isinstance(sourceText, str) else ""
@@ -103,7 +101,6 @@ async def summarize_document_api(
     try:
         result = summarize_document_with_deepseek(
             source_text=extracted["text"],
-            summary_length=summaryLength,
             extra_instruction=extraInstruction,
         )
     except AgentConfigError as exc:
@@ -116,7 +113,6 @@ async def summarize_document_api(
         "provider": "deepseek",
         "model": result["model"],
         "usage": result["usage"],
-        "summaryLength": summaryLength,
         "source": {
             "fileName": file_name,
             "fileType": extracted["fileType"],
@@ -138,7 +134,6 @@ def draft_with_knowledge_api(payload: KnowledgeDraftRequest, db: Session = Depen
         result = draft_document_with_knowledge(
             instruction=payload.instruction,
             knowledge_references=references,
-            summary_length=payload.summaryLength,
         )
     except AgentConfigError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -151,7 +146,6 @@ def draft_with_knowledge_api(payload: KnowledgeDraftRequest, db: Session = Depen
         "provider": "deepseek",
         "model": result["model"],
         "usage": result["usage"],
-        "summaryLength": payload.summaryLength,
         "source": {
             "fileName": "云矩知识库",
             "fileType": "knowledge",

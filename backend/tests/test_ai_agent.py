@@ -190,14 +190,14 @@ class AiDocumentSummaryEndpointTests(unittest.TestCase):
 
         async def _run():
             file = UploadFile(filename="memo.txt", file=io.BytesIO("raw text".encode("utf-8")))
-            return await summarize_document_api(file=file, summaryLength="short")
+            return await summarize_document_api(file=file)
 
         body = asyncio.run(_run())
         self.assertEqual(body["message"], "ok")
         self.assertEqual(body["summary"], "这是 DeepSeek 的总结结果。")
         self.assertEqual(body["model"], "deepseek-chat")
         self.assertEqual(body["usage"]["total_tokens"], 88)
-        self.assertEqual(body["summaryLength"], "short")
+        self.assertNotIn("summaryLength", body)
         self.assertEqual(body["source"]["fileName"], "memo.txt")
 
     @patch("app.routers.ai.summarize_document_with_deepseek")
@@ -212,7 +212,6 @@ class AiDocumentSummaryEndpointTests(unittest.TestCase):
             return await summarize_document_api(
                 file=None,
                 sourceText="  第一段内容。\n\n第二段内容。  ",
-                summaryLength="medium",
                 extraInstruction="请按会议纪要格式输出，并用“结论/要点/建议”三级结构。",
             )
 
@@ -222,7 +221,6 @@ class AiDocumentSummaryEndpointTests(unittest.TestCase):
         self.assertEqual(body["source"]["fileType"], "text")
         mock_summarize.assert_called_once_with(
             source_text="第一段内容。\n\n第二段内容。",
-            summary_length="medium",
             extra_instruction="请按会议纪要格式输出，并用“结论/要点/建议”三级结构。",
         )
 

@@ -37,7 +37,7 @@ describe('AppShell chrome', () => {
     expect(html).toContain('张三')
   })
 
-  it('allows page-level scrolling on the workspace route', () => {
+  it('fills wide workspace viewports while preserving natural-height fallback', () => {
     const html = renderToStaticMarkup(
       <MemoryRouter initialEntries={['/workspace']}>
         <AppShell>
@@ -58,6 +58,9 @@ describe('AppShell chrome', () => {
     )
     expect(styles).toMatch(
       /\.app-shell-scroll-workspace\s*\{[\s\S]*overflow:\s*visible;[\s\S]*padding-bottom:\s*0;/,
+    )
+    expect(styles).toMatch(
+      /@media \(min-width:\s*1181px\)\s*\{[\s\S]*\.app-shell-workspace\s*\{[\s\S]*height:\s*100dvh;[\s\S]*overflow:\s*hidden;[\s\S]*\.app-shell-main-workspace\s*\{[\s\S]*height:\s*100%;[\s\S]*\.app-shell-scroll-workspace\s*\{[\s\S]*overflow:\s*auto;/,
     )
   })
 

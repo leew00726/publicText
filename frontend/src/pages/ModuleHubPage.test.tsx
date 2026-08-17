@@ -65,6 +65,7 @@ describe('ModuleHubPage', () => {
     expect(html).toContain('公司归属')
     expect(html).toContain('当前可用 4 个模块')
     expect(html).toContain('workspace-primary-module')
+    expect(html).toContain('workspace-module-stack')
     expect(html).toContain('workspace-secondary-modules')
     expect(html).toContain('workspace-module-tier')
     expect(html).toContain('协同模块')
@@ -118,15 +119,21 @@ describe('ModuleHubPage', () => {
     expect(styles).toMatch(/border-left:\s*1px solid rgba\(40,\s*74,\s*118,\s*0\.12\);/)
   })
 
-  it('keeps the workspace reachable on shorter desktop viewports', () => {
+  it('fills wide desktop viewports without forcing the mobile layout to stretch', () => {
     const styles = fs.readFileSync(pagesCssPath, 'utf8')
 
     expect(styles).toMatch(
       /\.workspace-dashboard\s*\{[\s\S]*min-height:\s*100%;[\s\S]*height:\s*auto;[\s\S]*overflow:\s*visible;/,
     )
     expect(styles).toMatch(
-      /\.workspace-panel\s*\{[\s\S]*height:\s*auto;[\s\S]*grid-template-rows:\s*auto auto auto;[\s\S]*overflow:\s*visible;/,
+      /\.workspace-panel\s*\{[\s\S]*height:\s*auto;[\s\S]*grid-template-rows:\s*auto auto;[\s\S]*overflow:\s*visible;/,
     )
+    expect(styles).toMatch(
+      /@media \(min-width:\s*1181px\)\s*\{[\s\S]*\.workspace-dashboard\s*\{[\s\S]*height:\s*100%;[\s\S]*\.workspace-panel\s*\{[\s\S]*min-height:\s*100%;[\s\S]*height:\s*100%;[\s\S]*grid-template-rows:\s*auto minmax\(0,\s*1fr\);/,
+    )
+    expect(styles).toMatch(/\.workspace-module-stack\s*\{[\s\S]*align-self:\s*safe center;/)
+    expect(styles).toContain('min-height: clamp(160px, 21dvh, 176px);')
+    expect(styles).toContain('min-height: clamp(214px, 28dvh, 236px);')
   })
 
   it('keeps the workspace overview banner visually compact with a premium blue-white surface', () => {

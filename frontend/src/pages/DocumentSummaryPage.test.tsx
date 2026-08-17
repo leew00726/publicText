@@ -48,6 +48,18 @@ describe('DocumentSummaryPage', () => {
     expect(html).not.toContain('要求输入')
   })
 
+  it('does not expose or submit a summary length setting', () => {
+    const html = renderToStaticMarkup(<DocumentSummaryPage />)
+    const source = fs.readFileSync(path.resolve(__dirname, './DocumentSummaryPage.tsx'), 'utf8')
+
+    expect(html).not.toContain('总结长度')
+    expect(html).not.toContain('100-180字')
+    expect(html).not.toContain('220-320字')
+    expect(html).not.toContain('380-520字')
+    expect(source).not.toContain('summaryLength')
+    expect(source).not.toContain('SummaryLength')
+  })
+
   it('keeps the export template selector visible even before templates load', () => {
     const html = renderToStaticMarkup(<DocumentSummaryPage />)
 
@@ -107,6 +119,35 @@ describe('DocumentSummaryPage', () => {
     expect(styles).toMatch(/\.summary-page\s*\{[\s\S]*height:\s*calc\(100dvh\s*-\s*[^;]+\);[\s\S]*overflow:\s*hidden;/)
     expect(styles).toMatch(/\.summary-studio\s*\{[\s\S]*height:\s*100%;[\s\S]*min-height:\s*0;/)
     expect(styles).toMatch(/\.summary-panel-body\s*\{[\s\S]*min-height:\s*0;[\s\S]*overflow:\s*auto;/)
+  })
+
+  it('fills the desktop input console without scrolling or leaving unused space', () => {
+    const styles = fs.readFileSync(pagesCssPath, 'utf8')
+
+    expect(styles).toMatch(
+      /@media\s*\(min-width:\s*1181px\)\s*\{[\s\S]*\.summary-page \.summary-control-card \.summary-panel-body\s*\{[\s\S]*grid-template-rows:\s*auto minmax\(94px, 0\.6fr\) minmax\(120px, 0\.4fr\) minmax\(145px, 1fr\) auto;[\s\S]*gap:\s*5px;[\s\S]*align-content:\s*stretch;[\s\S]*padding:\s*7px 14px;[\s\S]*scrollbar-gutter:\s*auto;/,
+    )
+    expect(styles).toMatch(
+      /\.summary-page \.summary-control-card \.summary-drop-zone\s*\{[\s\S]*min-height:\s*72px;/,
+    )
+    expect(styles).toMatch(
+      /\.summary-page \.summary-control-card \.summary-knowledge-toggle\s*\{[\s\S]*display:\s*inline-flex;/,
+    )
+    expect(styles).toMatch(
+      /\.summary-page \.summary-control-card \.summary-knowledge-bridge\s*\{[\s\S]*grid-template-rows:\s*auto auto auto minmax\(32px, 1fr\);/,
+    )
+    expect(styles).toMatch(
+      /\.summary-page \.summary-control-card \.summary-agent-card\s*\{[\s\S]*grid-template-rows:\s*auto auto minmax\(56px, 1fr\) auto;/,
+    )
+    expect(styles).toMatch(
+      /\.summary-page \.summary-control-card \.summary-agent-card textarea\s*\{[\s\S]*height:\s*100%;[\s\S]*min-height:\s*56px;/,
+    )
+    expect(styles).toMatch(
+      /\.summary-page \.summary-control-card \.summary-text-panel\s*\{[\s\S]*grid-template-rows:\s*auto minmax\(72px, 1fr\);/,
+    )
+    expect(styles).toMatch(
+      /\.summary-page \.summary-control-card \.summary-text-panel textarea\s*\{[\s\S]*height:\s*100%;[\s\S]*min-height:\s*72px;/,
+    )
   })
 
   it('uses the compact premium blue-white document workspace theme', () => {

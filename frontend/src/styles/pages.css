@@ -309,7 +309,7 @@
   position: relative;
   isolation: isolate;
   display: grid;
-  grid-template-rows: auto auto auto;
+  grid-template-rows: auto auto;
   gap: 0;
   padding: 0;
   border-radius: 8px;
@@ -317,6 +317,12 @@
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 24px 58px rgba(18, 41, 76, 0.1);
   overflow: visible;
+}
+
+.workspace-module-stack {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto;
 }
 
 .workspace-panel::before {
@@ -451,7 +457,7 @@
 }
 
 .workspace-secondary-module {
-  grid-template-rows: auto auto auto;
+  grid-template-rows: auto auto minmax(40px, 1fr);
   gap: 14px;
   min-height: 204px;
   height: auto;
@@ -460,6 +466,10 @@
   border-top: 3px solid rgba(36, 87, 214, 0.22);
   border-radius: 8px;
   background: #ffffff;
+}
+
+.workspace-secondary-module .module-card-footer {
+  align-self: end;
 }
 
 .workspace-secondary-module + .workspace-secondary-module {
@@ -650,6 +660,32 @@
 .workspace-link-button:focus-visible {
   outline: 2px solid #2457d6;
   outline-offset: 2px;
+}
+
+@media (min-width: 1181px) {
+  .workspace-dashboard {
+    min-height: 100%;
+    height: 100%;
+  }
+
+  .workspace-panel {
+    min-height: 100%;
+    height: 100%;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .workspace-module-stack {
+    width: 100%;
+    align-self: safe center;
+  }
+
+  .workspace-primary-module.workspace-module-card {
+    min-height: clamp(160px, 21dvh, 176px);
+  }
+
+  .workspace-secondary-module {
+    min-height: clamp(214px, 28dvh, 236px);
+  }
 }
 
 .summary-page {
@@ -1152,6 +1188,101 @@
   border-left: 4px solid var(--summary-accent);
   border-radius: 6px;
   background: #f4f7ff;
+}
+
+@media (min-width: 1181px) {
+  .summary-page .summary-control-card .summary-panel-body {
+    grid-template-rows: auto minmax(94px, 0.6fr) minmax(120px, 0.4fr) minmax(145px, 1fr) auto;
+    gap: 5px;
+    align-content: stretch;
+    padding: 7px 14px;
+    scrollbar-gutter: auto;
+  }
+
+  .summary-page .summary-control-card .summary-source-switch {
+    padding: 2px;
+  }
+
+  .summary-page .summary-control-card .summary-source-tab,
+  .summary-page .summary-control-card .secondary-button {
+    min-height: 28px;
+    padding: 0 14px;
+  }
+
+  .summary-page .summary-control-card .summary-drop-zone {
+    min-height: 72px;
+    gap: 4px;
+    padding: 8px 12px;
+  }
+
+  .summary-page .summary-control-card .summary-knowledge-bridge {
+    min-height: 0;
+    height: 100%;
+    grid-template-rows: auto auto auto minmax(32px, 1fr);
+    gap: 4px;
+    padding: 6px 10px;
+  }
+
+  .summary-page .summary-control-card .summary-knowledge-bridge > button {
+    align-self: end;
+  }
+
+  .summary-page .summary-control-card .summary-section-heading {
+    padding-bottom: 5px;
+    padding-left: 10px;
+  }
+
+  .summary-page .summary-control-card .summary-knowledge-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .summary-page .summary-control-card .summary-side-note {
+    margin: 0;
+    line-height: 1.45;
+  }
+
+  .summary-page .summary-control-card .summary-agent-card {
+    min-height: 0;
+    grid-template-rows: auto auto minmax(56px, 1fr) auto;
+    gap: 5px;
+  }
+
+  .summary-page .summary-control-card .summary-agent-card label {
+    gap: 5px;
+  }
+
+  .summary-page .summary-control-card .summary-agent-card textarea {
+    height: 100%;
+    min-height: 56px;
+    padding: 8px 10px;
+    line-height: 1.45;
+  }
+
+  .summary-page .summary-control-card .summary-text-panel {
+    min-height: 0;
+    height: 100%;
+    grid-template-rows: auto minmax(72px, 1fr);
+    gap: 5px;
+  }
+
+  .summary-page .summary-control-card .summary-text-panel textarea {
+    height: 100%;
+    min-height: 72px;
+  }
+
+  .summary-page .summary-control-card .row-gap {
+    gap: 8px;
+  }
+
+  .summary-page .summary-control-card .row-gap button {
+    min-height: 32px;
+  }
+
+  .summary-page .summary-control-card .summary-primary-action {
+    min-height: 40px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

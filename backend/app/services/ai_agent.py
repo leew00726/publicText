@@ -6,7 +6,7 @@ import socket
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
-from typing import Any, Literal
+from typing import Any
 
 from app.config import Settings, get_settings
 
@@ -23,12 +23,6 @@ MODE_GUIDANCE: dict[str, str] = {
     "formal": "Keep a formal government-writing tone and do not change the original meaning.",
     "concise": "Reduce redundancy while preserving all key information and formal tone.",
     "polish": "Improve sentence flow and clarity while preserving formal tone and meaning.",
-}
-
-SUMMARY_LENGTH_GUIDANCE: dict[str, str] = {
-    "short": "100-180字，突出核心结论。",
-    "medium": "220-320字，覆盖结论、要点、建议。",
-    "long": "380-520字，完整覆盖背景、结论、要点、建议。",
 }
 
 TOPIC_REVISION_SYSTEM_PROMPT = (
@@ -197,7 +191,6 @@ def rewrite_with_deepseek(text: str, mode: str, settings: Settings | None = None
 
 def summarize_document_with_deepseek(
     source_text: str,
-    summary_length: Literal["short", "medium", "long"] = "medium",
     extra_instruction: str | None = None,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
@@ -215,7 +208,6 @@ def summarize_document_with_deepseek(
         system_prompt=SUMMARY_SYSTEM_PROMPT,
     )
 
-    length_guide = SUMMARY_LENGTH_GUIDANCE.get(summary_length, SUMMARY_LENGTH_GUIDANCE["medium"])
     extra = (extra_instruction or "").strip()
     extra_part = f"\n补充要求：{extra}" if extra else ""
 
@@ -226,7 +218,6 @@ def summarize_document_with_deepseek(
                 "role": "user",
                 "content": (
                     "请对以下公文内容生成中文总结。\n"
-                    f"长度要求：{length_guide}\n"
                     "输出结构：\n"
                     "1) 核心结论（1段）\n"
                     "2) 关键要点（3-6条）\n"
@@ -250,7 +241,6 @@ def summarize_document_with_deepseek(
 def draft_document_with_knowledge(
     instruction: str,
     knowledge_references: list[dict[str, Any]],
-    summary_length: Literal["short", "medium", "long"] = "medium",
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     cleaned_instruction = (instruction or "").strip()
@@ -270,7 +260,6 @@ def draft_document_with_knowledge(
         system_prompt=KNOWLEDGE_DRAFT_SYSTEM_PROMPT,
     )
 
-    length_guide = SUMMARY_LENGTH_GUIDANCE.get(summary_length, SUMMARY_LENGTH_GUIDANCE["medium"])
     context_chunks = []
     for index, item in enumerate(knowledge_references, start=1):
         context_chunks.append(
@@ -289,7 +278,6 @@ def draft_document_with_knowledge(
                 "role": "user",
                 "content": (
                     "请根据云矩知识库参考材料和用户要求，起草一份中文公文材料。\n"
-                    f"篇幅参考：{length_guide}\n"
                     "写作要求：\n"
                     f"{cleaned_instruction}\n\n"
                     "知识库参考材料：\n"

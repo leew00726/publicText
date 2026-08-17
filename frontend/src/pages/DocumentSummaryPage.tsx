@@ -7,7 +7,6 @@ import { isSupportedSummaryFileName, suggestSummaryExportTitle } from '../utils/
 import { loadEmployeeSession } from '../utils/employeeAuth'
 import { pickDefaultTopicTemplateId } from '../utils/topicCompose'
 
-type SummaryLength = 'short' | 'medium' | 'long'
 type SummarySourceMode = 'file' | 'text'
 type AgentMessage = {
   role: 'user' | 'assistant'
@@ -27,7 +26,6 @@ type SummaryApiResponse = {
   provider: 'deepseek'
   model: string
   usage: Record<string, any>
-  summaryLength: SummaryLength
   source: {
     fileName: string
     fileType: string
@@ -69,7 +67,6 @@ export function DocumentSummaryPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [sourceText, setSourceText] = useState('')
   const [useKnowledgeBase, setUseKnowledgeBase] = useState(false)
-  const [summaryLength, setSummaryLength] = useState<SummaryLength>('medium')
   const [agentMessages, setAgentMessages] = useState<AgentMessage[]>([])
   const [agentDraft, setAgentDraft] = useState('')
   const [summary, setSummary] = useState('')
@@ -205,7 +202,6 @@ export function DocumentSummaryPage() {
       try {
         const res = await api.post<SummaryApiResponse>('/api/layout/ai/draft-with-knowledge', {
           instruction: extraInstruction,
-          summaryLength,
         }, {
           timeout: 180000,
         })
@@ -244,7 +240,6 @@ export function DocumentSummaryPage() {
     if (sourceMode === 'text') {
       form.append('sourceText', normalizedSourceText)
     }
-    form.append('summaryLength', summaryLength)
     if (extraInstruction) {
       form.append('extraInstruction', extraInstruction)
     }
@@ -425,15 +420,6 @@ export function DocumentSummaryPage() {
                 <p className="summary-side-note">启用后将根据补充要求调阅云矩知识库生成材料。</p>
                 <KnowledgeBaseEntryButton />
               </section>
-
-              <label>
-                总结长度
-                <select value={summaryLength} onChange={(event) => setSummaryLength(event.target.value as SummaryLength)}>
-                  <option value="short">短（100-180字）</option>
-                  <option value="medium">中（220-320字）</option>
-                  <option value="long">长（380-520字）</option>
-                </select>
-              </label>
 
               <section className="summary-agent-card">
                 <div className="summary-section-heading">

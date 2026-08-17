@@ -114,16 +114,18 @@ class KnowledgeBaseTests(unittest.TestCase):
 
         response = self.client.post(
             "/api/layout/ai/draft-with-knowledge",
-            json={"instruction": "写一份安全生产整改报告", "summaryLength": "medium"},
+            json={"instruction": "写一份安全生产整改报告"},
         )
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertEqual(body["summary"], "关于安全生产整改工作的报告")
+        self.assertNotIn("summaryLength", body)
         self.assertEqual(body["source"]["fileName"], "云矩知识库")
         self.assertEqual(body["knowledgeReferences"][0]["title"], "安全生产工作报告")
         passed_refs = mock_draft.call_args.kwargs["knowledge_references"]
         self.assertIn("安全生产", passed_refs[0]["excerpt"])
+        self.assertNotIn("summary_length", mock_draft.call_args.kwargs)
 
 
 if __name__ == "__main__":

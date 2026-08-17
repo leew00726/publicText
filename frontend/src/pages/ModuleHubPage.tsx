@@ -1,10 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { api } from '../api/client'
-import type { GovDoc } from '../api/types'
 import { listModulesByRole, loadEmployeeSession, type EmployeeModule, type ModuleKey } from '../utils/employeeAuth'
-import { formatServerDateTime } from '../utils/time'
 
 type ModulePresentation = {
   eyebrow: string
@@ -45,49 +42,9 @@ const MODULE_PRESENTATIONS: Record<ModuleKey, ModulePresentation> = {
   },
 }
 
-type RecentDocSource = Pick<GovDoc, 'id' | 'title' | 'status' | 'updatedAt'> & {
-  structuredFields?: Partial<GovDoc['structuredFields']>
-}
-
-type RecentDocRow = {
-  id: string
-  index: string
-  title: string
-  meta: string
-  status: string
-}
-
-const RECENT_DOC_LIMIT = 3
-const DOC_STATUS_LABELS: Record<string, string> = {
-  draft: '编辑中',
-  published: '已完成',
-  archived: '已归档',
-}
-
-function getDocTimestamp(value: string): number {
-  const timestamp = Date.parse(value || '')
-  return Number.isNaN(timestamp) ? 0 : timestamp
-}
-
-export function buildRecentDocRows(docs: RecentDocSource[]): RecentDocRow[] {
-  return [...docs]
-    .sort((a, b) => getDocTimestamp(b.updatedAt) - getDocTimestamp(a.updatedAt))
-    .slice(0, RECENT_DOC_LIMIT)
-    .map((doc, index) => ({
-      id: doc.id,
-      index: String(index + 1).padStart(2, '0'),
-      title: doc.title || doc.structuredFields?.title || '未命名文档',
-      meta: `${doc.structuredFields?.topicName || '公文排版'} · ${formatServerDateTime(doc.updatedAt)}`,
-      status: DOC_STATUS_LABELS[doc.status] || doc.status || '待处理',
-    }))
-}
-
 export function ModuleHubPage() {
   const navigate = useNavigate()
   const session = loadEmployeeSession()
-  const [recentDocs, setRecentDocs] = useState<RecentDocRow[]>([])
-  const [recentDocsLoading, setRecentDocsLoading] = useState(false)
-  const [recentDocsError, setRecentDocsError] = useState<string | null>(null)
 
   const modules = useMemo(() => listModulesByRole(session?.role ?? 'staff'), [session?.role])
   const enabledModules = useMemo(() => modules.filter((moduleItem) => moduleItem.enabled), [modules])
@@ -102,34 +59,6 @@ export function ModuleHubPage() {
   const companyName = session?.companyName || '云成数科'
   const roleLabel = session?.role === 'admin' ? '管理员' : '普通员工'
   const displayName = session?.displayName || session?.username || '同事'
-  const sessionKey = session?.username || ''
-  const recentDocCountLabel = recentDocsLoading ? '同步中' : recentDocsError ? '异常' : `${recentDocs.length} 条`
-
-  useEffect(() => {
-    if (!sessionKey) return
-
-    let cancelled = false
-    setRecentDocsLoading(true)
-    setRecentDocsError(null)
-    void api.get<GovDoc[]>('/api/layout/docs')
-      .then((res) => {
-        if (cancelled) return
-        setRecentDocs(buildRecentDocRows(res.data))
-      })
-      .catch((error: any) => {
-        if (cancelled) return
-        const detail = error?.response?.data?.detail || '最近文档加载失败'
-        setRecentDocsError(String(detail))
-      })
-      .finally(() => {
-        if (cancelled) return
-        setRecentDocsLoading(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [sessionKey])
 
   if (!session) {
     return null
@@ -166,43 +95,6 @@ export function ModuleHubPage() {
           {secondaryModules.map((moduleItem) => (
             <SecondaryModuleCard key={moduleItem.key} moduleItem={moduleItem} onEnter={() => navigate(moduleItem.entryPath)} />
           ))}
-        </section>
-
-        <section className="workspace-recent-docs" aria-label="最近文档">
-          <div className="workspace-recent-header">
-            <div className="workspace-recent-heading">
-              <h3>最近文档</h3>
-              <span className="workspace-recent-count">{recentDocCountLabel}</span>
-            </div>
-            <button
-              type="button"
-              className="workspace-text-button"
-              aria-label="查看全部最近文档"
-              onClick={() => navigate(primaryModule?.entryPath || '/layout')}
-            >
-              查看全部
-            </button>
-          </div>
-          <ul className="workspace-recent-list">
-            {recentDocsLoading ? (
-              <li className="workspace-recent-state">正在加载最近文档...</li>
-            ) : recentDocsError ? (
-              <li className="workspace-recent-state">{recentDocsError}</li>
-            ) : recentDocs.length === 0 ? (
-              <li className="workspace-recent-state">暂无最近文档</li>
-            ) : (
-              recentDocs.map((doc) => (
-                <li key={doc.id}>
-                  <span className="workspace-recent-index">{doc.index}</span>
-                  <button type="button" className="workspace-recent-title" onClick={() => navigate(`/layout/docs/${doc.id}`)}>
-                    {doc.title}
-                  </button>
-                  <span className="workspace-recent-meta">{doc.meta}</span>
-                  <span className="workspace-recent-status">{doc.status}</span>
-                </li>
-              ))
-            )}
-          </ul>
         </section>
       </section>
     </main>

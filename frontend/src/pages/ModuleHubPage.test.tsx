@@ -78,9 +78,8 @@ describe('ModuleHubPage', () => {
     expect(html).toContain('进入知识库')
     expect(html).not.toContain('按题材进入正文编排流程')
     expect(html).not.toContain('从题材库、模板版本到正文编辑与导出')
-    expect(html).toContain('最近文档')
-    expect(html).toContain('workspace-recent-count')
-    expect(html).toContain('0 条')
+    expect(html).not.toContain('最近文档')
+    expect(html).not.toContain('workspace-recent')
     expect(html).not.toContain('会议纪要')
     expect(html.indexOf('公文排版')).toBeLessThan(html.indexOf('公文总结'))
     expect(html).not.toContain('模块总数')
@@ -100,48 +99,12 @@ describe('ModuleHubPage', () => {
     expect(html).not.toContain('data-particle-shape=')
   })
 
-  it('maps recent documents from real document records instead of static placeholders', () => {
-    const buildRecentDocRows = (ModuleHubPageModule as any).buildRecentDocRows
-    expect(typeof buildRecentDocRows).toBe('function')
-
-    const rows = buildRecentDocRows([
-      {
-        id: 'doc-old',
-        title: '较早文档',
-        status: 'draft',
-        updatedAt: '2026-03-01T08:00:00.000Z',
-        structuredFields: { topicName: '通知' },
-      },
-      {
-        id: 'doc-new',
-        title: '最新文档',
-        status: 'published',
-        updatedAt: '2026-03-03T08:00:00.000Z',
-        structuredFields: { topicName: '请示' },
-      },
-      {
-        id: 'doc-mid',
-        title: '中间文档',
-        status: 'archived',
-        updatedAt: '2026-03-02T08:00:00.000Z',
-        structuredFields: {},
-      },
-    ])
-
-    expect(rows.map((row: any) => row.id)).toEqual(['doc-new', 'doc-mid', 'doc-old'])
-    expect(rows[0].title).toBe('最新文档')
-    expect(rows[0].meta).toContain('请示')
-    expect(rows[0].status).toBe('已完成')
-    expect(rows[1].meta).toContain('公文排版')
-    expect(rows[1].status).toBe('已归档')
-  })
-
-  it('loads and opens recent documents from the document API', () => {
+  it('does not load recent documents from the document API', () => {
     const source = fs.readFileSync(path.resolve(__dirname, 'ModuleHubPage.tsx'), 'utf8')
 
-    expect(source).toContain("api.get<GovDoc[]>('/api/layout/docs')")
-    expect(source).toContain('navigate(`/layout/docs/${doc.id}`)')
-    expect(source).not.toContain('const RECENT_DOCS')
+    expect(source).not.toContain("'/api/layout/docs'")
+    expect(source).not.toContain('buildRecentDocRows')
+    expect(source).not.toContain('workspace-recent')
   })
 
   it('puts layout in the largest workspace module area on desktop', () => {
@@ -155,20 +118,14 @@ describe('ModuleHubPage', () => {
     expect(styles).toMatch(/border-left:\s*1px solid rgba\(40,\s*74,\s*118,\s*0\.12\);/)
   })
 
-  it('keeps recent documents reachable on shorter desktop viewports', () => {
+  it('keeps the workspace reachable on shorter desktop viewports', () => {
     const styles = fs.readFileSync(pagesCssPath, 'utf8')
 
     expect(styles).toMatch(
       /\.workspace-dashboard\s*\{[\s\S]*min-height:\s*100%;[\s\S]*height:\s*auto;[\s\S]*overflow:\s*visible;/,
     )
     expect(styles).toMatch(
-      /\.workspace-panel\s*\{[\s\S]*height:\s*auto;[\s\S]*grid-template-rows:\s*auto auto auto auto;[\s\S]*overflow:\s*visible;/,
-    )
-    expect(styles).toMatch(
-      /\.workspace-recent-docs\s*\{[\s\S]*min-height:\s*242px;[\s\S]*grid-template-rows:\s*auto auto;[\s\S]*gap:\s*12px;/,
-    )
-    expect(styles).toMatch(
-      /\.workspace-recent-list\s*\{[\s\S]*overflow:\s*hidden;[\s\S]*border:\s*1px solid rgba\(40,\s*74,\s*118,\s*0\.1\);/,
+      /\.workspace-panel\s*\{[\s\S]*height:\s*auto;[\s\S]*grid-template-rows:\s*auto auto auto;[\s\S]*overflow:\s*visible;/,
     )
   })
 
@@ -192,20 +149,14 @@ describe('ModuleHubPage', () => {
     )
   })
 
-  it('optimizes home page controls and recent-document rows for scanning and touch', () => {
+  it('optimizes home page controls for scanning and touch', () => {
     const styles = fs.readFileSync(pagesCssPath, 'utf8')
 
     expect(styles).toMatch(
-      /\.workspace-link-button,\s*\.workspace-text-button\s*\{[\s\S]*min-height:\s*44px;/,
+      /\.workspace-link-button\s*\{[\s\S]*min-height:\s*44px;/,
     )
     expect(styles).toMatch(
-      /\.workspace-link-button:focus-visible,\s*\.workspace-text-button:focus-visible,\s*\.workspace-recent-title:focus-visible\s*\{[\s\S]*outline:\s*2px solid #2457d6;/,
-    )
-    expect(styles).toMatch(
-      /\.workspace-recent-list li\s*\{[\s\S]*min-height:\s*54px;[\s\S]*grid-template-columns:\s*42px minmax\(0,\s*1\.2fr\) minmax\(140px,\s*0\.8fr\) 76px;/,
-    )
-    expect(styles).toMatch(
-      /\.workspace-recent-count\s*\{[\s\S]*min-height:\s*28px;[\s\S]*background:\s*#f4f7ff;/,
+      /\.workspace-link-button:focus-visible\s*\{[\s\S]*outline:\s*2px solid #2457d6;/,
     )
   })
 

@@ -9,6 +9,7 @@ import * as ModuleHubPageModule from './ModuleHubPage'
 const { ModuleHubPage } = ModuleHubPageModule
 
 const pagesCssPath = path.resolve(__dirname, '../styles/pages.css')
+const appShellCssPath = path.resolve(__dirname, '../styles/app-shell.css')
 
 vi.mock('../utils/employeeAuth', () => ({
   loadEmployeeSession: vi.fn(() => ({
@@ -63,12 +64,9 @@ describe('ModuleHubPage', () => {
     expect(html).toContain('当前可用模块')
     expect(html).toContain('欢迎回来，张三')
     expect(html).toContain('公司归属')
-    expect(html).toContain('当前可用 4 个模块')
     expect(html).toContain('workspace-primary-module')
     expect(html).toContain('workspace-module-stack')
     expect(html).toContain('workspace-secondary-modules')
-    expect(html).toContain('workspace-module-tier')
-    expect(html).toContain('协同模块')
     expect(html).toContain('公文总结')
     expect(html).toContain('公文排版')
     expect(html).toContain('公文管理')
@@ -77,8 +75,13 @@ describe('ModuleHubPage', () => {
     expect(html).toContain('进入公文排版')
     expect(html).toContain('进入公文管理')
     expect(html).toContain('进入知识库')
-    expect(html).not.toContain('按题材进入正文编排流程')
-    expect(html).not.toContain('从题材库、模板版本到正文编辑与导出')
+    expect(html).toContain('按题材进入正文编排流程')
+    expect(html).toContain('从题材库、模板版本到正文编辑与导出')
+    expect(html).not.toContain('workspace-module-tier')
+    expect(html).not.toContain('协同模块')
+    expect(html).not.toContain('module-card-eyebrow')
+    expect(html).not.toContain('workspace-module-count')
+    expect(html).not.toContain('当前可用 4 个模块')
     expect(html).not.toContain('最近文档')
     expect(html).not.toContain('workspace-recent')
     expect(html).not.toContain('会议纪要')
@@ -116,24 +119,24 @@ describe('ModuleHubPage', () => {
     )
     expect(styles).toMatch(/\.workspace-secondary-modules\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/)
     expect(styles).toMatch(/border-bottom:\s*1px solid rgba\(40,\s*74,\s*118,\s*0\.14\);/)
-    expect(styles).toMatch(/border-left:\s*1px solid rgba\(40,\s*74,\s*118,\s*0\.12\);/)
+    expect(styles).not.toMatch(/\.workspace-secondary-module \+ \.workspace-secondary-module\s*\{[\s\S]*border-left:/)
   })
 
-  it('fills wide desktop viewports without forcing the mobile layout to stretch', () => {
+  it('top-aligns the desktop workspace panel instead of centering it in dead space', () => {
     const styles = fs.readFileSync(pagesCssPath, 'utf8')
 
     expect(styles).toMatch(
       /\.workspace-dashboard\s*\{[\s\S]*min-height:\s*100%;[\s\S]*height:\s*auto;[\s\S]*overflow:\s*visible;/,
     )
     expect(styles).toMatch(
-      /\.workspace-panel\s*\{[\s\S]*height:\s*auto;[\s\S]*grid-template-rows:\s*auto auto;[\s\S]*overflow:\s*visible;/,
+      /\.workspace-panel\s*\{[^}]*height:\s*auto;[^}]*grid-template-rows:\s*auto auto;[^}]*overflow:\s*hidden;/,
     )
     expect(styles).toMatch(
-      /@media \(min-width:\s*1181px\)\s*\{[\s\S]*\.workspace-dashboard\s*\{[\s\S]*height:\s*100%;[\s\S]*\.workspace-panel\s*\{[\s\S]*min-height:\s*100%;[\s\S]*height:\s*100%;[\s\S]*grid-template-rows:\s*auto minmax\(0,\s*1fr\);/,
+      /@media \(min-width:\s*1181px\)\s*\{[\s\S]*\.workspace-dashboard\s*\{[\s\S]*align-self:\s*start;[\s\S]*\.workspace-panel\s*\{[\s\S]*align-self:\s*start;[\s\S]*grid-template-rows:\s*auto auto;/,
     )
-    expect(styles).toMatch(/\.workspace-module-stack\s*\{[\s\S]*align-self:\s*safe center;/)
-    expect(styles).toContain('min-height: clamp(160px, 21dvh, 176px);')
-    expect(styles).toContain('min-height: clamp(214px, 28dvh, 236px);')
+    expect(styles).toMatch(/\.workspace-module-stack\s*\{[\s\S]*align-content:\s*start;/)
+    expect(styles).not.toContain('align-self: safe center')
+    expect(styles).not.toContain('min-height: clamp(')
   })
 
   it('keeps the workspace overview banner visually compact with a premium blue-white surface', () => {
@@ -146,7 +149,7 @@ describe('ModuleHubPage', () => {
       /\.workspace-hero-copy\s*\{[\s\S]*gap:\s*6px;/,
     )
     expect(styles).toMatch(
-      /\.workspace-hero h2\s*\{[\s\S]*font-size:\s*22px;/,
+      /\.workspace-hero h2\s*\{[\s\S]*font-size:\s*20px;/,
     )
     expect(styles).toMatch(
       /\.workspace-overview-stat\s*\{[\s\S]*padding:\s*0 18px;[\s\S]*min-height:\s*40px;/,
@@ -175,5 +178,54 @@ describe('ModuleHubPage', () => {
     )
     expect(styles).not.toContain('.workspace-secondary-module .module-card-copy p {\n  -webkit-line-clamp')
     expect(styles).not.toContain('.workspace-secondary-module .workspace-secondary-flow {\n  min-width: 0;\n  overflow: hidden;')
+  })
+
+  it('keeps a descending type scale from the shell title down to the module cards', () => {
+    const styles = fs.readFileSync(pagesCssPath, 'utf8')
+    const shellStyles = fs.readFileSync(appShellCssPath, 'utf8')
+
+    expect(shellStyles).toMatch(
+      /\.app-shell-workspace \.shell-topbar-copy h1\s*\{[\s\S]*font-size:\s*26px;/,
+    )
+    expect(styles).toMatch(/\.workspace-primary-module h2\s*\{\s*font-size:\s*24px;/)
+    expect(styles).toMatch(/\.workspace-secondary-module h2\s*\{\s*font-size:\s*20px;/)
+  })
+
+  it('does not let the removed hero subtitle rule outrank the hero kicker', () => {
+    const styles = fs.readFileSync(pagesCssPath, 'utf8')
+
+    // `.workspace-hero p` is (0,1,1) and silently overrode `.workspace-hero-kicker`
+    expect(styles).not.toMatch(/\.workspace-hero p\s*\{/)
+    expect(styles).toMatch(/\.workspace-hero-kicker\s*\{[\s\S]*font-size:\s*11px;/)
+  })
+
+  it('meets AA contrast on the small grey workspace labels', () => {
+    const styles = fs.readFileSync(pagesCssPath, 'utf8')
+
+    expect(styles).toMatch(/\.workspace-overview-stat span\s*\{\s*color:\s*#5a6a80;/)
+    expect(styles).toMatch(/\.workspace-secondary-flow\s*\{[\s\S]*color:\s*#5a6a80;/)
+    expect(styles).not.toContain('#6c7a90')
+  })
+
+  it('keeps each module accent colour on the stacked mobile cards', () => {
+    const styles = fs.readFileSync(pagesCssPath, 'utf8')
+
+    // this group flipped border-left to a generic border-top and wiped is-knowledge / is-management
+    expect(styles).not.toMatch(
+      /\.workspace-secondary-module \+ \.workspace-secondary-module\s*\{\s*border-left:\s*0;/,
+    )
+    expect(styles).toMatch(/\.workspace-secondary-module\.is-knowledge\s*\{\s*border-top-color:\s*#4f75cf;/)
+    expect(styles).toMatch(/\.workspace-secondary-module\.is-management\s*\{\s*border-top-color:\s*#153a73;/)
+  })
+
+  it('sizes the module cards to their content instead of a fixed floor', () => {
+    const styles = fs.readFileSync(pagesCssPath, 'utf8')
+
+    expect(styles).toMatch(/\.workspace-secondary-module\s*\{[^}]*grid-template-rows:\s*auto auto auto;/)
+    expect(styles).not.toMatch(/\.workspace-secondary-module\s*\{[^}]*min-height:\s*204px;/)
+    expect(styles).not.toMatch(/\.workspace-primary-module\.workspace-module-card\s*\{[^}]*min-height:/)
+    // the button follows the copy instead of being pinned to a stretched bottom row
+    expect(styles).toMatch(/\.workspace-secondary-module \.module-card-footer\s*\{[^}]*justify-items:\s*start;/)
+    expect(styles).not.toMatch(/\.workspace-secondary-module \.module-card-footer\s*\{[^}]*align-self:\s*end;/)
   })
 })
